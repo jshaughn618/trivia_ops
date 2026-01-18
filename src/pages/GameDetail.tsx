@@ -95,7 +95,14 @@ export function GameDetailPage() {
             </div>
           </div>
         </Panel>
-        <Panel title="Editions">
+        <Panel
+          title="Editions"
+          action={
+            <Link to="/editions/new" className="text-xs font-display uppercase tracking-[0.25em] text-accent">
+              Add Edition
+            </Link>
+          }
+        >
           <div className="flex flex-col gap-3">
             {editions.length === 0 && (
               <div className="text-xs uppercase tracking-[0.2em] text-muted">No editions yet.</div>
