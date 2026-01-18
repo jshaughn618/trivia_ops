@@ -56,6 +56,9 @@ export function DashboardPage() {
             <ButtonLink to="/editions/new" variant="secondary">
               Build Edition
             </ButtonLink>
+            <ButtonLink to="/games" variant="secondary">
+              Games
+            </ButtonLink>
             <ButtonLink to="/events" variant="secondary">
               Run Event
             </ButtonLink>

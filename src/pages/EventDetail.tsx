@@ -5,7 +5,7 @@ import { AppShell } from '../components/AppShell';
 import { Panel } from '../components/Panel';
 import { PrimaryButton, SecondaryButton, DangerButton, ButtonLink } from '../components/Buttons';
 import { StampBadge } from '../components/StampBadge';
-import type { Event, EventRound, GameEdition, Team } from '../types';
+import type { Event, EventRound, GameEdition, Team, Location } from '../types';
 
 export function EventDetailPage() {
   const { eventId } = useParams();
@@ -13,8 +13,10 @@ export function EventDetailPage() {
   const [rounds, setRounds] = useState<EventRound[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [editions, setEditions] = useState<GameEdition[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
   const [status, setStatus] = useState('planned');
   const [notes, setNotes] = useState('');
+  const [locationId, setLocationId] = useState('');
   const [roundLabel, setRoundLabel] = useState('');
   const [roundEditionId, setRoundEditionId] = useState('');
   const [teamName, setTeamName] = useState('');
@@ -22,20 +24,23 @@ export function EventDetailPage() {
 
   const load = async () => {
     if (!eventId) return;
-    const [eventRes, roundsRes, teamsRes, editionsRes] = await Promise.all([
+    const [eventRes, roundsRes, teamsRes, editionsRes, locationsRes] = await Promise.all([
       api.getEvent(eventId),
       api.listEventRounds(eventId),
       api.listTeams(eventId),
-      api.listEditions()
+      api.listEditions(),
+      api.listLocations()
     ]);
     if (eventRes.ok) {
       setEvent(eventRes.data);
       setStatus(eventRes.data.status);
       setNotes(eventRes.data.notes ?? '');
+      setLocationId(eventRes.data.location_id ?? '');
     }
     if (roundsRes.ok) setRounds(roundsRes.data.sort((a, b) => a.round_number - b.round_number));
     if (teamsRes.ok) setTeams(teamsRes.data);
     if (editionsRes.ok) setEditions(editionsRes.data);
+    if (locationsRes.ok) setLocations(locationsRes.data);
   };
 
   useEffect(() => {
@@ -48,7 +53,7 @@ export function EventDetailPage() {
 
   const updateEvent = async () => {
     if (!eventId) return;
-    const res = await api.updateEvent(eventId, { status, notes });
+    const res = await api.updateEvent(eventId, { status, notes, location_id: locationId || null });
     if (res.ok) setEvent(res.data);
   };
 
@@ -107,6 +112,21 @@ export function EventDetailPage() {
               <span>Starts</span>
               <span>{new Date(event.starts_at).toLocaleString()}</span>
             </div>
+            <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+              Location
+              <select
+                className="h-10 px-3"
+                value={locationId}
+                onChange={(event) => setLocationId(event.target.value)}
+              >
+                <option value="">No location</option>
+                {locations.map((location) => (
+                  <option key={location.id} value={location.id}>
+                    {location.name}
+                  </option>
+                ))}
+              </select>
+            </label>
             <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
               Status
               <select className="h-10 px-3" value={status} onChange={(event) => setStatus(event.target.value)}>
