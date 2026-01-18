@@ -1,0 +1,41 @@
+import type { Env } from '../../types';
+import { jsonError, jsonOk } from '../../responses';
+import { parseJson } from '../../request';
+import { locationUpdateSchema } from '../../../shared/validators';
+import { execute, queryFirst } from '../../db';
+
+export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
+  const row = await queryFirst(env, 'SELECT * FROM locations WHERE id = ?', [params.id]);
+  if (!row) {
+    return jsonError({ code: 'not_found', message: 'Location not found' }, 404);
+  }
+  return jsonOk(row);
+};
+
+export const onRequestPut: PagesFunction<Env> = async ({ env, params, request }) => {
+  const payload = await parseJson(request);
+  const parsed = locationUpdateSchema.safeParse(payload);
+  if (!parsed.success) {
+    return jsonError({ code: 'validation_error', message: 'Invalid location update', details: parsed.error.flatten() }, 400);
+  }
+
+  const existing = await queryFirst(env, 'SELECT * FROM locations WHERE id = ?', [params.id]);
+  if (!existing) {
+    return jsonError({ code: 'not_found', message: 'Location not found' }, 404);
+  }
+
+  const data = { ...existing, ...parsed.data };
+  await execute(
+    env,
+    `UPDATE locations SET name = ?, address = ?, city = ?, state = ?, notes = ? WHERE id = ?`,
+    [data.name, data.address ?? null, data.city ?? null, data.state ?? null, data.notes ?? null, params.id]
+  );
+
+  const row = await queryFirst(env, 'SELECT * FROM locations WHERE id = ?', [params.id]);
+  return jsonOk(row);
+};
+
+export const onRequestDelete: PagesFunction<Env> = async ({ env, params }) => {
+  await execute(env, 'DELETE FROM locations WHERE id = ?', [params.id]);
+  return jsonOk({ ok: true });
+};

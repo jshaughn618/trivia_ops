@@ -1,0 +1,33 @@
+@import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600&family=Oswald:wght@500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #0f1114;
+  --panel: #171a1f;
+  --panel2: #1f2329;
+  --text: #f2f2ee;
+  --muted: #a5abb4;
+  --border: #31363f;
+  --accent: #f3c400;
+  --danger: #b5302a;
+}
+
+body {
+  @apply bg-bg text-text font-body;
+  min-height: 100vh;
+}
+
+h1, h2, h3, h4 {
+  @apply font-display uppercase tracking-wider;
+}
+
+input, select, textarea {
+  @apply bg-panel2 border border-border text-text placeholder:text-muted;
+}
+
+::selection {
+  background: #3a3f47;
+}
