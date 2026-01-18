@@ -46,7 +46,9 @@ export function DashboardPage() {
         <Link to="/events?status=planned">
           <StatTile label="Planned Events" value={String(plannedCount)} helper="Scheduled" />
         </Link>
-        <StatTile label="Draft Editions" value={String(draftCount)} helper="Build Queue" />
+        <Link to="/editions?status=draft">
+          <StatTile label="Draft Editions" value={String(draftCount)} helper="Build Queue" />
+        </Link>
       </div>
 
       <div className="mt-6 grid gap-4 md:grid-cols-3">

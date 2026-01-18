@@ -28,10 +28,7 @@ export function LoginPage() {
   return (
     <div className="min-h-screen bg-bg text-text flex items-center justify-center px-4">
       <div className="w-full max-w-md border-2 border-border bg-panel p-6">
-        <div className="flex items-center gap-3">
-          <img src="/trivia_ops_icon.png" alt="" className="h-10 w-10 border-2 border-border bg-panel2 p-1" />
-          <img src={logo} alt="Trivia Ops" className="h-10 w-auto" />
-        </div>
+        <img src={logo} alt="Trivia Ops" className="h-16 w-auto" />
         <h1 className="mt-4 text-2xl font-display uppercase tracking-[0.35em]">Login</h1>
         <p className="mt-2 text-xs uppercase tracking-[0.2em] text-muted">
           Industrial Control Access

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { api } from '../api';
 import { AppShell } from '../components/AppShell';
 import { Panel } from '../components/Panel';
@@ -12,6 +12,7 @@ export function EditionsPage() {
   const [gameId, setGameId] = useState('');
   const [status, setStatus] = useState('');
   const [tag, setTag] = useState('');
+  const location = useLocation();
 
   const load = async () => {
     const [gamesRes, editionsRes] = await Promise.all([
@@ -23,8 +24,11 @@ export function EditionsPage() {
   };
 
   useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const nextStatus = params.get('status') ?? '';
+    setStatus(nextStatus);
     load();
-  }, []);
+  }, [location.search]);
 
   return (
     <AppShell title="Editions">
