@@ -18,9 +18,8 @@ export function HeaderBar() {
   return (
     <header className="border-b-2 border-border bg-panel px-4 py-3">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
-        <Link to="/dashboard" className="flex items-center gap-3">
+        <Link to="/dashboard" className="flex items-center">
           <img src={logo} alt="Trivia Ops" className="h-8 w-auto" />
-          <span className="text-lg font-display uppercase tracking-[0.3em]">Trivia Ops</span>
         </Link>
         <button
           type="button"
