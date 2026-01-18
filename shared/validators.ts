@@ -137,6 +137,12 @@ export const mediaUploadSchema = z.object({
   kind: z.enum(['image', 'audio'])
 });
 
+export const aiGenerateSchema = z.object({
+  prompt: z.string().min(1),
+  model: z.string().min(1).optional(),
+  max_output_tokens: z.number().int().min(1).max(2000).optional()
+});
+
 export const userCreateSchema = z.object({
   email: emailSchema,
   password: passwordSchema,

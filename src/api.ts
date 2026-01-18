@@ -55,6 +55,8 @@ export const api = {
   updateUser: (id: string, payload: Partial<User> & { password?: string }) =>
     apiFetch<User>(`/api/users/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
   deleteUser: (id: string) => apiFetch<{ ok: true }>(`/api/users/${id}`, { method: 'DELETE' }),
+  aiGenerate: (payload: { prompt: string; model?: string; max_output_tokens?: number }) =>
+    apiFetch<{ text: string }>('/api/ai/generate', { method: 'POST', body: JSON.stringify(payload) }),
 
   listLocations: () => apiFetch<Location[]>('/api/locations'),
   createLocation: (payload: Partial<Location>) =>
