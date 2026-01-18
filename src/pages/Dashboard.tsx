@@ -43,7 +43,9 @@ export function DashboardPage() {
     <AppShell title="Dashboard">
       <div className="grid gap-4 md:grid-cols-3">
         <StatTile label="Live Events" value={String(liveCount)} helper="On Air" />
-        <StatTile label="Planned Events" value={String(plannedCount)} helper="Scheduled" />
+        <Link to="/events?status=planned">
+          <StatTile label="Planned Events" value={String(plannedCount)} helper="Scheduled" />
+        </Link>
         <StatTile label="Draft Editions" value={String(draftCount)} helper="Build Queue" />
       </div>
 

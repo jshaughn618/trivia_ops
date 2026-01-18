@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { api } from '../api';
 import { AppShell } from '../components/AppShell';
 import { Panel } from '../components/Panel';
@@ -10,6 +10,7 @@ import type { Event } from '../types';
 export function EventsPage() {
   const [events, setEvents] = useState<Event[]>([]);
   const [filter, setFilter] = useState('');
+  const location = useLocation();
 
   const load = async () => {
     const res = await api.listEvents();
@@ -17,8 +18,11 @@ export function EventsPage() {
   };
 
   useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const status = params.get('status') ?? '';
+    setFilter(status);
     load();
-  }, []);
+  }, [location.search]);
 
   const filtered = useMemo(() => {
     return filter ? events.filter((event) => event.status === filter) : events;
