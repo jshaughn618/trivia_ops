@@ -11,6 +11,4 @@ binding = "BUCKET"
 bucket_name = "trivia-ops-media"
 
 [vars]
-SESSION_SECRET = "REPLACE_ME"
 SESSION_TTL_HOURS = "24"
-OPENAI_API_KEY = "REPLACE_ME"
