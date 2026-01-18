@@ -4,36 +4,41 @@ import { api } from '../api';
 import { AppShell } from '../components/AppShell';
 import { Panel } from '../components/Panel';
 import { PrimaryButton, SecondaryButton, DangerButton } from '../components/Buttons';
-import type { Game, GameEdition } from '../types';
+import type { Game, GameEdition, GameType } from '../types';
 
 export function GameDetailPage() {
   const { gameId } = useParams();
   const navigate = useNavigate();
   const [game, setGame] = useState<Game | null>(null);
   const [editions, setEditions] = useState<GameEdition[]>([]);
+  const [gameTypes, setGameTypes] = useState<GameType[]>([]);
   const [name, setName] = useState('');
+  const [gameTypeId, setGameTypeId] = useState('');
   const [description, setDescription] = useState('');
 
   useEffect(() => {
     const load = async () => {
       if (!gameId) return;
-      const [gameRes, editionsRes] = await Promise.all([
+      const [gameRes, editionsRes, typesRes] = await Promise.all([
         api.getGame(gameId),
-        api.listEditions({ game_id: gameId })
+        api.listEditions({ game_id: gameId }),
+        api.listGameTypes()
       ]);
       if (gameRes.ok) {
         setGame(gameRes.data);
         setName(gameRes.data.name);
+        setGameTypeId(gameRes.data.game_type_id);
         setDescription(gameRes.data.description ?? '');
       }
       if (editionsRes.ok) setEditions(editionsRes.data);
+      if (typesRes.ok) setGameTypes(typesRes.data);
     };
     load();
   }, [gameId]);
 
   const handleUpdate = async () => {
     if (!gameId) return;
-    const res = await api.updateGame(gameId, { name, description });
+    const res = await api.updateGame(gameId, { name, description, game_type_id: gameTypeId });
     if (res.ok) setGame(res.data);
   };
 
@@ -59,6 +64,21 @@ export function GameDetailPage() {
             <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
               Name
               <input className="h-10 px-3" value={name} onChange={(event) => setName(event.target.value)} />
+            </label>
+            <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+              Game Type
+              <select
+                className="h-10 px-3"
+                value={gameTypeId}
+                onChange={(event) => setGameTypeId(event.target.value)}
+              >
+                <option value="">Select a type</option>
+                {gameTypes.map((type) => (
+                  <option key={type.id} value={type.id}>
+                    {type.name}
+                  </option>
+                ))}
+              </select>
             </label>
             <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
               Description

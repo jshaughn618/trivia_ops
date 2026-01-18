@@ -10,6 +10,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
       ei.edition_id,
       COALESCE(eri.overridden_prompt, ei.prompt) AS prompt,
       COALESCE(eri.overridden_answer, ei.answer) AS answer,
+      ei.answer_a,
+      ei.answer_b,
       COALESCE(eri.overridden_fun_fact, ei.fun_fact) AS fun_fact,
       eri.ordinal AS ordinal,
       ei.media_type,

@@ -44,8 +44,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
 
   await execute(
     env,
-    `INSERT INTO editions (id, game_id, title, description, status, tags_csv, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO editions (id, game_id, title, description, status, tags_csv, theme, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ,
     [
       id,
@@ -54,6 +54,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       data.description ?? null,
       data.status,
       data.tags_csv ?? null,
+      data.theme ?? null,
       createdAt,
       createdAt
     ]

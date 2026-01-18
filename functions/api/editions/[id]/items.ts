@@ -27,14 +27,16 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request }
   await execute(
     env,
     `INSERT INTO edition_items
-     (id, edition_id, prompt, answer, fun_fact, ordinal, media_type, media_key, media_caption, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+     (id, edition_id, prompt, answer, answer_a, answer_b, fun_fact, ordinal, media_type, media_key, media_caption, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ,
     [
       id,
       params.id,
       data.prompt,
-      data.answer,
+      data.answer ?? '',
+      data.answer_a ?? null,
+      data.answer_b ?? null,
       data.fun_fact ?? null,
       data.ordinal,
       data.media_type ?? null,

@@ -11,6 +11,7 @@ export function EditionNewPage() {
   const [gameId, setGameId] = useState('');
   const [title, setTitle] = useState('');
   const [tags, setTags] = useState('');
+  const [theme, setTheme] = useState('');
   const [description, setDescription] = useState('');
   const navigate = useNavigate();
 
@@ -26,6 +27,7 @@ export function EditionNewPage() {
       game_id: gameId,
       title,
       tags_csv: tags,
+      theme,
       description,
       status: 'draft'
     });
@@ -56,6 +58,10 @@ export function EditionNewPage() {
           <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
             Tags (comma separated)
             <input className="h-10 px-3" value={tags} onChange={(event) => setTags(event.target.value)} />
+          </label>
+          <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+            Theme
+            <input className="h-10 px-3" value={theme} onChange={(event) => setTheme(event.target.value)} />
           </label>
           <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
             Description

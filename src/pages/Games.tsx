@@ -4,17 +4,20 @@ import { api } from '../api';
 import { AppShell } from '../components/AppShell';
 import { Panel } from '../components/Panel';
 import { PrimaryButton, SecondaryButton } from '../components/Buttons';
-import type { Game } from '../types';
+import type { Game, GameType } from '../types';
 
 export function GamesPage() {
   const [games, setGames] = useState<Game[]>([]);
+  const [gameTypes, setGameTypes] = useState<GameType[]>([]);
   const [name, setName] = useState('');
+  const [gameTypeId, setGameTypeId] = useState('');
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
 
   const load = async () => {
-    const res = await api.listGames();
-    if (res.ok) setGames(res.data);
+    const [gamesRes, typesRes] = await Promise.all([api.listGames(), api.listGameTypes()]);
+    if (gamesRes.ok) setGames(gamesRes.data);
+    if (typesRes.ok) setGameTypes(typesRes.data);
   };
 
   useEffect(() => {
@@ -22,13 +25,14 @@ export function GamesPage() {
   }, []);
 
   const handleCreate = async () => {
-    if (!name.trim()) return;
+    if (!name.trim() || !gameTypeId) return;
     setLoading(true);
-    const res = await api.createGame({ name, description });
+    const res = await api.createGame({ name, description, game_type_id: gameTypeId });
     setLoading(false);
     if (res.ok) {
       setName('');
       setDescription('');
+      setGameTypeId('');
       load();
     }
   };
@@ -58,6 +62,17 @@ export function GamesPage() {
               <input className="h-10 px-3" value={name} onChange={(event) => setName(event.target.value)} />
             </label>
             <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+              Game Type
+              <select className="h-10 px-3" value={gameTypeId} onChange={(event) => setGameTypeId(event.target.value)}>
+                <option value="">Select a type</option>
+                {gameTypes.map((type) => (
+                  <option key={type.id} value={type.id}>
+                    {type.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
               Description
               <textarea
                 className="min-h-[80px] px-3 py-2"
@@ -73,6 +88,7 @@ export function GamesPage() {
                 onClick={() => {
                   setName('');
                   setDescription('');
+                  setGameTypeId('');
                 }}
               >
                 Clear

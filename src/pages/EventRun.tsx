@@ -112,7 +112,11 @@ export function EventRunPage() {
               {item && showAnswer && (
                 <div className="border-2 border-border bg-panel p-4">
                   <div className="text-xs uppercase tracking-[0.2em] text-muted">Answer</div>
-                  <div className="mt-2 text-base font-display uppercase tracking-[0.2em]">{item.answer}</div>
+                  <div className="mt-2 text-base font-display uppercase tracking-[0.2em]">
+                    {item.answer || (item.answer_a && item.answer_b
+                      ? `A: ${item.answer_a} / B: ${item.answer_b}`
+                      : '')}
+                  </div>
                 </div>
               )}
               {item && showFact && item.fun_fact && (

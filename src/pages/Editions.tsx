@@ -43,7 +43,7 @@ export function EditionsPage() {
                 <div className="text-sm font-display uppercase tracking-[0.25em]">{edition.title}</div>
                 <div className="mt-1 flex items-center justify-between text-xs uppercase tracking-[0.2em] text-muted">
                   <span>{edition.status}</span>
-                  <span>{edition.tags_csv ?? 'No tags'}</span>
+                  <span>{edition.theme ?? edition.tags_csv ?? 'No tags'}</span>
                 </div>
               </Link>
             ))}

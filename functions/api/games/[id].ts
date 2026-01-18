@@ -27,8 +27,8 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request })
   const data = { ...existing, ...parsed.data };
   await execute(
     env,
-    `UPDATE games SET name = ?, description = ?, default_settings_json = ? WHERE id = ?`,
-    [data.name, data.description ?? null, data.default_settings_json ?? null, params.id]
+    `UPDATE games SET name = ?, game_type_id = ?, description = ?, default_settings_json = ? WHERE id = ?`,
+    [data.name, data.game_type_id, data.description ?? null, data.default_settings_json ?? null, params.id]
   );
 
   const row = await queryFirst(env, 'SELECT * FROM games WHERE id = ?', [params.id]);

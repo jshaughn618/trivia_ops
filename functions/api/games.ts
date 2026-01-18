@@ -2,7 +2,7 @@ import type { Env } from '../types';
 import { jsonError, jsonOk } from '../responses';
 import { parseJson } from '../request';
 import { gameCreateSchema } from '../../shared/validators';
-import { execute, nowIso, queryAll } from '../db';
+import { execute, nowIso, queryAll, queryFirst } from '../db';
 
 export const onRequestGet: PagesFunction<Env> = async ({ env }) => {
   const rows = await queryAll(env, 'SELECT * FROM games ORDER BY created_at DESC');
@@ -20,12 +20,20 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const createdAt = nowIso();
   const data = parsed.data;
 
+  const gameType = await queryFirst<{ default_settings_json: string | null }>(
+    env,
+    'SELECT default_settings_json FROM game_types WHERE id = ? AND deleted = 0',
+    [data.game_type_id]
+  );
+
+  const defaultSettings = data.default_settings_json ?? gameType?.default_settings_json ?? null;
+
   await execute(
     env,
-    `INSERT INTO games (id, name, description, default_settings_json, created_at)
-     VALUES (?, ?, ?, ?, ?)`
+    `INSERT INTO games (id, name, game_type_id, description, default_settings_json, created_at)
+     VALUES (?, ?, ?, ?, ?, ?)`
     ,
-    [id, data.name, data.description ?? null, data.default_settings_json ?? null, createdAt]
+    [id, data.name, data.game_type_id, data.description ?? null, defaultSettings, createdAt]
   );
 
   const rows = await queryAll(env, 'SELECT * FROM games WHERE id = ?', [id]);

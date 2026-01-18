@@ -17,11 +17,17 @@ export const locationUpdateSchema = locationCreateSchema.partial();
 
 export const gameCreateSchema = z.object({
   name: z.string().min(1),
+  game_type_id: idSchema,
   description: z.string().nullable().optional(),
   default_settings_json: z.string().nullable().optional()
 });
 
-export const gameUpdateSchema = gameCreateSchema.partial();
+export const gameUpdateSchema = z.object({
+  name: z.string().min(1).optional(),
+  game_type_id: idSchema.optional(),
+  description: z.string().nullable().optional(),
+  default_settings_json: z.string().nullable().optional()
+});
 
 const editionStatusSchema = z.enum(['draft', 'published', 'archived']);
 const eventStatusSchema = z.enum(['planned', 'live', 'completed', 'canceled']);
@@ -33,7 +39,8 @@ export const editionCreateSchema = z.object({
   title: z.string().min(1),
   description: z.string().nullable().optional(),
   status: editionStatusSchema.default('draft'),
-  tags_csv: z.string().nullable().optional()
+  tags_csv: z.string().nullable().optional(),
+  theme: z.string().nullable().optional()
 });
 
 export const editionUpdateSchema = z.object({
@@ -41,12 +48,15 @@ export const editionUpdateSchema = z.object({
   title: z.string().min(1).optional(),
   description: z.string().nullable().optional(),
   status: editionStatusSchema.optional(),
-  tags_csv: z.string().nullable().optional()
+  tags_csv: z.string().nullable().optional(),
+  theme: z.string().nullable().optional()
 });
 
-export const editionItemCreateSchema = z.object({
+const editionItemBaseSchema = z.object({
   prompt: z.string().min(1),
-  answer: z.string().min(1),
+  answer: z.string().min(1).optional(),
+  answer_a: z.string().min(1).optional(),
+  answer_b: z.string().min(1).optional(),
   fun_fact: z.string().nullable().optional(),
   ordinal: z.number().int().min(0),
   media_type: z.enum(['image', 'audio']).nullable().optional(),
@@ -54,7 +64,32 @@ export const editionItemCreateSchema = z.object({
   media_caption: z.string().nullable().optional()
 });
 
-export const editionItemUpdateSchema = editionItemCreateSchema.partial();
+export const editionItemCreateSchema = editionItemBaseSchema.refine(
+  (data) => Boolean(data.answer) || (Boolean(data.answer_a) && Boolean(data.answer_b)),
+  {
+    message: 'Provide an answer or both answer_a and answer_b',
+    path: ['answer']
+  }
+);
+
+export const editionItemUpdateSchema = editionItemBaseSchema
+  .partial()
+  .refine(
+    (data) =>
+      data.answer !== undefined ||
+      data.answer_a !== undefined ||
+      data.answer_b !== undefined ||
+      data.prompt !== undefined ||
+      data.fun_fact !== undefined ||
+      data.ordinal !== undefined ||
+      data.media_type !== undefined ||
+      data.media_key !== undefined ||
+      data.media_caption !== undefined,
+    {
+      message: 'No fields provided',
+      path: ['answer']
+    }
+  );
 
 export const eventCreateSchema = z.object({
   title: z.string().min(1),

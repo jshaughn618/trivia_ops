@@ -38,7 +38,16 @@ export type Location = {
 export type Game = {
   id: Id;
   name: string;
+  game_type_id: Id;
   description: string | null;
+  default_settings_json: string | null;
+  created_at: string;
+};
+
+export type GameType = {
+  id: Id;
+  name: string;
+  code: string;
   default_settings_json: string | null;
   created_at: string;
 };
@@ -50,6 +59,7 @@ export type GameEdition = {
   description: string | null;
   status: EditionStatus;
   tags_csv: string | null;
+  theme: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -59,6 +69,8 @@ export type EditionItem = {
   edition_id: Id;
   prompt: string;
   answer: string;
+  answer_a: string | null;
+  answer_b: string | null;
   fun_fact: string | null;
   ordinal: number;
   media_type: MediaType | null;

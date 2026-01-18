@@ -5,6 +5,7 @@ import type {
   EventRound,
   Game,
   GameEdition,
+  GameType,
   Location,
   Team,
   User
@@ -41,6 +42,7 @@ export const api = {
       body: JSON.stringify({ email, password })
     }),
   logout: () => apiFetch<{ ok: true }>('/api/logout', { method: 'POST' }),
+  listGameTypes: () => apiFetch<GameType[]>('/api/game-types'),
   listUsers: () => apiFetch<User[]>('/api/users'),
   createUser: (payload: {
     email: string;

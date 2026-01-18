@@ -10,6 +10,8 @@ import type { EditionItem, GameEdition } from '../types';
 const emptyItem = {
   prompt: '',
   answer: '',
+  answer_a: '',
+  answer_b: '',
   fun_fact: '',
   media_caption: ''
 };
@@ -24,7 +26,9 @@ export function EditionDetailPage() {
   const [title, setTitle] = useState('');
   const [status, setStatus] = useState('draft');
   const [tags, setTags] = useState('');
+  const [theme, setTheme] = useState('');
   const [description, setDescription] = useState('');
+  const [gameTypeId, setGameTypeId] = useState('');
 
   const load = async () => {
     if (!editionId) return;
@@ -37,7 +41,10 @@ export function EditionDetailPage() {
       setTitle(editionRes.data.title);
       setStatus(editionRes.data.status);
       setTags(editionRes.data.tags_csv ?? '');
+      setTheme(editionRes.data.theme ?? '');
       setDescription(editionRes.data.description ?? '');
+      const gameRes = await api.getGame(editionRes.data.game_id);
+      if (gameRes.ok) setGameTypeId(gameRes.data.game_type_id);
     }
     if (itemsRes.ok) {
       setItems(itemsRes.data.sort((a, b) => a.ordinal - b.ordinal));
@@ -58,6 +65,7 @@ export function EditionDetailPage() {
       title,
       status,
       tags_csv: tags,
+      theme,
       description
     });
     if (res.ok) setEdition(res.data);
@@ -71,10 +79,17 @@ export function EditionDetailPage() {
 
   const handleCreateItem = async () => {
     if (!editionId) return;
-    if (!itemDraft.prompt.trim() || !itemDraft.answer.trim()) return;
+    if (!itemDraft.prompt.trim()) return;
+    if (gameTypeId === 'audio') {
+      if (!itemDraft.answer_a.trim() || !itemDraft.answer_b.trim()) return;
+    } else if (!itemDraft.answer.trim()) {
+      return;
+    }
     const res = await api.createEditionItem(editionId, {
       prompt: itemDraft.prompt,
       answer: itemDraft.answer,
+      answer_a: itemDraft.answer_a || null,
+      answer_b: itemDraft.answer_b || null,
       fun_fact: itemDraft.fun_fact || null,
       media_caption: itemDraft.media_caption || null,
       ordinal: nextOrdinal
@@ -90,6 +105,8 @@ export function EditionDetailPage() {
     setItemDraft({
       prompt: item.prompt,
       answer: item.answer,
+      answer_a: item.answer_a ?? '',
+      answer_b: item.answer_b ?? '',
       fun_fact: item.fun_fact ?? '',
       media_caption: item.media_caption ?? ''
     });
@@ -104,6 +121,8 @@ export function EditionDetailPage() {
     const res = await api.updateEditionItem(item.id, {
       prompt: itemDraft.prompt,
       answer: itemDraft.answer,
+      answer_a: itemDraft.answer_a || null,
+      answer_b: itemDraft.answer_b || null,
       fun_fact: itemDraft.fun_fact || null,
       media_caption: itemDraft.media_caption || null
     });
@@ -168,6 +187,10 @@ export function EditionDetailPage() {
               <input className="h-10 px-3" value={tags} onChange={(event) => setTags(event.target.value)} />
             </label>
             <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+              Theme
+              <input className="h-10 px-3" value={theme} onChange={(event) => setTheme(event.target.value)} />
+            </label>
+            <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
               Description
               <textarea
                 className="min-h-[100px] px-3 py-2"
@@ -188,7 +211,11 @@ export function EditionDetailPage() {
               <tr key={item.id} className="bg-panel">
                 <td className="px-3 py-2 text-xs text-muted">{item.ordinal}</td>
                 <td className="px-3 py-2 text-xs text-text">{item.prompt}</td>
-                <td className="px-3 py-2 text-xs text-text">{item.answer}</td>
+                <td className="px-3 py-2 text-xs text-text">
+                  {item.answer || (item.answer_a && item.answer_b
+                    ? `A: ${item.answer_a} / B: ${item.answer_b}`
+                    : '')}
+                </td>
                 <td className="px-3 py-2 text-xs text-muted">
                   {item.media_key ? item.media_type : 'None'}
                 </td>
@@ -233,8 +260,29 @@ export function EditionDetailPage() {
                   className="h-10 px-3"
                   value={itemDraft.answer}
                   onChange={(event) => setItemDraft((draft) => ({ ...draft, answer: event.target.value }))}
+                  disabled={gameTypeId === 'audio'}
                 />
               </label>
+              {gameTypeId === 'audio' && (
+                <>
+                  <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+                    Answer A
+                    <input
+                      className="h-10 px-3"
+                      value={itemDraft.answer_a}
+                      onChange={(event) => setItemDraft((draft) => ({ ...draft, answer_a: event.target.value }))}
+                    />
+                  </label>
+                  <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+                    Answer B
+                    <input
+                      className="h-10 px-3"
+                      value={itemDraft.answer_b}
+                      onChange={(event) => setItemDraft((draft) => ({ ...draft, answer_b: event.target.value }))}
+                    />
+                  </label>
+                </>
+              )}
               <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
                 Fun Fact
                 <textarea
