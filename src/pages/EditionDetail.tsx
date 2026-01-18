@@ -29,6 +29,11 @@ export function EditionDetailPage() {
   const [theme, setTheme] = useState('');
   const [description, setDescription] = useState('');
   const [gameTypeId, setGameTypeId] = useState('');
+  const [refineOpen, setRefineOpen] = useState(false);
+  const [refineLoading, setRefineLoading] = useState(false);
+  const [refineOptions, setRefineOptions] = useState<string[]>([]);
+  const [refineError, setRefineError] = useState<string | null>(null);
+  const [refineSeed, setRefineSeed] = useState('');
 
   const load = async () => {
     if (!editionId) return;
@@ -157,6 +162,38 @@ export function EditionDetailPage() {
     }
   };
 
+  const startRefine = async () => {
+    if (!itemDraft.prompt.trim()) return;
+    setRefineOpen(true);
+    setRefineLoading(true);
+    setRefineError(null);
+    setRefineSeed(itemDraft.prompt.trim());
+
+    const prompt = `Rewrite the following trivia question into 5 distinct, clean pub-trivia ready versions. Return as a numbered list only.\n\nQuestion: ${itemDraft.prompt.trim()}`;
+    const res = await api.aiGenerate({ prompt, max_output_tokens: 300 });
+    setRefineLoading(false);
+    if (!res.ok) {
+      setRefineError(res.error.message);
+      setRefineOptions([]);
+      return;
+    }
+    const options = res.data.text
+      .split('\n')
+      .map((line) => line.replace(/^\s*\d+[\).]\s*/, '').trim())
+      .filter(Boolean);
+    setRefineOptions(options.slice(0, 5));
+  };
+
+  const applyRefine = (value: string) => {
+    setItemDraft((draft) => ({ ...draft, prompt: value }));
+    setRefineOpen(false);
+  };
+
+  const keepOriginal = () => {
+    setItemDraft((draft) => ({ ...draft, prompt: refineSeed || draft.prompt }));
+    setRefineOpen(false);
+  };
+
   if (!edition) {
     return (
       <AppShell title="Edition Detail">
@@ -247,7 +284,16 @@ export function EditionDetailPage() {
             <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">Add Item</div>
             <div className="mt-3 grid gap-3">
               <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-                Prompt
+                <span className="flex items-center justify-between">
+                  Prompt
+                  <button
+                    type="button"
+                    onClick={startRefine}
+                    className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent hover:text-text"
+                  >
+                    Refine
+                  </button>
+                </span>
                 <input
                   className="h-10 px-3"
                   value={itemDraft.prompt}
@@ -314,6 +360,52 @@ export function EditionDetailPage() {
                   <PrimaryButton onClick={handleCreateItem}>Add Item</PrimaryButton>
                 )}
               </div>
+              {refineOpen && (
+                <div className="border-2 border-border bg-panel2 p-3">
+                  <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">Refined Prompts</div>
+                  {refineLoading && (
+                    <div className="mt-2 text-xs uppercase tracking-[0.2em] text-muted">Generating…</div>
+                  )}
+                  {refineError && (
+                    <div className="mt-2 text-xs uppercase tracking-[0.2em] text-danger">{refineError}</div>
+                  )}
+                  <div className="mt-3 flex flex-col gap-2">
+                    {refineOptions.map((option) => (
+                      <button
+                        key={option}
+                        type="button"
+                        onClick={() => applyRefine(option)}
+                        className="border-2 border-border bg-panel px-3 py-2 text-left text-xs uppercase tracking-[0.2em] text-text hover:border-accent"
+                      >
+                        {option}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={startRefine}
+                      className="border-2 border-border px-3 py-2 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent hover:text-text"
+                    >
+                      Generate Again
+                    </button>
+                    <button
+                      type="button"
+                      onClick={keepOriginal}
+                      className="border-2 border-border px-3 py-2 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent hover:text-text"
+                    >
+                      Keep Original
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRefineOpen(false)}
+                      className="border-2 border-border px-3 py-2 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent hover:text-text"
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </Panel>
