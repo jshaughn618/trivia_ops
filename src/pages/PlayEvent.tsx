@@ -474,7 +474,13 @@ export function PlayEventPage() {
                 title="Leaderboard"
                 action={
                   <SecondaryButton
-                    onClick={() => window.open(`/play/${data.event.public_code}/leaderboard`, '_blank')}
+                    onClick={() =>
+                      navigate(
+                        `/play/${data.event.public_code}/leaderboard${
+                          teamId ? `?team_id=${teamId}` : ''
+                        }`
+                      )
+                    }
                   >
                     View Full Leaderboard
                   </SecondaryButton>

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api';
 import { Panel } from '../components/Panel';
 import { SecondaryButton } from '../components/Buttons';
@@ -23,12 +23,16 @@ type PublicLeaderboardResponse = {
 export function PlayLeaderboardPage() {
   const { code } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { theme, toggleTheme } = useTheme();
   const normalizedCode = useMemo(() => (code ?? '').trim().toUpperCase(), [code]);
   const storedTeamId = useMemo(() => {
     if (!normalizedCode) return '';
+    const params = new URLSearchParams(location.search);
+    const fromQuery = params.get('team_id');
+    if (fromQuery) return fromQuery;
     return localStorage.getItem(`player_team_code_${normalizedCode}`) ?? '';
-  }, [normalizedCode]);
+  }, [normalizedCode, location.search]);
   const [data, setData] = useState<PublicLeaderboardResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
