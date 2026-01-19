@@ -117,13 +117,20 @@ export function EventLeaderboardPage() {
                 ...orderedRounds.map((round) => `R${round.round_number}`),
                 'Total'
               ]}
-              rows={rows.map((row, index) => [
-                String(index + 1),
-                row.team.name,
-                ...orderedRounds.map((round) => String(row.roundScores[round.id] ?? 0)),
-                String(row.total)
-              ])}
-            />
+            >
+              {rows.map((row, index) => (
+                <tr key={row.team.id}>
+                  <td className="px-3 py-2 text-xs text-muted">{index + 1}</td>
+                  <td className="px-3 py-2 text-sm font-medium text-text">{row.team.name}</td>
+                  {orderedRounds.map((round) => (
+                    <td key={round.id} className="px-3 py-2 text-sm text-text">
+                      {row.roundScores[round.id] ?? 0}
+                    </td>
+                  ))}
+                  <td className="px-3 py-2 text-sm font-semibold text-text">{row.total}</td>
+                </tr>
+              ))}
+            </Table>
           )}
         </Panel>
       </div>

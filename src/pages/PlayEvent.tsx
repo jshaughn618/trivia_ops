@@ -286,8 +286,8 @@ export function PlayEventPage() {
           </div>
         </div>
 
-        <div className="grid gap-4 lg:grid-cols-[1.4fr,1fr]">
-          <div className={isLive ? 'lg:col-span-2' : undefined}>
+        <div className="grid gap-4 lg:grid-cols-[1fr,320px]">
+          <div className="flex flex-col gap-4">
             <Panel title="Now Showing">
               {!teamId ? (
                 <div className="text-sm text-muted">
@@ -399,6 +399,24 @@ export function PlayEventPage() {
                 waitingRoom
               )}
             </Panel>
+            {!isLive && (
+              <Panel title="Rounds">
+                <div className="flex flex-col gap-2">
+                  {data.rounds
+                    .filter((round) => round.status !== 'canceled')
+                    .map((round) => (
+                      <div key={round.id} className="rounded-md border border-border bg-panel2 px-3 py-2">
+                        <div className="text-sm text-muted">
+                          {round.round_number}. {round.label}
+                        </div>
+                        <div className="text-xs text-muted">
+                          {round.status === 'locked' ? 'completed' : round.status}
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </Panel>
+            )}
           </div>
 
           <div className="flex flex-col gap-4">
@@ -434,7 +452,14 @@ export function PlayEventPage() {
               </Panel>
             )}
             {!isLive && waitingShowLeaderboard && (
-              <Panel title="Leaderboard">
+              <Panel
+                title="Leaderboard"
+                action={
+                  <SecondaryButton onClick={() => window.open(`/events/${data.event.id}/leaderboard`, '_blank')}>
+                    View Full Leaderboard
+                  </SecondaryButton>
+                }
+              >
                 <div className="mt-1 flex flex-col gap-2">
                   {data.leaderboard.length === 0 && (
                     <div className="text-sm text-muted">No scores yet.</div>
@@ -458,27 +483,6 @@ export function PlayEventPage() {
             )}
           </div>
         </div>
-
-        {!isLive && (
-          <div className="mt-6">
-            <Panel title="Rounds">
-              <div className="flex flex-col gap-2">
-                {data.rounds
-                  .filter((round) => round.status !== 'canceled')
-                  .map((round) => (
-                    <div key={round.id} className="rounded-md border border-border bg-panel2 px-3 py-2">
-                      <div className="text-sm text-muted">
-                        {round.round_number}. {round.label}
-                      </div>
-                      <div className="text-xs text-muted">
-                        {round.status === 'locked' ? 'completed' : round.status}
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            </Panel>
-          </div>
-        )}
 
         <div className="mt-6">
           <SecondaryButton onClick={() => navigate('/login')}>Back to Login</SecondaryButton>
