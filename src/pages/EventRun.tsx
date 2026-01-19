@@ -320,11 +320,20 @@ export function EventRunPage() {
               {item && showAnswer && (
                 <div className="border-2 border-border bg-panel p-4">
                   <div className="text-xs uppercase tracking-[0.2em] text-muted">Answer</div>
-                  <div className="mt-2 text-base font-display uppercase tracking-[0.2em]">
-                    {item.answer || (item.answer_a && item.answer_b
-                      ? `${item.answer_a_label ? `${item.answer_a_label}: ` : 'A: '}${item.answer_a} / ${item.answer_b_label ? `${item.answer_b_label}: ` : 'B: '}${item.answer_b}`
-                      : '')}
-                  </div>
+                  {item.answer && !item.answer_a && !item.answer_b ? (
+                    <div className="mt-2 text-base font-display uppercase tracking-[0.2em]">{item.answer}</div>
+                  ) : (
+                    <div className="mt-2 flex flex-col gap-2 text-base font-display uppercase tracking-[0.2em]">
+                      <div>
+                        {item.answer_a_label ? `${item.answer_a_label}: ` : 'A: '}
+                        {item.answer_a || 'N/A'}
+                      </div>
+                      <div>
+                        {item.answer_b_label ? `${item.answer_b_label}: ` : 'B: '}
+                        {item.answer_b || 'N/A'}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
               {item && showFact && (
