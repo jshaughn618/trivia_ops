@@ -31,7 +31,7 @@ export const gameUpdateSchema = z.object({
 
 const editionStatusSchema = z.enum(['draft', 'published', 'archived']);
 const eventStatusSchema = z.enum(['planned', 'live', 'completed', 'canceled']);
-const eventRoundStatusSchema = z.enum(['planned', 'live', 'locked']);
+const eventRoundStatusSchema = z.enum(['planned', 'live', 'locked', 'completed']);
 const userTypeSchema = z.enum(['admin', 'host', 'player']);
 
 export const editionCreateSchema = z.object({

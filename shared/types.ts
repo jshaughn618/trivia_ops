@@ -2,7 +2,7 @@ export type Id = string;
 
 export type EditionStatus = 'draft' | 'published' | 'archived';
 export type EventStatus = 'planned' | 'live' | 'completed' | 'canceled';
-export type EventRoundStatus = 'planned' | 'live' | 'locked';
+export type EventRoundStatus = 'planned' | 'live' | 'locked' | 'completed';
 export type MediaType = 'image' | 'audio';
 
 export type ApiError = {
