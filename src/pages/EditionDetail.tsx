@@ -385,10 +385,24 @@ export function EditionDetailPage() {
   };
 
   const generateFunFact = async () => {
-    if (!itemDraft.prompt.trim() && !itemDraft.answer.trim()) return;
+    if (!itemDraft.prompt.trim()) return;
     setFactLoading(true);
     setFactError(null);
-    const prompt = `Write one short, interesting pub-trivia factoid related to the question and answer. Keep it under 20 words.\n\nQuestion: ${itemDraft.prompt.trim()}\nAnswer: ${itemDraft.answer.trim()}`;
+    const themeLine = theme.trim() ? `Theme: ${theme.trim()}` : '';
+    const parts = [
+      'Write one short, interesting pub-trivia factoid. Keep it under 20 words.',
+      themeLine,
+      `Question: ${itemDraft.prompt.trim()}`
+    ];
+    if (gameTypeId === 'audio') {
+      if (itemDraft.answer_a.trim()) parts.push(`Answer A: ${itemDraft.answer_a.trim()}`);
+      if (itemDraft.answer_b.trim()) parts.push(`Answer B: ${itemDraft.answer_b.trim()}`);
+      if (itemDraft.answer_a_label.trim()) parts.push(`Answer A Label: ${itemDraft.answer_a_label.trim()}`);
+      if (itemDraft.answer_b_label.trim()) parts.push(`Answer B Label: ${itemDraft.answer_b_label.trim()}`);
+    } else if (itemDraft.answer.trim()) {
+      parts.push(`Answer: ${itemDraft.answer.trim()}`);
+    }
+    const prompt = parts.filter(Boolean).join('\n');
     const res = await api.aiGenerate({ prompt, max_output_tokens: 80 });
     setFactLoading(false);
     if (!res.ok) {

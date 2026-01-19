@@ -149,6 +149,11 @@ export function PlayEventPage() {
   const answerText = data.current_item?.answer || (data.current_item?.answer_a && data.current_item?.answer_b
     ? `${data.current_item.answer_a_label ? `${data.current_item.answer_a_label}: ` : 'A: '}${data.current_item.answer_a} / ${data.current_item.answer_b_label ? `${data.current_item.answer_b_label}: ` : 'B: '}${data.current_item.answer_b}`
     : null);
+  const nextRound = useMemo(() => {
+    const ordered = [...data.rounds].sort((a, b) => a.round_number - b.round_number);
+    return ordered.find((round) => !['completed', 'locked', 'canceled'].includes(round.status)) ?? null;
+  }, [data.rounds]);
+
   const waitingRoom = (
     <div className="flex flex-col gap-4">
       <div className="border-2 border-border bg-panel2 p-4">
@@ -156,10 +161,10 @@ export function PlayEventPage() {
         <div className="mt-2 text-sm font-display uppercase tracking-[0.2em]">
           {waitingMessage || 'Stand by for the next round.'}
         </div>
-        {waitingShowNextRound && activeRound && (
+        {waitingShowNextRound && nextRound && (
           <div className="mt-2 text-xs uppercase tracking-[0.2em] text-muted">
-            Up Next: Round {activeRound.round_number}
-            {activeRound.label ? ` — ${activeRound.label}` : ''}
+            Up Next: Round {nextRound.round_number}
+            {nextRound.label ? ` — ${nextRound.label}` : ''}
           </div>
         )}
       </div>
@@ -374,16 +379,18 @@ export function PlayEventPage() {
         <div className="mt-6">
           <Panel title="Rounds">
             <div className="flex flex-col gap-2">
-              {data.rounds.map((round) => (
-                <div key={round.id} className="border-2 border-border bg-panel2 px-3 py-2">
-                  <div className="text-xs uppercase tracking-[0.2em] text-muted">
-                    {round.round_number}. {round.label}
+              {data.rounds
+                .filter((round) => round.status !== 'canceled')
+                .map((round) => (
+                  <div key={round.id} className="border-2 border-border bg-panel2 px-3 py-2">
+                    <div className="text-xs uppercase tracking-[0.2em] text-muted">
+                      {round.round_number}. {round.label}
+                    </div>
+                    <div className="text-[10px] uppercase tracking-[0.2em] text-muted">
+                      {round.status === 'locked' ? 'completed' : round.status}
+                    </div>
                   </div>
-                  <div className="text-[10px] uppercase tracking-[0.2em] text-muted">
-                    {round.status === 'locked' ? 'completed' : round.status}
-                  </div>
-                </div>
-              ))}
+                ))}
             </div>
           </Panel>
         </div>
