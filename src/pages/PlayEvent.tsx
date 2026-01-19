@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api';
 import { Panel } from '../components/Panel';
 import { PrimaryButton, SecondaryButton } from '../components/Buttons';
@@ -59,6 +59,7 @@ type PublicEventResponse = {
 export function PlayEventPage() {
   const { code } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [data, setData] = useState<PublicEventResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -95,6 +96,14 @@ export function PlayEventPage() {
     const stored = localStorage.getItem(`player_team_${data.event.id}`);
     if (stored) setTeamId(stored);
   }, [data?.event?.id]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const teamParam = params.get('team_id') ?? '';
+    if (teamParam && !teamId) {
+      setTeamId(teamParam);
+    }
+  }, [location.search, teamId]);
 
   useEffect(() => {
     if (!normalizedCode) return;

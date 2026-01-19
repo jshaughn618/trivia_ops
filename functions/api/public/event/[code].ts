@@ -49,6 +49,17 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
     [event.id]
   );
 
+  const roundScores = await queryAll<{ event_round_id: string; team_id: string; score: number }>(
+    env,
+    `SELECT event_round_id, team_id, score
+     FROM event_round_scores
+     WHERE COALESCE(deleted, 0) = 0
+       AND event_round_id IN (
+         SELECT id FROM event_rounds WHERE event_id = ? AND COALESCE(deleted, 0) = 0
+       )`,
+    [event.id]
+  );
+
   const live = await queryFirst<{
     id: string;
     event_id: string;
@@ -159,6 +170,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
     rounds,
     teams,
     leaderboard,
+    round_scores: roundScores,
     live: live
       ? {
           ...live,

@@ -16,6 +16,8 @@ type PublicLeaderboardResponse = {
     location_name: string | null;
   };
   leaderboard: { team_id: string; name: string; total: number }[];
+  rounds?: { id: string; round_number: number; label: string; status: string }[];
+  round_scores?: { event_round_id: string; team_id: string; score: number }[];
 };
 
 export function PlayLeaderboardPage() {
@@ -23,6 +25,10 @@ export function PlayLeaderboardPage() {
   const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
   const normalizedCode = useMemo(() => (code ?? '').trim().toUpperCase(), [code]);
+  const storedTeamId = useMemo(() => {
+    if (!normalizedCode) return '';
+    return localStorage.getItem(`player_team_code_${normalizedCode}`) ?? '';
+  }, [normalizedCode]);
   const [data, setData] = useState<PublicLeaderboardResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -72,7 +78,19 @@ export function PlayLeaderboardPage() {
     );
   }
 
-  const rows = [...data.leaderboard].sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
+  const orderedRounds = (data.rounds ?? []).slice().sort((a, b) => a.round_number - b.round_number);
+  const scoreMap = new Map<string, Record<string, number>>();
+  (data.round_scores ?? []).forEach((row) => {
+    const teamScores = scoreMap.get(row.team_id) ?? {};
+    teamScores[row.event_round_id] = row.score;
+    scoreMap.set(row.team_id, teamScores);
+  });
+  const rows = [...data.leaderboard]
+    .map((row) => ({
+      ...row,
+      roundScores: scoreMap.get(row.team_id) ?? {}
+    }))
+    .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
 
   return (
     <div className="min-h-screen bg-bg text-text">
@@ -96,18 +114,36 @@ export function PlayLeaderboardPage() {
               >
                 {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
               </button>
-              <SecondaryButton onClick={() => navigate(`/play/${data.event.public_code}`)}>
+              <SecondaryButton
+                onClick={() =>
+                  navigate(
+                    `/play/${data.event.public_code}${storedTeamId ? `?team_id=${storedTeamId}` : ''}`
+                  )
+                }
+              >
                 Back to Event
               </SecondaryButton>
             </div>
           </div>
         </div>
         <Panel title="Leaderboard">
-          <Table headers={['Rank', 'Team', 'Total']}>
+          <Table
+            headers={[
+              'Rank',
+              'Team',
+              ...orderedRounds.map((round) => `R${round.round_number}`),
+              'Total'
+            ]}
+          >
             {rows.map((row, index) => (
               <tr key={row.team_id}>
                 <td className="px-3 py-2 text-xs text-muted">{index + 1}</td>
                 <td className="px-3 py-2 text-sm font-medium text-text">{row.name}</td>
+                {orderedRounds.map((round) => (
+                  <td key={round.id} className="px-3 py-2 text-sm text-text">
+                    {row.roundScores[round.id] ?? 0}
+                  </td>
+                ))}
                 <td className="px-3 py-2 text-sm font-semibold text-text">{row.total}</td>
               </tr>
             ))}
