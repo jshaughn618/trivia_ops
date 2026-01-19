@@ -607,6 +607,15 @@ export function EditionDetailPage() {
                 <div
                   className={`border-2 ${activeItemId === item.id ? 'border-accent' : 'border-border'} bg-panel2 p-3`}
                   draggable
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => startEdit(item)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      startEdit(item);
+                    }
+                  }}
                   onDragStart={() => setDraggedId(item.id)}
                   onDragOver={(event) => event.preventDefault()}
                   onDrop={() => {
@@ -623,14 +632,20 @@ export function EditionDetailPage() {
                     <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
-                        onClick={() => startEdit(item)}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          startEdit(item);
+                        }}
                         className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent hover:text-text"
                       >
                         Edit Item
                       </button>
                       <button
                         type="button"
-                        onClick={() => api.deleteEditionItem(item.id).then(load)}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          api.deleteEditionItem(item.id).then(load);
+                        }}
                         className="border-2 border-danger px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-danger hover:border-[#9d2a24]"
                       >
                         Delete
