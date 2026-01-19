@@ -15,7 +15,8 @@ const emptyItem = {
   answer_b_label: '',
   fun_fact: '',
   media_key: '',
-  media_type: ''
+  media_type: '',
+  media_filename: ''
 };
 
 export function EditionDetailPage() {
@@ -169,7 +170,8 @@ export function EditionDetailPage() {
       answer_b_label: item.answer_b_label ?? '',
       fun_fact: item.fun_fact ?? '',
       media_type: item.media_type ?? '',
-      media_key: item.media_key ?? ''
+      media_key: item.media_key ?? '',
+      media_filename: ''
     });
   };
 
@@ -245,7 +247,8 @@ export function EditionDetailPage() {
       setItemDraft((draft) => ({
         ...draft,
         media_type: uploadRes.data.media_type,
-        media_key: uploadRes.data.key
+        media_key: uploadRes.data.key,
+        media_filename: file.name || draft.media_filename
       }));
       load();
     } else {
@@ -267,7 +270,8 @@ export function EditionDetailPage() {
       setItemDraft((draft) => ({
         ...draft,
         media_type: uploadRes.data.media_type,
-        media_key: uploadRes.data.key
+        media_key: uploadRes.data.key,
+        media_filename: file.name || draft.media_filename
       }));
     } else {
       setMediaError(uploadRes.error.message);
@@ -754,6 +758,7 @@ export function EditionDetailPage() {
                             {itemDraft.media_key && (
                               <span className="text-[10px] uppercase tracking-[0.2em] text-muted">
                                 {gameTypeId === 'audio' ? 'Audio attached' : 'Image attached'}
+                                {itemDraft.media_filename ? ` • ${itemDraft.media_filename}` : ''}
                               </span>
                             )}
                           </div>
@@ -956,6 +961,7 @@ export function EditionDetailPage() {
                     {itemDraft.media_key && (
                       <span className="text-[10px] uppercase tracking-[0.2em] text-muted">
                         {gameTypeId === 'audio' ? 'Audio attached' : 'Image attached'}
+                        {itemDraft.media_filename ? ` • ${itemDraft.media_filename}` : ''}
                       </span>
                     )}
                   </div>
