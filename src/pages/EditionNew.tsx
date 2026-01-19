@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { AppShell } from '../components/AppShell';
 import { Panel } from '../components/Panel';
@@ -13,12 +13,19 @@ export function EditionNewPage() {
   const [theme, setTheme] = useState('');
   const [description, setDescription] = useState('');
   const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     api.listGames().then((res) => {
       if (res.ok) setGames(res.data);
     });
   }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const fromGame = params.get('game_id') ?? '';
+    if (fromGame) setGameId(fromGame);
+  }, [location.search]);
 
   const handleCreate = async () => {
     if (!gameId || !theme.trim()) return;

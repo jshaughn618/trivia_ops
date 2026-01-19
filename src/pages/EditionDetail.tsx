@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api';
 import { AppShell } from '../components/AppShell';
@@ -13,7 +13,9 @@ const emptyItem = {
   answer_b: '',
   answer_a_label: '',
   answer_b_label: '',
-  fun_fact: ''
+  fun_fact: '',
+  media_key: '',
+  media_type: ''
 };
 
 export function EditionDetailPage() {
@@ -41,8 +43,12 @@ export function EditionDetailPage() {
   const [factLoading, setFactLoading] = useState(false);
   const [factError, setFactError] = useState<string | null>(null);
   const [infoOpen, setInfoOpen] = useState(true);
-  const [activeItemId, setActiveItemId] = useState<string | null>('new');
+  const [mediaUploading, setMediaUploading] = useState(false);
+  const [mediaError, setMediaError] = useState<string | null>(null);
+  const [activeItemId, setActiveItemId] = useState<string | null>(null);
   const [draggedId, setDraggedId] = useState<string | null>(null);
+  const editUploadRef = useRef<HTMLInputElement | null>(null);
+  const newUploadRef = useRef<HTMLInputElement | null>(null);
 
   const load = async () => {
     if (!editionId) return;
@@ -121,11 +127,13 @@ export function EditionDetailPage() {
       answer_a_label: itemDraft.answer_a_label || null,
       answer_b_label: itemDraft.answer_b_label || null,
       fun_fact: itemDraft.fun_fact || null,
+      media_type: itemDraft.media_type || null,
+      media_key: itemDraft.media_key || null,
       ordinal: nextOrdinal
     });
     if (res.ok) {
       setItemDraft({ ...emptyItem });
-      setActiveItemId('new');
+      setActiveItemId(null);
       load();
     }
   };
@@ -142,7 +150,9 @@ export function EditionDetailPage() {
       answer_b: item.answer_b ?? '',
       answer_a_label: item.answer_a_label ?? '',
       answer_b_label: item.answer_b_label ?? '',
-      fun_fact: item.fun_fact ?? ''
+      fun_fact: item.fun_fact ?? '',
+      media_type: item.media_type ?? '',
+      media_key: item.media_key ?? ''
     });
   };
 
@@ -159,11 +169,12 @@ export function EditionDetailPage() {
       answer_b: itemDraft.answer_b || null,
       answer_a_label: itemDraft.answer_a_label || null,
       answer_b_label: itemDraft.answer_b_label || null,
-      fun_fact: itemDraft.fun_fact || null
+      fun_fact: itemDraft.fun_fact || null,
+      media_type: itemDraft.media_type || null,
+      media_key: itemDraft.media_key || null
     });
     if (res.ok) {
       cancelEdit();
-      setActiveItemId(null);
       load();
     }
   };
@@ -184,14 +195,49 @@ export function EditionDetailPage() {
   };
 
   const handleUpload = async (item: EditionItem, file: File) => {
-    const kind = file.type.startsWith('audio/') ? 'audio' : 'image';
+    if (gameTypeId === 'audio' && file.type !== 'audio/mpeg') {
+      setMediaError('Audio rounds require MP3 files.');
+      return;
+    }
+    const kind = gameTypeId === 'audio' ? 'audio' : file.type.startsWith('audio/') ? 'audio' : 'image';
+    setMediaUploading(true);
+    setMediaError(null);
     const uploadRes = await api.uploadMedia(file, kind);
+    setMediaUploading(false);
     if (uploadRes.ok) {
       await api.updateEditionItem(item.id, {
         media_type: uploadRes.data.media_type,
         media_key: uploadRes.data.key
       });
+      setItemDraft((draft) => ({
+        ...draft,
+        media_type: uploadRes.data.media_type,
+        media_key: uploadRes.data.key
+      }));
       load();
+    } else {
+      setMediaError(uploadRes.error.message);
+    }
+  };
+
+  const handleDraftUpload = async (file: File) => {
+    if (gameTypeId === 'audio' && file.type !== 'audio/mpeg') {
+      setMediaError('Audio rounds require MP3 files.');
+      return;
+    }
+    const kind = gameTypeId === 'audio' ? 'audio' : file.type.startsWith('audio/') ? 'audio' : 'image';
+    setMediaUploading(true);
+    setMediaError(null);
+    const uploadRes = await api.uploadMedia(file, kind);
+    setMediaUploading(false);
+    if (uploadRes.ok) {
+      setItemDraft((draft) => ({
+        ...draft,
+        media_type: uploadRes.data.media_type,
+        media_key: uploadRes.data.key
+      }));
+    } else {
+      setMediaError(uploadRes.error.message);
     }
   };
 
@@ -302,7 +348,7 @@ export function EditionDetailPage() {
   }
 
   return (
-    <AppShell title="Edition Detail">
+    <AppShell title={theme ? `Edition Detail — ${theme}` : 'Edition Detail'}>
       <div className="flex flex-col gap-4">
         <Panel
           title="Edition Info"
@@ -531,18 +577,32 @@ export function EditionDetailPage() {
                       </label>
                       <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
                         Media Upload
-                        <input
-                          type="file"
-                          accept={gameTypeId === 'audio' ? 'audio/mpeg' : 'image/png,image/jpeg,image/webp'}
-                          onChange={(event) => {
-                            const file = event.target.files?.[0];
-                            if (file) handleUpload(item, file);
-                          }}
-                          className="text-xs text-muted"
-                        />
+                        <div className="flex flex-wrap items-center gap-2">
+                          <input
+                            ref={editUploadRef}
+                            type="file"
+                            accept={gameTypeId === 'audio' ? 'audio/mpeg' : 'image/png,image/jpeg,image/webp'}
+                            onChange={(event) => {
+                              const file = event.target.files?.[0];
+                              if (file) handleUpload(item, file);
+                            }}
+                            className="hidden"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => editUploadRef.current?.click()}
+                            className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent hover:text-text"
+                          >
+                            {mediaUploading ? 'Uploading' : 'Upload MP3'}
+                          </button>
+                          {itemDraft.media_key && (
+                            <span className="text-[10px] uppercase tracking-[0.2em] text-muted">Audio attached</span>
+                          )}
+                        </div>
                         {gameTypeId === 'audio' && (
                           <span className="text-[10px] tracking-[0.2em] text-muted">MP3 only for audio rounds.</span>
                         )}
+                        {mediaError && <span className="text-[10px] tracking-[0.2em] text-danger">{mediaError}</span>}
                       </label>
                       <div className="flex flex-wrap gap-2">
                         <PrimaryButton onClick={() => saveEdit(item)}>Save</PrimaryButton>
@@ -703,15 +763,32 @@ export function EditionDetailPage() {
               </label>
               <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
                 Media Upload
-                <input
-                  type="file"
-                  accept={gameTypeId === 'audio' ? 'audio/mpeg' : 'image/png,image/jpeg,image/webp'}
-                  disabled
-                  className="text-xs text-muted"
-                />
-                <span className="text-[10px] tracking-[0.2em] text-muted">
-                  Save the item first to upload media.
-                </span>
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    ref={newUploadRef}
+                    type="file"
+                    accept={gameTypeId === 'audio' ? 'audio/mpeg' : 'image/png,image/jpeg,image/webp'}
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      if (file) handleDraftUpload(file);
+                    }}
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => newUploadRef.current?.click()}
+                    className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent hover:text-text"
+                  >
+                    {mediaUploading ? 'Uploading' : 'Upload MP3'}
+                  </button>
+                  {itemDraft.media_key && (
+                    <span className="text-[10px] uppercase tracking-[0.2em] text-muted">Audio attached</span>
+                  )}
+                </div>
+                {gameTypeId === 'audio' && (
+                  <span className="text-[10px] tracking-[0.2em] text-muted">MP3 only for audio rounds.</span>
+                )}
+                {mediaError && <span className="text-[10px] tracking-[0.2em] text-danger">{mediaError}</span>}
               </label>
               <div className="flex flex-wrap gap-2">
                 <PrimaryButton onClick={handleCreateItem}>Save</PrimaryButton>

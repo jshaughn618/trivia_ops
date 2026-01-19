@@ -229,7 +229,7 @@ export function EventDetailPage() {
                   <option value="">Select edition</option>
                   {editions.map((edition) => (
                     <option key={edition.id} value={edition.id}>
-                      {edition.title}
+                      {edition.theme ?? 'Untitled Theme'}
                     </option>
                   ))}
                 </select>

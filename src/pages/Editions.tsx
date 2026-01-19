@@ -44,10 +44,12 @@ export function EditionsPage() {
                 to={`/editions/${edition.id}`}
                 className="border-2 border-border bg-panel2 p-3"
               >
-                <div className="text-sm font-display uppercase tracking-[0.25em]">{edition.title}</div>
+                <div className="text-sm font-display uppercase tracking-[0.25em]">
+                  {edition.theme ?? 'Untitled Theme'}
+                </div>
                 <div className="mt-1 flex items-center justify-between text-xs uppercase tracking-[0.2em] text-muted">
                   <span>{edition.status}</span>
-                  <span>{edition.theme ?? edition.tags_csv ?? 'No tags'}</span>
+                  <span>{games.find((game) => game.id === edition.game_id)?.name ?? 'Unknown game'}</span>
                 </div>
               </Link>
             ))}

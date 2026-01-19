@@ -50,7 +50,7 @@ export function GameDetailPage() {
     setDescError(null);
     const editionLines = editions
       .slice(0, 10)
-      .map((edition, index) => `${index + 1}. ${edition.theme ?? edition.title}`)
+      .map((edition, index) => `${index + 1}. ${edition.theme ?? 'Untitled Theme'}`)
       .join('\n');
     const prompt = `Write a short, punchy 1-2 sentence description for a trivia game named below. Use any editions as context if provided.\n\nGame name: ${name}\nEditions:\n${editionLines}`;
     const res = await api.aiGenerate({ prompt, max_output_tokens: 120 });
@@ -130,7 +130,10 @@ export function GameDetailPage() {
         <Panel
           title="Editions"
           action={
-            <Link to="/editions/new" className="text-xs font-display uppercase tracking-[0.25em] text-accent">
+            <Link
+              to={`/editions/new?game_id=${game.id}`}
+              className="text-xs font-display uppercase tracking-[0.25em] text-accent"
+            >
               Add Edition
             </Link>
           }
@@ -141,7 +144,9 @@ export function GameDetailPage() {
             )}
             {editions.map((edition) => (
               <Link key={edition.id} to={`/editions/${edition.id}`} className="border-2 border-border bg-panel2 p-3">
-                <div className="text-sm font-display uppercase tracking-[0.25em]">{edition.theme ?? edition.title}</div>
+                <div className="text-sm font-display uppercase tracking-[0.25em]">
+                  {edition.theme ?? 'Untitled Theme'}
+                </div>
                 <div className="mt-1 text-xs uppercase tracking-[0.2em] text-muted">
                   {edition.status}
                 </div>
