@@ -10,11 +10,22 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, data }) 
   let kind = typeof kindEntry === 'string' && kindEntry ? kindEntry : null;
 
   if (!fileBlob) {
+    const fileValue = file as unknown;
     return jsonError(
       {
         code: 'invalid_request',
         message: 'File is required',
-        details: { content_type: request.headers.get('content-type'), form_keys: [...form.keys()] }
+        details: {
+          content_type: request.headers.get('content-type'),
+          form_keys: [...form.keys()],
+          file_type: typeof fileValue,
+          file_ctor: fileValue && (fileValue as { constructor?: { name?: string } }).constructor?.name,
+          file_has_arrayBuffer: Boolean(
+            fileValue && typeof (fileValue as { arrayBuffer?: unknown }).arrayBuffer === 'function'
+          ),
+          file_is_blob: fileValue instanceof Blob,
+          file_string_length: typeof fileValue === 'string' ? fileValue.length : null
+        }
       },
       400
     );
