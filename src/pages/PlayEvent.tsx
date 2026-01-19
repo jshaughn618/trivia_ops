@@ -174,36 +174,34 @@ export function PlayEventPage() {
               </div>
             </div>
             {teamId && teamNameLabel && (
-              <div className="flex flex-col items-end gap-2 text-right">
-                <div className="flex items-center gap-2">
-                  <div className="text-xs uppercase tracking-[0.2em] text-muted">Your Team</div>
-                  <div className="relative">
-                    <button
-                      type="button"
-                      aria-label="Team menu"
-                      aria-haspopup="menu"
-                      aria-expanded={teamMenuOpen}
-                      onClick={() => setTeamMenuOpen((open) => !open)}
-                      className="flex h-8 w-8 flex-col items-center justify-center gap-1 border-2 border-border bg-panel2"
-                    >
-                      <span className="h-0.5 w-4 bg-text" />
-                      <span className="h-0.5 w-4 bg-text" />
-                      <span className="h-0.5 w-4 bg-text" />
-                    </button>
-                    {teamMenuOpen && (
-                      <div className="absolute right-0 mt-2 min-w-[160px] border-2 border-border bg-panel p-2 text-left">
-                        <button
-                          type="button"
-                          onClick={handleChangeTeam}
-                          className="w-full border-2 border-border bg-panel2 px-3 py-2 text-xs uppercase tracking-[0.2em] text-text"
-                        >
-                          Change Team
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
+              <div className="flex items-center gap-3 text-right">
+                <div className="text-xs uppercase tracking-[0.2em] text-muted">Your Team</div>
                 <div className="text-sm font-display uppercase tracking-[0.2em]">{teamNameLabel}</div>
+                <div className="relative">
+                  <button
+                    type="button"
+                    aria-label="Team menu"
+                    aria-haspopup="menu"
+                    aria-expanded={teamMenuOpen}
+                    onClick={() => setTeamMenuOpen((open) => !open)}
+                    className="flex h-8 w-8 flex-col items-center justify-center gap-1 border-2 border-border bg-panel2"
+                  >
+                    <span className="h-0.5 w-4 bg-text" />
+                    <span className="h-0.5 w-4 bg-text" />
+                    <span className="h-0.5 w-4 bg-text" />
+                  </button>
+                  {teamMenuOpen && (
+                    <div className="absolute right-0 mt-2 min-w-[160px] border-2 border-border bg-panel p-2 text-left">
+                      <button
+                        type="button"
+                        onClick={handleChangeTeam}
+                        className="w-full border-2 border-border bg-panel2 px-3 py-2 text-xs uppercase tracking-[0.2em] text-text"
+                      >
+                        Change Team
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
