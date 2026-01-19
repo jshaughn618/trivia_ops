@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PrimaryButton, SecondaryButton } from '../components/Buttons';
 import { useAuth } from '../auth';
@@ -32,13 +32,22 @@ export function LoginPage() {
     }
   };
 
+  const sanitized = (value: string) => value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const codeValue = code.join('');
+  const codeReady = code.every((digit) => digit.length === 1);
+
+  useEffect(() => {
+    codeRefs.current[0]?.focus();
+  }, []);
+
   return (
     <div className="min-h-screen bg-bg text-text flex items-center justify-center px-4">
       <div className="w-full max-w-md border-2 border-border bg-panel p-6">
         <img src={logo} alt="Trivia Ops" className="h-16 w-auto" />
         <div className="mt-4">
-          <div className="text-2xl font-display uppercase tracking-[0.35em]">Join Game</div>
-          <div className="mt-2 text-xs uppercase tracking-[0.2em] text-muted">Enter Event Code</div>
+          <div className="text-3xl font-display tracking-tight">Join game</div>
+          <div className="mt-2 text-sm text-muted">Enter the 4-character code from your host</div>
+          <div className="mt-1 text-xs text-muted">Tip: you can paste the full code.</div>
           <div className="mt-3 flex flex-col gap-3">
             <div className="flex gap-2">
               {code.map((value, index) => (
@@ -47,13 +56,13 @@ export function LoginPage() {
                   ref={(el) => {
                     codeRefs.current[index] = el;
                   }}
-                  inputMode="numeric"
-                  pattern="[0-9]*"
+                  inputMode="text"
+                  pattern="[A-Za-z0-9]*"
                   maxLength={1}
-                  className="h-12 w-12 border-2 border-border bg-panel2 text-center text-lg font-display tracking-[0.2em]"
+                  className="h-12 w-12 border-2 border-strong bg-panel2 text-center text-lg font-display tracking-[0.2em] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
                   value={value}
                   onChange={(event) => {
-                    const next = event.target.value.replace(/\D/g, '').slice(0, 1);
+                    const next = sanitized(event.target.value).slice(0, 1);
                     setCode((prev) => {
                       const updated = [...prev];
                       updated[index] = next;
@@ -70,6 +79,26 @@ export function LoginPage() {
                     if (event.key === 'Backspace' && !code[index] && index > 0) {
                       codeRefs.current[index - 1]?.focus();
                     }
+                    if (event.key === 'Enter' && codeReady) {
+                      navigate(`/play/${codeValue}`);
+                    }
+                  }}
+                  onPaste={(event) => {
+                    event.preventDefault();
+                    const paste = sanitized(event.clipboardData.getData('text'));
+                    if (!paste) return;
+                    setCode((prev) => {
+                      const updated = [...prev];
+                      for (let i = 0; i < paste.length && index + i < updated.length; i += 1) {
+                        updated[index + i] = paste[i];
+                      }
+                      if (updated.every((digit) => digit)) {
+                        navigate(`/play/${updated.join('')}`);
+                      }
+                      return updated;
+                    });
+                    const nextIndex = Math.min(index + paste.length, codeRefs.current.length - 1);
+                    codeRefs.current[nextIndex]?.focus();
                   }}
                   aria-label={`Event code digit ${index + 1}`}
                 />
@@ -78,24 +107,23 @@ export function LoginPage() {
             <PrimaryButton
               type="button"
               onClick={() => {
-                const value = code.join('');
-                if (value.trim()) navigate(`/play/${value}`);
+                if (codeReady) navigate(`/play/${codeValue}`);
               }}
+              disabled={!codeReady}
             >
-              Enter Event
+              Join game
             </PrimaryButton>
           </div>
         </div>
         <div className="mt-6 border-t-2 border-border pt-4">
           <div className="flex items-center justify-between gap-3">
-            <div className="text-2xl font-display uppercase tracking-[0.35em]">Host Login</div>
             <SecondaryButton type="button" onClick={() => setHostOpen((prev) => !prev)}>
-              {hostOpen ? 'Hide' : 'Host Login'}
+              {hostOpen ? 'Hide' : 'Host login'}
             </SecondaryButton>
           </div>
           {hostOpen && (
             <>
-              <p className="mt-2 text-xs uppercase tracking-[0.2em] text-muted">Host Console Access</p>
+              <p className="mt-2 text-xs text-muted">Host console access</p>
               <form className="mt-4 flex flex-col gap-4" onSubmit={handleSubmit}>
                 <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
                   Email

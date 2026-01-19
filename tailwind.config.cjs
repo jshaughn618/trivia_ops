@@ -10,6 +10,7 @@ module.exports = {
         text: "var(--text)",
         muted: "var(--muted)",
         border: "var(--border)",
+        "border-strong": "var(--border-strong)",
         accent: "var(--accent)",
         "accent-fg": "var(--accent-fg)",
         "accent-ink": "var(--accent-ink)",

@@ -11,6 +11,7 @@
   --text: #f2f2ee;
   --muted: #a5abb4;
   --border: #3a4250;
+  --border-strong: #4a5261;
   --accent: #f3c400;
   --accent-fg: #0f1114;
   --accent-ink: #f3c400;
@@ -28,6 +29,7 @@
   --text: #171a1f;
   --muted: #5b616c;
   --border: #c7ccd6;
+  --border-strong: #aeb6c3;
   --accent: #f3c400;
   --accent-fg: #171a1f;
   --accent-ink: #8c5f00;
@@ -48,7 +50,8 @@ h1, h2, h3, h4 {
 }
 
 input, select, textarea {
-  @apply bg-panel2 border border-border text-text placeholder:text-muted rounded-md px-3 py-2;
+  @apply bg-panel2 border text-text placeholder:text-muted rounded-md px-3 py-2;
+  border-color: var(--border-strong, var(--border));
 }
 
 input:focus, select:focus, textarea:focus {
