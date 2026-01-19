@@ -1,8 +1,8 @@
 import type { Env } from './types';
 import { queryFirst } from './db';
 
-const CODE_LENGTH = 6;
-const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const CODE_LENGTH = 4;
+const CODE_CHARS = '0123456789';
 
 export async function generateEventCode(env: Env): Promise<string> {
   for (let attempt = 0; attempt < 10; attempt += 1) {

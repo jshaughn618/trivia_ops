@@ -3,7 +3,7 @@ import { useLocation, useParams } from 'react-router-dom';
 import { api } from '../api';
 import { AppShell } from '../components/AppShell';
 import { Panel } from '../components/Panel';
-import { PrimaryButton, SecondaryButton } from '../components/Buttons';
+import { ButtonLink, PrimaryButton, SecondaryButton } from '../components/Buttons';
 import { StampBadge } from '../components/StampBadge';
 import { logError, logInfo } from '../lib/log';
 import type { EditionItem, Event, EventRound, Game, GameEdition } from '../types';
@@ -329,7 +329,13 @@ export function EventRunPage() {
               </div>
               {item ? (
                 <div className="relative border-2 border-border bg-panel2 p-4">
-                  <div className="text-xs uppercase tracking-[0.2em] text-muted">Question</div>
+                  <div className="text-xs uppercase tracking-[0.2em] text-muted">
+                    {item.media_type === 'audio'
+                      ? `Clip ${index + 1}`
+                      : item.media_type === 'image'
+                        ? `Image ${index + 1}`
+                        : `Question ${index + 1}`}
+                  </div>
                   <div className="mt-2 text-lg font-display uppercase tracking-[0.2em]">{item.prompt}</div>
                   {item.media_type === 'image' && item.media_key && (
                     <img
@@ -493,6 +499,9 @@ export function EventRunPage() {
             <div className="flex flex-col gap-4">
               <div className="text-xs uppercase tracking-[0.2em] text-muted">Event</div>
               <div className="text-sm font-display uppercase tracking-[0.2em]">{event.title}</div>
+              <ButtonLink to={`/events/${event.id}`} variant="secondary">
+                Back to Event
+              </ButtonLink>
               <div className="border-2 border-border bg-panel2 p-3 text-xs uppercase tracking-[0.2em] text-muted">
                 {activeRound ? `Status: ${roundStatusLabel(activeRound.status)}` : 'Awaiting round selection'}
               </div>

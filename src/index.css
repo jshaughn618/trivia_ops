@@ -15,6 +15,17 @@
   --danger: #b5302a;
 }
 
+:root[data-theme='light'] {
+  --bg: #f5f3ee;
+  --panel: #ffffff;
+  --panel2: #ece8df;
+  --text: #171a1f;
+  --muted: #5b616c;
+  --border: #c7ccd6;
+  --accent: #f3c400;
+  --danger: #b5302a;
+}
+
 body {
   @apply bg-bg text-text font-body;
   min-height: 100vh;
@@ -30,4 +41,8 @@ input, select, textarea {
 
 ::selection {
   background: #3a3f47;
+}
+
+:root[data-theme='light'] ::selection {
+  background: #d8d4c8;
 }

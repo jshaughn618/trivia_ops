@@ -807,6 +807,13 @@ export function EditionDetailPage() {
                                 {itemDraft.media_filename ? ` • ${itemDraft.media_filename}` : ''}
                               </span>
                             )}
+                            {gameTypeId === 'visual' && itemDraft.media_key && (
+                              <img
+                                src={api.mediaUrl(itemDraft.media_key)}
+                                alt="Uploaded"
+                                className="h-16 w-16 border-2 border-border object-cover"
+                              />
+                            )}
                           </div>
                           {gameTypeId === 'audio' && (
                             <span className="text-[10px] tracking-[0.2em] text-muted">MP3 only for audio rounds.</span>
@@ -1018,6 +1025,13 @@ export function EditionDetailPage() {
                         {gameTypeId === 'audio' ? 'Audio attached' : 'Image attached'}
                         {itemDraft.media_filename ? ` • ${itemDraft.media_filename}` : ''}
                       </span>
+                    )}
+                    {gameTypeId === 'visual' && itemDraft.media_key && (
+                      <img
+                        src={api.mediaUrl(itemDraft.media_key)}
+                        alt="Uploaded"
+                        className="h-16 w-16 border-2 border-border object-cover"
+                      />
                     )}
                   </div>
                   {gameTypeId === 'audio' && (

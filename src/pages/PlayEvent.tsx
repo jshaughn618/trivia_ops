@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api';
 import { Panel } from '../components/Panel';
 import { PrimaryButton, SecondaryButton } from '../components/Buttons';
+import { useTheme } from '../lib/theme';
 
 const POLL_MS = 4000;
 
@@ -50,6 +51,7 @@ export function PlayEventPage() {
   const [teamName, setTeamName] = useState('');
   const [teamNameLabel, setTeamNameLabel] = useState<string | null>(null);
   const [teamMenuOpen, setTeamMenuOpen] = useState(false);
+  const { theme, toggleTheme } = useTheme();
   const normalizedCode = useMemo(() => (code ?? '').trim().toUpperCase(), [code]);
 
   const load = async () => {
@@ -135,6 +137,7 @@ export function PlayEventPage() {
     );
   }
 
+  const isClosed = data.event.status === 'completed' || data.event.status === 'canceled';
   const activeRound = data.rounds.find((round) => round.id === data.live?.active_round_id) ?? null;
   const isLive = activeRound?.status === 'live';
   const waitingMessage = data.live?.waiting_message?.trim() ?? '';
@@ -163,6 +166,36 @@ export function PlayEventPage() {
     </div>
   );
 
+  if (isClosed) {
+    const closedLabel = data.event.status === 'canceled' ? 'Canceled' : 'Closed';
+    return (
+      <div className="min-h-screen bg-bg text-text">
+        <div className="mx-auto max-w-5xl px-4 py-6">
+          <div className="mb-6 border-b-2 border-border pb-3">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="text-xs uppercase tracking-[0.2em] text-muted">Event Code</div>
+                <div className="text-2xl font-display uppercase tracking-[0.3em]">{data.event.public_code}</div>
+                <div className="mt-1 text-sm uppercase tracking-[0.2em] text-muted">{data.event.title}</div>
+                <div className="mt-1 text-xs uppercase tracking-[0.2em] text-muted">
+                  {data.event.location_name ?? 'Location TBD'} • {new Date(data.event.starts_at).toLocaleString()}
+                </div>
+              </div>
+            </div>
+          </div>
+          <Panel title={`Event ${closedLabel}`}>
+            <div className="text-xs uppercase tracking-[0.2em] text-muted">
+              This event is {closedLabel.toLowerCase()}. Check with the host for the next session.
+            </div>
+          </Panel>
+          <div className="mt-6">
+            <SecondaryButton onClick={() => navigate('/login')}>Back to Login</SecondaryButton>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-bg text-text">
       <div className="mx-auto max-w-5xl px-4 py-6">
@@ -176,36 +209,46 @@ export function PlayEventPage() {
                 {data.event.location_name ?? 'Location TBD'} • {new Date(data.event.starts_at).toLocaleString()}
               </div>
             </div>
-            {teamId && teamNameLabel && (
-              <div className="flex items-center gap-3 text-right">
-                <div className="text-sm font-display uppercase tracking-[0.2em]">{teamNameLabel}</div>
-                <div className="relative">
-                  <button
-                    type="button"
-                    aria-label="Team menu"
-                    aria-haspopup="menu"
-                    aria-expanded={teamMenuOpen}
-                    onClick={() => setTeamMenuOpen((open) => !open)}
-                    className="flex h-8 w-8 flex-col items-center justify-center gap-1 border-2 border-border bg-panel2"
-                  >
-                    <span className="h-0.5 w-4 bg-text" />
-                    <span className="h-0.5 w-4 bg-text" />
-                    <span className="h-0.5 w-4 bg-text" />
-                  </button>
-                  {teamMenuOpen && (
-                    <div className="absolute right-0 mt-2 min-w-[160px] border-2 border-border bg-panel p-2 text-left">
-                      <button
-                        type="button"
-                        onClick={handleChangeTeam}
-                        className="w-full border-2 border-border bg-panel2 px-3 py-2 text-xs uppercase tracking-[0.2em] text-text"
-                      >
-                        Change Team
-                      </button>
-                    </div>
-                  )}
+            <div className="flex items-center gap-3 text-right">
+              <button
+                type="button"
+                aria-pressed={theme === 'light'}
+                onClick={toggleTheme}
+                className="border-2 border-border bg-panel2 px-3 py-1 text-[10px] font-display uppercase tracking-[0.2em] text-text"
+              >
+                {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+              </button>
+              {teamId && teamNameLabel && (
+                <div className="flex items-center gap-3">
+                  <div className="text-sm font-display uppercase tracking-[0.2em]">{teamNameLabel}</div>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      aria-label="Team menu"
+                      aria-haspopup="menu"
+                      aria-expanded={teamMenuOpen}
+                      onClick={() => setTeamMenuOpen((open) => !open)}
+                      className="flex h-8 w-8 flex-col items-center justify-center gap-1 border-2 border-border bg-panel2"
+                    >
+                      <span className="h-0.5 w-4 bg-text" />
+                      <span className="h-0.5 w-4 bg-text" />
+                      <span className="h-0.5 w-4 bg-text" />
+                    </button>
+                    {teamMenuOpen && (
+                      <div className="absolute right-0 mt-2 min-w-[160px] border-2 border-border bg-panel p-2 text-left">
+                        <button
+                          type="button"
+                          onClick={handleChangeTeam}
+                          className="w-full border-2 border-border bg-panel2 px-3 py-2 text-xs uppercase tracking-[0.2em] text-text"
+                        >
+                          Change Team
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
 
@@ -269,7 +312,7 @@ export function PlayEventPage() {
           </div>
 
           <div className="flex flex-col gap-4">
-            {!teamId && (
+            {!teamId && !isClosed && (
               <Panel title="Join a Team">
                 <div className="flex flex-col gap-3">
                   <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">

@@ -13,14 +13,17 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request }
     return jsonError({ code: 'validation_error', message: 'Invalid join request', details: parsed.error.flatten() }, 400);
   }
 
-  const event = await queryFirst<{ id: string }>(
+  const event = await queryFirst<{ id: string; status: string }>(
     env,
-    'SELECT id FROM events WHERE public_code = ? AND deleted = 0',
+    'SELECT id, status FROM events WHERE public_code = ? AND deleted = 0',
     [code]
   );
 
   if (!event) {
     return jsonError({ code: 'not_found', message: 'Event not found' }, 404);
+  }
+  if (event.status === 'completed' || event.status === 'canceled') {
+    return jsonError({ code: 'event_closed', message: 'Event is closed' }, 403);
   }
 
   if (parsed.data.team_id) {
