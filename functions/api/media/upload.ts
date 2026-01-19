@@ -36,14 +36,15 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, data }) 
   if (fileBlob) {
     buffer = await fileBlob.arrayBuffer();
     size = fileBlob.size;
-  if (!kind) {
-    if (fileBlob.type.startsWith('audio/')) kind = 'audio';
-    if (fileBlob.type.startsWith('image/')) kind = 'image';
-  }
+    if (!kind) {
+      if (fileBlob.type.startsWith('audio/')) kind = 'audio';
+      if (fileBlob.type.startsWith('image/')) kind = 'image';
+    }
   } else if (typeof file === 'string' && file.length > 0) {
     let raw = file;
     let mime: string | null = null;
-    if (raw.startsWith('data:')) {
+    const isDataUri = raw.startsWith('data:');
+    if (isDataUri) {
       const match = raw.match(/^data:([^;]+);base64,(.*)$/s);
       if (match) {
         mime = match[1];
@@ -81,17 +82,25 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, data }) 
     const matchesKind = (sniff: { kind: string } | null) =>
       Boolean(sniff && (!desiredKind || sniff.kind === desiredKind));
 
+    const preferBase64 = isDataUri;
+    const first = preferBase64 ? base64Sniff : rawSniff;
+    const second = preferBase64 ? rawSniff : base64Sniff;
+    const firstBytes = preferBase64 ? base64Bytes : rawBytes;
+    const secondBytes = preferBase64 ? rawBytes : base64Bytes;
+    const firstLabel = preferBase64 ? 'base64' : 'raw';
+    const secondLabel = preferBase64 ? 'raw' : 'base64';
+
     let selectedSniff: { kind: string } | null = null;
-    if (matchesKind(base64Sniff)) {
-      buffer = base64Bytes!.buffer;
-      size = base64Bytes!.byteLength;
-      selectedSniff = base64Sniff;
-      logInfo(env, 'media_decode', { requestId, method: 'base64', size });
-    } else if (matchesKind(rawSniff)) {
-      buffer = rawBytes.buffer;
-      size = rawBytes.byteLength;
-      selectedSniff = rawSniff;
-      logInfo(env, 'media_decode', { requestId, method: 'raw', size });
+    if (matchesKind(first) && firstBytes) {
+      buffer = firstBytes.buffer;
+      size = firstBytes.byteLength;
+      selectedSniff = first;
+      logInfo(env, 'media_decode', { requestId, method: firstLabel, size });
+    } else if (matchesKind(second) && secondBytes) {
+      buffer = secondBytes.buffer;
+      size = secondBytes.byteLength;
+      selectedSniff = second;
+      logInfo(env, 'media_decode', { requestId, method: secondLabel, size });
     } else if (base64Bytes) {
       buffer = base64Bytes.buffer;
       size = base64Bytes.byteLength;

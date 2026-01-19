@@ -260,5 +260,9 @@ export const api = {
       requestId
     };
   },
+  deleteMedia: (key: string) =>
+    apiFetch<{ ok: true }>(`/api/media/${encodeURI(key)}`, {
+      method: 'DELETE'
+    }),
   mediaUrl: (key: string) => `/api/media/${encodeURI(key)}`
 };

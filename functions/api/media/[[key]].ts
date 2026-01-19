@@ -1,5 +1,5 @@
 import type { Env } from '../../types';
-import { jsonError } from '../../responses';
+import { jsonError, jsonOk } from '../../responses';
 import { logError, logInfo, logWarn } from '../../_lib/log';
 
 export const onRequestGet: PagesFunction<Env> = async ({ env, params, data, request }) => {
@@ -124,5 +124,44 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params, data, requ
       stack: error instanceof Error ? error.stack : undefined
     });
     return jsonError({ code: 'server_error', message: 'Media fetch failed' }, 500);
+  }
+};
+
+export const onRequestDelete: PagesFunction<Env> = async ({ env, params, data, request }) => {
+  const requestId = data.requestId ?? request.headers.get('x-request-id') ?? 'unknown';
+  const raw = params.key;
+  const key = Array.isArray(raw) ? raw.join('/') : raw;
+  if (!key) {
+    return jsonError({ code: 'invalid_request', message: 'Missing media key' }, 400);
+  }
+
+  if (!data.user) {
+    return jsonError({ code: 'unauthorized', message: 'Authentication required' }, 401);
+  }
+
+  if (!key.startsWith(`user/${data.user.id}/`)) {
+    return jsonError({ code: 'forbidden', message: 'Access denied' }, 403);
+  }
+
+  logInfo(env, 'media_delete_start', {
+    requestId,
+    key,
+    userId: data.user.id
+  });
+
+  try {
+    const start = performance.now();
+    await env.BUCKET.delete(key);
+    const durationMs = Math.round(performance.now() - start);
+    logInfo(env, 'r2_delete', { requestId, key, durationMs });
+    return jsonOk({ ok: true });
+  } catch (error) {
+    logError(env, 'media_delete_error', {
+      requestId,
+      key,
+      message: error instanceof Error ? error.message : 'unknown_error',
+      stack: error instanceof Error ? error.stack : undefined
+    });
+    return jsonError({ code: 'server_error', message: 'Media delete failed' }, 500);
   }
 };

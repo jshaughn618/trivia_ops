@@ -256,6 +256,28 @@ export function EditionDetailPage() {
     }
   };
 
+  const handleDeleteMedia = async (item?: EditionItem) => {
+    if (!itemDraft.media_key) return;
+    setMediaUploading(true);
+    setMediaError(null);
+    const res = await api.deleteMedia(itemDraft.media_key);
+    setMediaUploading(false);
+    if (!res.ok) {
+      setMediaError(res.error.message);
+      return;
+    }
+    if (item) {
+      await api.updateEditionItem(item.id, { media_type: null, media_key: null });
+    }
+    setItemDraft((draft) => ({
+      ...draft,
+      media_type: '',
+      media_key: '',
+      media_filename: ''
+    }));
+    load();
+  };
+
   const handleDraftUpload = async (file: File) => {
     if (gameTypeId === 'audio' && file.type !== 'audio/mpeg') {
       setMediaError('Audio rounds require MP3 files.');
@@ -756,6 +778,15 @@ export function EditionDetailPage() {
                                   : 'Upload Image'}
                             </button>
                             {itemDraft.media_key && (
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteMedia(item)}
+                                className="border-2 border-danger px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-danger hover:border-[#9d2a24]"
+                              >
+                                Delete Media
+                              </button>
+                            )}
+                            {itemDraft.media_key && (
                               <span className="text-[10px] uppercase tracking-[0.2em] text-muted">
                                 {gameTypeId === 'audio' ? 'Audio attached' : 'Image attached'}
                                 {itemDraft.media_filename ? ` • ${itemDraft.media_filename}` : ''}
@@ -958,6 +989,15 @@ export function EditionDetailPage() {
                           ? 'Upload MP3'
                           : 'Upload Image'}
                     </button>
+                    {itemDraft.media_key && (
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteMedia()}
+                        className="border-2 border-danger px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-danger hover:border-[#9d2a24]"
+                      >
+                        Delete Media
+                      </button>
+                    )}
                     {itemDraft.media_key && (
                       <span className="text-[10px] uppercase tracking-[0.2em] text-muted">
                         {gameTypeId === 'audio' ? 'Audio attached' : 'Image attached'}
