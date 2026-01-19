@@ -45,6 +45,11 @@ export function EditionDetailPage() {
   const [infoOpen, setInfoOpen] = useState(true);
   const [mediaUploading, setMediaUploading] = useState(false);
   const [mediaError, setMediaError] = useState<string | null>(null);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkText, setBulkText] = useState('');
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const [bulkError, setBulkError] = useState<string | null>(null);
+  const [bulkResult, setBulkResult] = useState<string | null>(null);
   const [activeItemId, setActiveItemId] = useState<string | null>(null);
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const editUploadRef = useRef<HTMLInputElement | null>(null);
@@ -119,9 +124,10 @@ export function EditionDetailPage() {
     } else if (!itemDraft.answer.trim()) {
       return;
     }
+    const answerValue = gameTypeId === 'audio' ? undefined : itemDraft.answer.trim();
     const res = await api.createEditionItem(editionId, {
       prompt: itemDraft.prompt,
-      answer: itemDraft.answer,
+      answer: answerValue,
       answer_a: itemDraft.answer_a || null,
       answer_b: itemDraft.answer_b || null,
       answer_a_label: itemDraft.answer_a_label || null,
@@ -162,9 +168,11 @@ export function EditionDetailPage() {
   };
 
   const saveEdit = async (item: EditionItem) => {
+    if (gameTypeId !== 'audio' && !itemDraft.answer.trim()) return;
+    const answerValue = gameTypeId === 'audio' ? undefined : itemDraft.answer.trim();
     const res = await api.updateEditionItem(item.id, {
       prompt: itemDraft.prompt,
-      answer: itemDraft.answer,
+      answer: answerValue,
       answer_a: itemDraft.answer_a || null,
       answer_b: itemDraft.answer_b || null,
       answer_a_label: itemDraft.answer_a_label || null,
@@ -339,6 +347,79 @@ export function EditionDetailPage() {
     setItemDraft((draft) => ({ ...draft, fun_fact: line.trim() }));
   };
 
+  const parseBulkJson = (text: string) => {
+    const trimmed = text.trim().replace(/^```json/i, '').replace(/^```/i, '').replace(/```$/, '').trim();
+    const start = trimmed.indexOf('[');
+    const end = trimmed.lastIndexOf(']');
+    const jsonText = start >= 0 && end >= 0 ? trimmed.slice(start, end + 1) : trimmed;
+    return JSON.parse(jsonText) as Array<{
+      prompt: string;
+      answer?: string;
+      answer_a?: string;
+      answer_b?: string;
+      answer_a_label?: string;
+      answer_b_label?: string;
+      fun_fact?: string;
+    }>;
+  };
+
+  const handleBulkGenerate = async () => {
+    if (!bulkText.trim()) return;
+    setBulkLoading(true);
+    setBulkError(null);
+    setBulkResult(null);
+    setActiveItemId(null);
+    const formatNote =
+      gameTypeId === 'audio'
+        ? 'Each item must include answer_a and answer_b. If labels are provided, include answer_a_label and answer_b_label.'
+        : 'Each item must include answer.';
+    const prompt = `Parse the following text into trivia items without altering any question or answer text. Do not rewrite or correct. Return ONLY valid JSON array. ${formatNote}\n\nOutput format:\n[{\n  \"prompt\": \"...\",\n  \"answer\": \"...\",\n  \"answer_a\": \"...\",\n  \"answer_b\": \"...\",\n  \"answer_a_label\": \"...\",\n  \"answer_b_label\": \"...\"\n}]\n\nInput:\n${bulkText.trim()}`;
+    const res = await api.aiGenerate({ prompt, max_output_tokens: 900 });
+    setBulkLoading(false);
+    if (!res.ok) {
+      setBulkError(res.error.message);
+      return;
+    }
+
+    let parsed: ReturnType<typeof parseBulkJson>;
+    try {
+      parsed = parseBulkJson(res.data.text);
+    } catch (error) {
+      setBulkError('Could not parse the AI response. Try a simpler input block.');
+      return;
+    }
+
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      setBulkError('No items were parsed.');
+      return;
+    }
+
+    const baseOrdinal = nextOrdinal;
+    for (let index = 0; index < parsed.length; index += 1) {
+      const entry = parsed[index];
+      if (!entry.prompt) continue;
+      if (gameTypeId === 'audio') {
+        if (!entry.answer_a || !entry.answer_b) continue;
+      } else if (!entry.answer) {
+        continue;
+      }
+      await api.createEditionItem(editionId!, {
+        prompt: entry.prompt,
+        answer: entry.answer ?? '',
+        answer_a: entry.answer_a ?? null,
+        answer_b: entry.answer_b ?? null,
+        answer_a_label: entry.answer_a_label ?? null,
+        answer_b_label: entry.answer_b_label ?? null,
+        fun_fact: entry.fun_fact ?? null,
+        ordinal: baseOrdinal + index
+      });
+    }
+    setBulkResult(`Added ${parsed.length} items`);
+    setBulkText('');
+    setBulkOpen(false);
+    load();
+  };
+
   if (!edition) {
     return (
       <AppShell title="Edition Detail">
@@ -422,7 +503,40 @@ export function EditionDetailPage() {
             </div>
           )}
         </Panel>
-        <Panel title="Items">
+        <Panel
+          title="Items"
+          action={
+            <SecondaryButton onClick={() => setBulkOpen((prev) => !prev)}>
+              {bulkOpen ? 'Close Import' : 'Bulk Add'}
+            </SecondaryButton>
+          }
+        >
+          {bulkOpen && (
+            <div className="mb-4 border-2 border-border bg-panel2 p-3">
+              <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">Bulk Import</div>
+              <div className="mt-2 text-[10px] uppercase tracking-[0.2em] text-muted">
+                Paste question/answer blocks. AI will parse without rewriting.
+              </div>
+              <textarea
+                className="mt-3 min-h-[140px] w-full px-3 py-2"
+                value={bulkText}
+                onChange={(event) => setBulkText(event.target.value)}
+                placeholder="Q: ... A: ... (or one per line)"
+              />
+              <div className="mt-3 flex flex-wrap gap-2">
+                <PrimaryButton onClick={handleBulkGenerate} disabled={bulkLoading}>
+                  {bulkLoading ? 'Generating' : 'Generate'}
+                </PrimaryButton>
+                <SecondaryButton onClick={() => setBulkOpen(false)}>Cancel</SecondaryButton>
+              </div>
+              {bulkError && (
+                <div className="mt-2 text-xs uppercase tracking-[0.2em] text-danger">{bulkError}</div>
+              )}
+              {bulkResult && (
+                <div className="mt-2 text-xs uppercase tracking-[0.2em] text-muted">{bulkResult}</div>
+              )}
+            </div>
+          )}
           <div className="flex flex-col gap-3">
             {orderedItems.length === 0 && (
               <div className="text-xs uppercase tracking-[0.2em] text-muted">No items yet.</div>
