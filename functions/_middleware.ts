@@ -10,7 +10,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
   const publicRoutes = ['/login', '/api/login'];
   const publicPrefixes = ['/play', '/api/public'];
-  const isStatic = path.startsWith('/assets/') || /\.[a-zA-Z0-9]+$/.test(path);
+  const isStatic = !path.startsWith('/api/') && (path.startsWith('/assets/') || /\.[a-zA-Z0-9]+$/.test(path));
 
   if (publicRoutes.includes(path) || publicPrefixes.some((prefix) => path.startsWith(prefix)) || isStatic) {
     return context.next();
