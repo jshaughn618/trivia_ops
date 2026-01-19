@@ -91,6 +91,11 @@ export function EventRunPage() {
   useEffect(() => {
     if (roundId) loadItems(roundId);
   }, [roundId]);
+  useEffect(() => {
+    if (roundId || rounds.length === 0) return;
+    const nextRound = rounds.find((round) => round.status !== 'completed') ?? rounds[0];
+    if (nextRound) setRoundId(nextRound.id);
+  }, [rounds, roundId]);
 
   const editionById = useMemo(() => {
     return Object.fromEntries(editions.map((edition) => [edition.id, edition]));
@@ -267,6 +272,12 @@ export function EventRunPage() {
     await load();
   };
 
+  const setCompleted = async () => {
+    if (!activeRound) return;
+    await api.updateEventRound(activeRound.id, { status: 'completed' });
+    await load();
+  };
+
   const saveWaitingRoom = async () => {
     if (!eventId) return;
     setWaitingSaving(true);
@@ -427,6 +438,11 @@ export function EventRunPage() {
                     Go Offline
                   </SecondaryButton>
                 )}
+                {activeRound?.status !== 'completed' && (
+                  <SecondaryButton onClick={setCompleted} disabled={!activeRound}>
+                    Mark Completed
+                  </SecondaryButton>
+                )}
               </div>
               <div className="text-xs uppercase tracking-[0.2em] text-muted">
                 Item {items.length === 0 ? 0 : index + 1} / {items.length}
@@ -437,21 +453,42 @@ export function EventRunPage() {
           )}
         </Panel>
         <div className="flex flex-col gap-4">
+          <Panel title="Rounds">
+            <div className="flex flex-col gap-3">
+              {rounds.length === 0 && (
+                <div className="text-xs uppercase tracking-[0.2em] text-muted">No rounds yet.</div>
+              )}
+              {rounds.map((round) => {
+                const display = roundDisplay(round);
+                const selected = round.id === roundId;
+                const isCompleted = round.status === 'completed';
+                return (
+                  <button
+                    key={round.id}
+                    type="button"
+                    onClick={() => setRoundId(round.id)}
+                    className={`flex w-full flex-col gap-2 border-2 px-3 py-2 text-left ${
+                      selected
+                        ? 'border-accent bg-panel text-text'
+                        : isCompleted
+                          ? 'border-border bg-panel2 text-muted'
+                          : 'border-border bg-panel2'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs font-display uppercase tracking-[0.2em]">{display.title}</div>
+                      <StampBadge label={round.status.toUpperCase()} variant="inspected" />
+                    </div>
+                    <div className="text-[10px] uppercase tracking-[0.2em] text-muted">{display.detail}</div>
+                  </button>
+                );
+              })}
+            </div>
+          </Panel>
           <Panel title="Round Control">
             <div className="flex flex-col gap-4">
               <div className="text-xs uppercase tracking-[0.2em] text-muted">Event</div>
               <div className="text-sm font-display uppercase tracking-[0.2em]">{event.title}</div>
-              <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-                Select Round
-                <select className="h-10 px-3" value={roundId} onChange={(event) => setRoundId(event.target.value)}>
-                  <option value="">Choose round</option>
-                  {rounds.map((round) => (
-                    <option key={round.id} value={round.id}>
-                      {roundDisplay(round).title} — {roundDisplay(round).detail}
-                    </option>
-                  ))}
-                </select>
-              </label>
               <div className="border-2 border-border bg-panel2 p-3 text-xs uppercase tracking-[0.2em] text-muted">
                 {activeRound ? `Status: ${activeRound.status}` : 'Awaiting round selection'}
               </div>
