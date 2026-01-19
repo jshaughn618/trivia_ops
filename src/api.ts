@@ -12,25 +12,63 @@ import type {
   Team,
   User
 } from './types';
+import { createRequestId, logError, logInfo, logWarn } from './lib/log';
 
 async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<ApiEnvelope<T>> {
+  const requestId = createRequestId();
+  const method = (options.method ?? 'GET').toUpperCase();
+  const start = performance.now();
+  logInfo('api_request_start', { requestId, method, path });
   const res = await fetch(path, {
     ...options,
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
+      'x-request-id': requestId,
       ...(options.headers ?? {})
     }
   });
 
   const text = await res.text();
-  const json = text ? JSON.parse(text) : null;
-  if (json && typeof json.ok === 'boolean') {
+  let json: unknown = null;
+  if (text) {
+    try {
+      json = JSON.parse(text);
+    } catch {
+      logWarn('api_response_non_json', {
+        requestId,
+        method,
+        path,
+        status: res.status,
+        body_snippet: text.slice(0, 200)
+      });
+    }
+  }
+  const durationMs = Math.round(performance.now() - start);
+  const responseRequestId = res.headers.get('x-request-id');
+  logInfo('api_request_end', {
+    requestId,
+    responseRequestId,
+    method,
+    path,
+    status: res.status,
+    ok: res.ok,
+    durationMs
+  });
+  if (json && typeof json === 'object' && json !== null && 'ok' in json) {
     return json as ApiEnvelope<T>;
   }
 
   if (!res.ok) {
-    return { ok: false, error: { code: 'http_error', message: res.statusText } };
+    logError('api_request_failed', {
+      requestId,
+      responseRequestId,
+      method,
+      path,
+      status: res.status,
+      body_snippet: text.slice(0, 200)
+    });
+    return { ok: false, error: { code: 'http_error', message: res.statusText, details: text.slice(0, 200) } };
   }
 
   return { ok: true, data: json as T };
@@ -157,6 +195,8 @@ export const api = {
     }),
 
   uploadMedia: async (file: File, kind: 'image' | 'audio') => {
+    const requestId = createRequestId();
+    const start = performance.now();
     const form = new FormData();
     const fallbackName = kind === 'audio' ? 'upload.mp3' : 'upload.png';
     form.append('file', file, file.name || fallbackName);
@@ -165,11 +205,60 @@ export const api = {
     const res = await fetch('/api/media/upload', {
       method: 'POST',
       body: form,
-      credentials: 'include'
+      credentials: 'include',
+      headers: { 'x-request-id': requestId }
     });
     const text = await res.text();
-    const json = text ? JSON.parse(text) : null;
+    let json: unknown = null;
+    if (text) {
+      try {
+        json = JSON.parse(text);
+      } catch {
+        logWarn('media_upload_non_json', { requestId, status: res.status, body_snippet: text.slice(0, 200) });
+      }
+    }
+    const durationMs = Math.round(performance.now() - start);
+    logInfo('media_upload_end', { requestId, status: res.status, ok: res.ok, durationMs });
+    if (!res.ok) {
+      logError('media_upload_failed', { requestId, status: res.status, body_snippet: text.slice(0, 200) });
+    }
     return json as ApiEnvelope<{ key: string; media_type: 'image' | 'audio'; content_type: string }>;
+  },
+  fetchMedia: async (key: string) => {
+    const requestId = createRequestId();
+    const start = performance.now();
+    logInfo('media_fetch_start', { requestId, key });
+    const res = await fetch(`/api/media/${encodeURI(key)}`, {
+      method: 'GET',
+      credentials: 'include',
+      headers: { 'x-request-id': requestId }
+    });
+    const durationMs = Math.round(performance.now() - start);
+    if (!res.ok) {
+      const text = await res.text();
+      logError('media_fetch_failed', {
+        requestId,
+        key,
+        status: res.status,
+        durationMs,
+        body_snippet: text.slice(0, 200)
+      });
+      return { ok: false as const, error: { code: 'http_error', message: res.statusText, details: text.slice(0, 200) }, requestId };
+    }
+    const blob = await res.blob();
+    logInfo('media_fetch_end', {
+      requestId,
+      key,
+      status: res.status,
+      durationMs,
+      contentType: res.headers.get('content-type'),
+      size: blob.size
+    });
+    return {
+      ok: true as const,
+      data: { blob, contentType: res.headers.get('content-type') },
+      requestId
+    };
   },
   mediaUrl: (key: string) => `/api/media/${encodeURI(key)}`
 };
