@@ -65,7 +65,7 @@ export function LoginPage() {
         <div className="mt-4">
           <div className="text-3xl font-display tracking-tight">Join game</div>
           <div className="mt-2 text-sm text-muted">Enter the 4-character code from your host</div>
-          <div className="mt-1 text-xs text-muted">Tip: you can paste the full code.</div>
+          <div className="mt-1 text-xs text-muted">&nbsp;</div>
           <div className="mt-3 flex flex-col gap-3">
             <div className="flex justify-center gap-3">
               {code.map((value, index) => (
