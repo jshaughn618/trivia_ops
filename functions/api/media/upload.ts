@@ -8,8 +8,42 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, data }) 
   const kindEntry = form.get('kind');
   const fileBlob = file && typeof (file as Blob).arrayBuffer === 'function' ? (file as Blob) : null;
   let kind = typeof kindEntry === 'string' && kindEntry ? kindEntry : null;
+  let buffer: ArrayBuffer | null = null;
+  let size = 0;
 
-  if (!fileBlob) {
+  if (fileBlob) {
+    buffer = await fileBlob.arrayBuffer();
+    size = fileBlob.size;
+    if (!kind) {
+      if (fileBlob.type.startsWith('audio/')) kind = 'audio';
+      if (fileBlob.type.startsWith('image/')) kind = 'image';
+    }
+  } else if (typeof file === 'string' && file.length > 0) {
+    let raw = file;
+    let mime: string | null = null;
+    if (raw.startsWith('data:')) {
+      const match = raw.match(/^data:([^;]+);base64,(.*)$/s);
+      if (match) {
+        mime = match[1];
+        raw = match[2];
+      }
+    }
+    const cleaned = raw.replace(/\s+/g, '');
+    if (!/^[A-Za-z0-9+/=]+$/.test(cleaned)) {
+      return jsonError({ code: 'invalid_request', message: 'Invalid file encoding' }, 400);
+    }
+    const binary = atob(cleaned);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    buffer = bytes.buffer;
+    size = bytes.byteLength;
+    if (!kind && mime) {
+      if (mime.startsWith('audio/')) kind = 'audio';
+      if (mime.startsWith('image/')) kind = 'image';
+    }
+  } else {
     const fileValue = file as unknown;
     return jsonError(
       {
@@ -31,21 +65,15 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, data }) 
     );
   }
 
-  if (!kind) {
-    if (fileBlob.type.startsWith('audio/')) kind = 'audio';
-    if (fileBlob.type.startsWith('image/')) kind = 'image';
-  }
-
   if (kind !== 'image' && kind !== 'audio') {
     return jsonError({ code: 'invalid_request', message: 'Invalid media kind' }, 400);
   }
 
   const maxBytes = kind === 'image' ? MAX_IMAGE_BYTES : MAX_AUDIO_BYTES;
-  if (fileBlob.size > maxBytes) {
+  if (size > maxBytes) {
     return jsonError({ code: 'file_too_large', message: 'File exceeds size limit' }, 400);
   }
 
-  const buffer = await fileBlob.arrayBuffer();
   const sniff = sniffMedia(new Uint8Array(buffer));
   if (!sniff || sniff.kind !== kind) {
     return jsonError({ code: 'invalid_media', message: 'Unsupported media type' }, 400);
