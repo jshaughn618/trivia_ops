@@ -70,25 +70,6 @@ export function EventRunPage() {
     if (roundId) loadItems(roundId);
   }, [roundId]);
 
-  useEffect(() => {
-    if (timerRef.current) {
-      window.clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-    setElapsedSeconds(0);
-    if (activeRound?.status === 'live' && items.length > 0) {
-      timerRef.current = window.setInterval(() => {
-        setElapsedSeconds((prev) => prev + 1);
-      }, 1000);
-    }
-    return () => {
-      if (timerRef.current) {
-        window.clearInterval(timerRef.current);
-        timerRef.current = null;
-      }
-    };
-  }, [activeRound?.status, roundId, index, items.length]);
-
   const editionById = useMemo(() => {
     return Object.fromEntries(editions.map((edition) => [edition.id, edition]));
   }, [editions]);
@@ -110,6 +91,25 @@ export function EventRunPage() {
 
   const activeRound = useMemo(() => rounds.find((round) => round.id === roundId) ?? null, [rounds, roundId]);
   const item = items[index];
+
+  useEffect(() => {
+    if (timerRef.current) {
+      window.clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    setElapsedSeconds(0);
+    if (activeRound?.status === 'live' && items.length > 0) {
+      timerRef.current = window.setInterval(() => {
+        setElapsedSeconds((prev) => prev + 1);
+      }, 1000);
+    }
+    return () => {
+      if (timerRef.current) {
+        window.clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, [activeRound?.status, roundId, index, items.length]);
 
   const nextItem = () => {
     if (index < items.length - 1) {
