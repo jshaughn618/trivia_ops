@@ -210,7 +210,16 @@ export function EventDetailPage() {
       <div className="grid gap-4 lg:grid-cols-[1fr,340px]">
         <Panel
           title="Event Status"
-          action={<ButtonLink to={`/events/${event.id}/run`} variant="primary">Run Event</ButtonLink>}
+          action={
+            <div className="flex flex-wrap items-center gap-2">
+              <ButtonLink to={`/events/${event.id}/leaderboard`} variant="secondary">
+                Leaderboard
+              </ButtonLink>
+              <ButtonLink to={`/events/${event.id}/run`} variant="primary">
+                Run Event
+              </ButtonLink>
+            </div>
+          }
         >
           <div className="grid gap-4">
             <div className="border-2 border-border bg-panel2 p-3">

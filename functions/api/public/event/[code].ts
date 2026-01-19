@@ -69,6 +69,67 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
   );
 
   let currentItem = null;
+  let visualRound = false;
+  let visualItems: Array<{
+    id: string;
+    prompt: string;
+    answer: string;
+    answer_a: string | null;
+    answer_b: string | null;
+    answer_a_label: string | null;
+    answer_b_label: string | null;
+    fun_fact: string | null;
+    media_type: string | null;
+    media_key: string | null;
+    ordinal: number;
+  }> = [];
+
+  if (live?.active_round_id) {
+    const roundStatus = await queryFirst<{ status: string }>(
+      env,
+      'SELECT status FROM event_rounds WHERE id = ? AND COALESCE(deleted, 0) = 0',
+      [live.active_round_id]
+    );
+    if (roundStatus?.status === 'live') {
+      const roundItems = await queryAll<{
+        id: string;
+        prompt: string;
+        answer: string;
+        answer_a: string | null;
+        answer_b: string | null;
+        answer_a_label: string | null;
+        answer_b_label: string | null;
+        fun_fact: string | null;
+        media_type: string | null;
+        media_key: string | null;
+        ordinal: number;
+      }>(
+        env,
+        `SELECT
+          ei.id,
+          COALESCE(eri.overridden_prompt, ei.prompt) AS prompt,
+          COALESCE(eri.overridden_answer, ei.answer) AS answer,
+          ei.answer_a,
+          ei.answer_b,
+          ei.answer_a_label,
+          ei.answer_b_label,
+          COALESCE(eri.overridden_fun_fact, ei.fun_fact) AS fun_fact,
+          ei.media_type,
+          ei.media_key,
+          eri.ordinal
+         FROM event_round_items eri
+         JOIN edition_items ei ON ei.id = eri.edition_item_id
+         WHERE eri.event_round_id = ? AND COALESCE(eri.deleted, 0) = 0 AND COALESCE(ei.deleted, 0) = 0
+         ORDER BY eri.ordinal ASC`,
+        [live.active_round_id]
+      );
+      const imageItems = roundItems.filter((item) => item.media_type === 'image' && item.media_key);
+      if (roundItems.length > 0 && imageItems.length === roundItems.length) {
+        visualRound = true;
+        visualItems = imageItems;
+      }
+    }
+  }
   if (live?.active_round_id && live.current_item_ordinal) {
     currentItem = await queryFirst(
       env,
@@ -108,6 +169,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
           waiting_show_next_round: Boolean(live.waiting_show_next_round)
         }
       : null,
-    current_item: currentItem
+    current_item: currentItem,
+    visual_round: visualRound,
+    visual_items: visualItems
   });
 };

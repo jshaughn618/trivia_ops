@@ -11,6 +11,7 @@ import { EventsPage } from './pages/Events';
 import { EventNewPage } from './pages/EventNew';
 import { EventDetailPage } from './pages/EventDetail';
 import { EventRunPage } from './pages/EventRun';
+import { EventLeaderboardPage } from './pages/EventLeaderboard';
 import { LocationsPage } from './pages/Locations';
 import { LocationDetailPage } from './pages/LocationDetail';
 import { SettingsPage } from './pages/Settings';
@@ -100,6 +101,14 @@ export function App() {
         element={
           <RequireAuth>
             <EventRunPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/events/:eventId/leaderboard"
+        element={
+          <RequireAuth>
+            <EventLeaderboardPage />
           </RequireAuth>
         }
       />

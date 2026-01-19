@@ -29,6 +29,20 @@ type PublicEventResponse = {
     waiting_show_leaderboard: boolean;
     waiting_show_next_round: boolean;
   } | null;
+  visual_round?: boolean;
+  visual_items?: {
+    id: string;
+    prompt: string;
+    answer: string;
+    answer_a: string | null;
+    answer_b: string | null;
+    answer_a_label: string | null;
+    answer_b_label: string | null;
+    fun_fact: string | null;
+    media_type: string | null;
+    media_key: string | null;
+    ordinal: number;
+  }[];
   current_item: {
     prompt: string;
     answer: string;
@@ -53,6 +67,7 @@ export function PlayEventPage() {
   const [teamNameLabel, setTeamNameLabel] = useState<string | null>(null);
   const [teamMenuOpen, setTeamMenuOpen] = useState(false);
   const [mediaError, setMediaError] = useState<string | null>(null);
+  const [visualIndex, setVisualIndex] = useState(0);
   const { theme, toggleTheme } = useTheme();
   const normalizedCode = useMemo(() => (code ?? '').trim().toUpperCase(), [code]);
 
@@ -89,7 +104,11 @@ export function PlayEventPage() {
 
   useEffect(() => {
     setMediaError(null);
-  }, [data?.current_item?.media_key, data?.current_item?.media_type]);
+  }, [data?.current_item?.media_key, data?.current_item?.media_type, visualIndex, data?.visual_items?.length]);
+
+  useEffect(() => {
+    setVisualIndex(0);
+  }, [data?.live?.active_round_id, data?.visual_items?.length]);
 
   const handleJoin = async () => {
     if (!data) return;
@@ -146,14 +165,19 @@ export function PlayEventPage() {
   const isClosed = data.event.status === 'completed' || data.event.status === 'canceled';
   const activeRound = data.rounds.find((round) => round.id === data.live?.active_round_id) ?? null;
   const isLive = activeRound?.status === 'live';
+  const visualItems = data.visual_items ?? [];
+  const visualMode = isLive && data.visual_round && visualItems.length > 0;
   const waitingMessage = data.live?.waiting_message?.trim() ?? '';
   const waitingShowLeaderboard = data.live?.waiting_show_leaderboard ?? false;
   const waitingShowNextRound = data.live?.waiting_show_next_round ?? true;
-  const questionLabel = activeRound && data.live?.current_item_ordinal
-    ? `Round ${activeRound.round_number} • Question ${data.live.current_item_ordinal}`
-    : 'Question';
-  const answerText = data.current_item?.answer || (data.current_item?.answer_a && data.current_item?.answer_b
-    ? `${data.current_item.answer_a_label ? `${data.current_item.answer_a_label}: ` : 'A: '}${data.current_item.answer_a} / ${data.current_item.answer_b_label ? `${data.current_item.answer_b_label}: ` : 'B: '}${data.current_item.answer_b}`
+  const displayItem = visualMode ? visualItems[visualIndex] : data.current_item;
+  const questionLabel = visualMode
+    ? `Round ${activeRound?.round_number ?? ''} • Image ${visualIndex + 1} of ${visualItems.length}`.trim()
+    : activeRound && data.live?.current_item_ordinal
+      ? `Round ${activeRound.round_number} • Question ${data.live.current_item_ordinal}`
+      : 'Question';
+  const answerText = displayItem?.answer || (displayItem?.answer_a && displayItem?.answer_b
+    ? `${displayItem.answer_a_label ? `${displayItem.answer_a_label}: ` : 'A: '}${displayItem.answer_a} / ${displayItem.answer_b_label ? `${displayItem.answer_b_label}: ` : 'B: '}${displayItem.answer_b}`
     : null);
   const nextRound = (() => {
     const rounds = data?.rounds ?? [];
@@ -276,24 +300,47 @@ export function PlayEventPage() {
                     <div className="mt-2 text-lg font-display">Round {activeRound.round_number}</div>
                     <div className="mt-1 text-sm text-muted">{activeRound.label}</div>
                   </div>
-                  {data.current_item ? (
+                  {displayItem ? (
                     <>
                       <div className="rounded-md bg-panel2 p-4">
                         <div className="ui-label">{questionLabel}</div>
                         <div className="mt-3 text-3xl font-display leading-tight md:text-5xl">
-                          {data.current_item.prompt}
+                          {displayItem.prompt}
                         </div>
-                        {data.current_item.media_type === 'image' && data.current_item.media_key && (
+                        {visualMode && (
+                          <div className="mt-4 flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-muted">
+                            <button
+                              type="button"
+                              onClick={() => setVisualIndex((prev) => Math.max(prev - 1, 0))}
+                              disabled={visualIndex === 0}
+                              className="border border-border px-3 py-1 disabled:opacity-50"
+                            >
+                              Prev
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setVisualIndex((prev) => Math.min(prev + 1, visualItems.length - 1))}
+                              disabled={visualIndex >= visualItems.length - 1}
+                              className="border border-border px-3 py-1 disabled:opacity-50"
+                            >
+                              Next
+                            </button>
+                            <span>
+                              Image {visualIndex + 1} / {visualItems.length}
+                            </span>
+                          </div>
+                        )}
+                        {displayItem.media_type === 'image' && displayItem.media_key && (
                           <div className="mt-4 rounded-md border border-border bg-panel p-2">
                             <img
                               className="max-h-[50vh] w-full object-contain"
-                              src={api.publicMediaUrl(data.event.public_code, data.current_item.media_key)}
+                              src={api.publicMediaUrl(data.event.public_code, displayItem.media_key)}
                               alt="Media"
                               onError={() => {
                                 setMediaError('Media unavailable.');
                                 logError('participant_media_error', {
                                   eventId: data.event.id,
-                                  mediaKey: data.current_item?.media_key ?? null
+                                  mediaKey: displayItem?.media_key ?? null
                                 });
                               }}
                             />
@@ -304,7 +351,7 @@ export function PlayEventPage() {
                             {mediaError}
                           </div>
                         )}
-                        {data.current_item.media_type === 'audio' && (
+                        {displayItem.media_type === 'audio' && (
                           <div className="mt-4 flex items-center gap-3 rounded-md border border-border bg-panel px-3 py-3">
                             <span className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border bg-panel2">
                               <svg
@@ -337,10 +384,10 @@ export function PlayEventPage() {
                           </div>
                         </div>
                       )}
-                      {data.live?.reveal_fun_fact && data.current_item.fun_fact && (
+                      {data.live?.reveal_fun_fact && displayItem.fun_fact && (
                         <div className="rounded-md bg-panel p-4">
                           <div className="ui-label">Factoid</div>
-                          <div className="mt-2 text-base text-text">{data.current_item.fun_fact}</div>
+                          <div className="mt-2 text-base text-text">{displayItem.fun_fact}</div>
                         </div>
                       )}
                     </>

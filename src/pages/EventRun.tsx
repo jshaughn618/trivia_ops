@@ -570,6 +570,11 @@ export function EventRunPage() {
                   {waitingError}
                 </div>
               )}
+              {waitingShowLeaderboard && (
+                <SecondaryButton onClick={() => window.open(`/events/${eventId}/leaderboard`, '_blank')}>
+                  View Full Leaderboard
+                </SecondaryButton>
+              )}
               <PrimaryButton onClick={saveWaitingRoom} disabled={waitingSaving}>
                 {waitingSaving ? 'Updating…' : 'Update Waiting Room'}
               </PrimaryButton>
