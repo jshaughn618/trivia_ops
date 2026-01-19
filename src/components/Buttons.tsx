@@ -2,13 +2,13 @@ import type { ButtonHTMLAttributes, AnchorHTMLAttributes } from 'react';
 import { Link, type LinkProps } from 'react-router-dom';
 
 const base =
-  'inline-flex items-center justify-center gap-2 px-4 py-2 border-2 text-xs font-display uppercase tracking-[0.2em] transition-colors duration-150';
+  'inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg disabled:pointer-events-none disabled:opacity-50';
 
 export function PrimaryButton(props: ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
     <button
       {...props}
-      className={`${base} bg-accent text-bg border-accent hover:bg-[#e6b900] ${props.className ?? ''}`}
+      className={`${base} border border-transparent bg-accent text-accent-fg hover:brightness-95 active:brightness-90 ${props.className ?? ''}`}
     />
   );
 }
@@ -17,7 +17,7 @@ export function SecondaryButton(props: ButtonHTMLAttributes<HTMLButtonElement>) 
   return (
     <button
       {...props}
-      className={`${base} bg-panel2 text-text border-border hover:border-accent ${props.className ?? ''}`}
+      className={`${base} border border-border bg-panel text-text hover:bg-panel2 ${props.className ?? ''}`}
     />
   );
 }
@@ -26,17 +26,21 @@ export function DangerButton(props: ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
     <button
       {...props}
-      className={`${base} bg-danger text-text border-danger hover:bg-[#9d2a24] ${props.className ?? ''}`}
+      className={`${base} border border-transparent bg-danger text-danger-fg hover:brightness-95 active:brightness-90 ${props.className ?? ''}`}
     />
   );
 }
 
-export function ButtonLink(props: LinkProps & { variant?: 'primary' | 'secondary' }) {
+export function ButtonLink(props: LinkProps & { variant?: 'primary' | 'secondary' | 'ghost' | 'outline' }) {
   const variant = props.variant ?? 'secondary';
   const variantClass =
     variant === 'primary'
-      ? 'bg-accent text-bg border-accent hover:bg-[#e6b900]'
-      : 'bg-panel2 text-text border-border hover:border-accent';
+      ? 'border border-transparent bg-accent text-accent-fg hover:brightness-95 active:brightness-90'
+      : variant === 'ghost'
+        ? 'border border-transparent bg-transparent text-text hover:bg-panel2'
+        : variant === 'outline'
+          ? 'border border-accent-ink text-accent-ink hover:bg-accent-soft'
+          : 'border border-border bg-panel text-text hover:bg-panel2';
 
   return (
     <Link
@@ -50,7 +54,7 @@ export function TextLink(props: AnchorHTMLAttributes<HTMLAnchorElement>) {
   return (
     <a
       {...props}
-      className={`text-accent uppercase tracking-[0.2em] text-xs hover:text-[#e6b900] ${props.className ?? ''}`}
+      className={`text-sm font-medium text-accent-ink hover:underline ${props.className ?? ''}`}
     />
   );
 }

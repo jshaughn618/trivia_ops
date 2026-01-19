@@ -512,7 +512,7 @@ export function EditionDetailPage() {
             <button
               type="button"
               onClick={() => setInfoOpen((prev) => !prev)}
-              className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent hover:text-text"
+              className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
             >
               {infoOpen ? 'Collapse' : 'Expand'}
             </button>
@@ -549,7 +549,7 @@ export function EditionDetailPage() {
                 <button
                   type="button"
                   onClick={generateMeta}
-                  className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent hover:text-text"
+                  className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
                   disabled={metaLoading}
                 >
                   {metaLoading ? 'Generating' : 'Generate Details'}
@@ -619,7 +619,7 @@ export function EditionDetailPage() {
             {orderedItems.map((item, index) => (
               <div key={item.id} className="flex flex-col gap-3">
                 <div
-                  className={`border-2 ${activeItemId === item.id ? 'border-accent' : 'border-border'} bg-panel2 p-3`}
+                  className={`border-2 ${activeItemId === item.id ? 'border-accent-ink' : 'border-border'} bg-panel2 p-3`}
                   draggable
                   role="button"
                   tabIndex={0}
@@ -650,7 +650,7 @@ export function EditionDetailPage() {
                           event.stopPropagation();
                           startEdit(item);
                         }}
-                        className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent hover:text-text"
+                        className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
                       >
                         Edit Item
                       </button>
@@ -690,7 +690,7 @@ export function EditionDetailPage() {
                           <button
                             type="button"
                             onClick={startRefine}
-                            className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent hover:text-text"
+                            className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
                           >
                             Refine
                           </button>
@@ -708,7 +708,7 @@ export function EditionDetailPage() {
                             <button
                               type="button"
                               onClick={generateAnswer}
-                              className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent hover:text-text"
+                              className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
                               disabled={answerLoading}
                             >
                               {answerLoading ? 'Generating' : 'Generate'}
@@ -768,7 +768,7 @@ export function EditionDetailPage() {
                           <button
                             type="button"
                             onClick={generateFunFact}
-                            className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent hover:text-text"
+                            className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
                             disabled={factLoading}
                           >
                             {factLoading ? 'Generating' : 'Generate'}
@@ -798,7 +798,7 @@ export function EditionDetailPage() {
                             <button
                               type="button"
                               onClick={() => editUploadRef.current?.click()}
-                              className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent hover:text-text"
+                              className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
                             >
                               {mediaUploading
                                 ? 'Uploading'
@@ -862,7 +862,7 @@ export function EditionDetailPage() {
                                 key={option}
                                 type="button"
                                 onClick={() => applyRefine(option)}
-                                className="border-2 border-border bg-panel px-3 py-2 text-left text-xs uppercase tracking-[0.2em] text-text hover:border-accent"
+                                className="border-2 border-border bg-panel px-3 py-2 text-left text-xs uppercase tracking-[0.2em] text-text hover:border-accent-ink"
                               >
                                 {option}
                               </button>
@@ -872,21 +872,21 @@ export function EditionDetailPage() {
                             <button
                               type="button"
                               onClick={startRefine}
-                              className="border-2 border-border px-3 py-2 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent hover:text-text"
+                              className="border-2 border-border px-3 py-2 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
                             >
                               Generate Again
                             </button>
                             <button
                               type="button"
                               onClick={keepOriginal}
-                              className="border-2 border-border px-3 py-2 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent hover:text-text"
+                              className="border-2 border-border px-3 py-2 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
                             >
                               Keep Original
                             </button>
                             <button
                               type="button"
                               onClick={() => setRefineOpen(false)}
-                              className="border-2 border-border px-3 py-2 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent hover:text-text"
+                              className="border-2 border-border px-3 py-2 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
                             >
                               Close
                             </button>
@@ -909,7 +909,7 @@ export function EditionDetailPage() {
                   <button
                     type="button"
                     onClick={startRefine}
-                    className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent hover:text-text"
+                    className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
                   >
                     Refine
                   </button>
@@ -927,7 +927,7 @@ export function EditionDetailPage() {
                     <button
                       type="button"
                       onClick={generateAnswer}
-                      className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent hover:text-text"
+                      className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
                       disabled={answerLoading}
                     >
                       {answerLoading ? 'Generating' : 'Generate'}
@@ -987,7 +987,7 @@ export function EditionDetailPage() {
                   <button
                     type="button"
                     onClick={generateFunFact}
-                    className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent hover:text-text"
+                    className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
                     disabled={factLoading}
                   >
                     {factLoading ? 'Generating' : 'Generate'}
@@ -1017,7 +1017,7 @@ export function EditionDetailPage() {
                     <button
                       type="button"
                       onClick={() => newUploadRef.current?.click()}
-                      className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent hover:text-text"
+                      className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
                     >
                       {mediaUploading
                         ? 'Uploading'
@@ -1081,7 +1081,7 @@ export function EditionDetailPage() {
                         key={option}
                         type="button"
                         onClick={() => applyRefine(option)}
-                        className="border-2 border-border bg-panel px-3 py-2 text-left text-xs uppercase tracking-[0.2em] text-text hover:border-accent"
+                        className="border-2 border-border bg-panel px-3 py-2 text-left text-xs uppercase tracking-[0.2em] text-text hover:border-accent-ink"
                       >
                         {option}
                       </button>
@@ -1091,21 +1091,21 @@ export function EditionDetailPage() {
                     <button
                       type="button"
                       onClick={startRefine}
-                      className="border-2 border-border px-3 py-2 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent hover:text-text"
+                      className="border-2 border-border px-3 py-2 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
                     >
                       Generate Again
                     </button>
                     <button
                       type="button"
                       onClick={keepOriginal}
-                      className="border-2 border-border px-3 py-2 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent hover:text-text"
+                      className="border-2 border-border px-3 py-2 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
                     >
                       Keep Original
                     </button>
                     <button
                       type="button"
                       onClick={() => setRefineOpen(false)}
-                      className="border-2 border-border px-3 py-2 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent hover:text-text"
+                      className="border-2 border-border px-3 py-2 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
                     >
                       Close
                     </button>

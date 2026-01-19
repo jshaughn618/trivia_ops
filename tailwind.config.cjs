@@ -11,11 +11,16 @@ module.exports = {
         muted: "var(--muted)",
         border: "var(--border)",
         accent: "var(--accent)",
-        danger: "var(--danger)"
+        "accent-fg": "var(--accent-fg)",
+        "accent-ink": "var(--accent-ink)",
+        "accent-soft": "var(--accent-soft)",
+        danger: "var(--danger)",
+        "danger-fg": "var(--danger-fg)",
+        "danger-ink": "var(--danger-ink)"
       },
       fontFamily: {
-        display: ["Oswald", "sans-serif"],
-        body: ["Chakra Petch", "sans-serif"]
+        display: ["Oswald", "ui-sans-serif", "system-ui"],
+        body: ["ui-sans-serif", "system-ui", "-apple-system", "Segoe UI", "Roboto", "Helvetica", "Arial", "sans-serif"]
       }
     }
   },

@@ -6,10 +6,10 @@ import logoDark from '../assets/trivia_ops_logo_dark.png';
 import logoLight from '../assets/trivia_ops_logo_light.png';
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
-  `px-3 py-2 text-xs font-display uppercase tracking-[0.25em] border-2 transition-colors ${
+  `rounded-md px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg ${
     isActive
-      ? 'border-accent text-accent'
-      : 'border-transparent text-muted hover:border-border hover:text-text'
+      ? 'border border-accent-ink text-accent-ink'
+      : 'border border-transparent text-muted hover:border-border hover:text-text'
   }`;
 
 export function HeaderBar() {
@@ -20,7 +20,7 @@ export function HeaderBar() {
   const logo = theme === 'light' ? logoLight : logoDark;
 
   return (
-    <header className="border-b-2 border-border bg-panel px-4 py-3">
+    <header className="border-b border-border bg-panel px-4 py-3">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
         <Link to="/dashboard" className="flex items-center">
           <img src={logo} alt="Trivia Ops" className="h-10 w-auto" />
@@ -41,7 +41,7 @@ export function HeaderBar() {
             <button
               type="button"
               onClick={() => setOpen((prev) => !prev)}
-              className="border-2 border-border px-3 py-2 text-xs font-display uppercase tracking-[0.3em] text-muted hover:border-accent hover:text-text"
+              className="rounded-md border border-border px-3 py-2 text-sm font-medium text-muted hover:border-accent-ink hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
               aria-expanded={open}
               aria-label="Open menu"
             >
@@ -51,7 +51,7 @@ export function HeaderBar() {
               </span>
             </button>
             {open && (
-              <div className="absolute right-0 mt-3 w-48 border-2 border-border bg-panel2 p-2">
+              <div className="absolute right-0 mt-3 w-48 rounded-md border border-border bg-panel2 p-2 shadow-sm">
                 <nav className="flex flex-col gap-2">
                   <NavLink to="/dashboard" className={navLinkClass} onClick={() => setOpen(false)}>
                     Dashboard

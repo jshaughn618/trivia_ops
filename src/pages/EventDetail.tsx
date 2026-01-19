@@ -239,7 +239,7 @@ export function EventDetailPage() {
                     <a
                       href={qrUrl}
                       download={`trivia-ops-${event.public_code}.png`}
-                      className="text-xs uppercase tracking-[0.2em] text-accent"
+                      className="text-xs uppercase tracking-[0.2em] text-accent-ink"
                     >
                       Download QR Code
                     </a>
@@ -326,7 +326,7 @@ export function EventDetailPage() {
                   <div className="mt-2 flex flex-wrap gap-2">
                     <Link
                       to={`/events/${event.id}/run?round=${round.id}`}
-                      className="text-xs uppercase tracking-[0.2em] text-accent"
+                      className="text-xs uppercase tracking-[0.2em] text-accent-ink"
                     >
                       Open Runner
                     </Link>

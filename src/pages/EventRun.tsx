@@ -481,7 +481,7 @@ export function EventRunPage() {
                     onClick={() => setRoundId(round.id)}
                     className={`flex w-full flex-col gap-2 border-2 px-3 py-2 text-left ${
                       selected
-                        ? 'border-accent bg-panel text-text'
+                        ? 'border-accent-ink bg-panel text-text'
                         : isCompleted
                           ? 'border-border bg-panel2 text-muted'
                           : 'border-border bg-panel2'

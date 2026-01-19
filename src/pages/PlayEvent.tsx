@@ -110,7 +110,7 @@ export function PlayEventPage() {
   if (!normalizedCode) {
     return (
       <div className="min-h-screen bg-bg text-text flex items-center justify-center">
-        <div className="border-2 border-border bg-panel px-6 py-4 text-xs font-display uppercase tracking-[0.3em] text-muted">
+        <div className="rounded-lg border border-border bg-panel px-6 py-4 text-sm font-medium text-muted">
           Invalid Code
         </div>
       </div>
@@ -120,7 +120,7 @@ export function PlayEventPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-bg text-text flex items-center justify-center">
-        <div className="border-2 border-border bg-panel px-6 py-4 text-xs font-display uppercase tracking-[0.3em] text-muted">
+        <div className="rounded-lg border border-border bg-panel px-6 py-4 text-sm font-medium text-muted">
           Loading Event
         </div>
       </div>
@@ -130,7 +130,7 @@ export function PlayEventPage() {
   if (error || !data) {
     return (
       <div className="min-h-screen bg-bg text-text flex items-center justify-center">
-        <div className="border-2 border-danger bg-panel2 px-6 py-4 text-xs uppercase tracking-[0.2em] text-danger">
+        <div className="rounded-lg border border-danger bg-panel2 px-6 py-4 text-sm text-danger-ink">
           {error ?? 'Event not found'}
         </div>
       </div>
@@ -143,8 +143,8 @@ export function PlayEventPage() {
   const waitingMessage = data.live?.waiting_message?.trim() ?? '';
   const waitingShowLeaderboard = data.live?.waiting_show_leaderboard ?? false;
   const waitingShowNextRound = data.live?.waiting_show_next_round ?? true;
-  const questionLabel = data.live?.current_item_ordinal
-    ? `Question ${data.live.current_item_ordinal}`
+  const questionLabel = activeRound && data.live?.current_item_ordinal
+    ? `Round ${activeRound.round_number} • Question ${data.live.current_item_ordinal}`
     : 'Question';
   const answerText = data.current_item?.answer || (data.current_item?.answer_a && data.current_item?.answer_b
     ? `${data.current_item.answer_a_label ? `${data.current_item.answer_a_label}: ` : 'A: '}${data.current_item.answer_a} / ${data.current_item.answer_b_label ? `${data.current_item.answer_b_label}: ` : 'B: '}${data.current_item.answer_b}`
@@ -156,13 +156,11 @@ export function PlayEventPage() {
 
   const waitingRoom = (
     <div className="flex flex-col gap-4">
-      <div className="border-2 border-border bg-panel2 p-4">
-        <div className="text-xs uppercase tracking-[0.2em] text-muted">Waiting Room</div>
-        <div className="mt-2 text-sm font-display uppercase tracking-[0.2em]">
-          {waitingMessage || 'Stand by for the next round.'}
-        </div>
+      <div className="rounded-md bg-panel2 p-4">
+        <div className="ui-label">Waiting Room</div>
+        <div className="mt-2 text-lg font-display">{waitingMessage || 'Stand by for the next round.'}</div>
         {waitingShowNextRound && nextRound && (
-          <div className="mt-2 text-xs uppercase tracking-[0.2em] text-muted">
+          <div className="mt-2 text-sm text-muted">
             Up Next: Round {nextRound.round_number}
             {nextRound.label ? ` — ${nextRound.label}` : ''}
           </div>
@@ -175,21 +173,21 @@ export function PlayEventPage() {
     const closedLabel = data.event.status === 'canceled' ? 'Canceled' : 'Closed';
     return (
       <div className="min-h-screen bg-bg text-text">
-        <div className="mx-auto max-w-5xl px-4 py-6">
-          <div className="mb-6 border-b-2 border-border pb-3">
+        <div className="mx-auto max-w-4xl px-6 py-8">
+          <div className="mb-6 border-b border-border pb-3">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <div className="text-xs uppercase tracking-[0.2em] text-muted">Event Code</div>
-                <div className="text-2xl font-display uppercase tracking-[0.3em]">{data.event.public_code}</div>
-                <div className="mt-1 text-sm uppercase tracking-[0.2em] text-muted">{data.event.title}</div>
-                <div className="mt-1 text-xs uppercase tracking-[0.2em] text-muted">
+                <div className="ui-label">Event Code</div>
+                <div className="text-2xl font-display tracking-tight">{data.event.public_code}</div>
+                <div className="mt-1 text-sm text-muted">{data.event.title}</div>
+                <div className="mt-1 text-sm text-muted">
                   {data.event.location_name ?? 'Location TBD'} • {new Date(data.event.starts_at).toLocaleString()}
                 </div>
               </div>
             </div>
           </div>
           <Panel title={`Event ${closedLabel}`}>
-            <div className="text-xs uppercase tracking-[0.2em] text-muted">
+            <div className="text-sm text-muted">
               This event is {closedLabel.toLowerCase()}. Check with the host for the next session.
             </div>
           </Panel>
@@ -203,14 +201,14 @@ export function PlayEventPage() {
 
   return (
     <div className="min-h-screen bg-bg text-text">
-      <div className="mx-auto max-w-5xl px-4 py-6">
-        <div className="mb-6 border-b-2 border-border pb-3">
+      <div className="mx-auto max-w-4xl px-6 py-8">
+        <div className="mb-6 border-b border-border pb-3">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <div className="text-xs uppercase tracking-[0.2em] text-muted">Event Code</div>
-              <div className="text-2xl font-display uppercase tracking-[0.3em]">{data.event.public_code}</div>
-              <div className="mt-1 text-sm uppercase tracking-[0.2em] text-muted">{data.event.title}</div>
-              <div className="mt-1 text-xs uppercase tracking-[0.2em] text-muted">
+              <div className="ui-label">Event Code</div>
+              <div className="text-3xl font-display tracking-tight">{data.event.public_code}</div>
+              <div className="mt-1 text-sm text-muted">{data.event.title}</div>
+              <div className="mt-1 text-sm text-muted">
                 {data.event.location_name ?? 'Location TBD'} • {new Date(data.event.starts_at).toLocaleString()}
               </div>
             </div>
@@ -219,13 +217,13 @@ export function PlayEventPage() {
                 type="button"
                 aria-pressed={theme === 'light'}
                 onClick={toggleTheme}
-                className="border-2 border-border bg-panel2 px-3 py-1 text-[10px] font-display uppercase tracking-[0.2em] text-text"
+                className="rounded-md border border-border bg-panel2 px-3 py-1 text-xs font-medium text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
               >
                 {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
               </button>
               {teamId && teamNameLabel && (
                 <div className="flex items-center gap-3">
-                  <div className="text-sm font-display uppercase tracking-[0.2em]">{teamNameLabel}</div>
+                  <div className="text-sm font-medium">{teamNameLabel}</div>
                   <div className="relative">
                     <button
                       type="button"
@@ -233,18 +231,18 @@ export function PlayEventPage() {
                       aria-haspopup="menu"
                       aria-expanded={teamMenuOpen}
                       onClick={() => setTeamMenuOpen((open) => !open)}
-                      className="flex h-8 w-8 flex-col items-center justify-center gap-1 border-2 border-border bg-panel2"
+                      className="flex h-8 w-8 flex-col items-center justify-center gap-1 rounded-md border border-border bg-panel2"
                     >
                       <span className="h-0.5 w-4 bg-text" />
                       <span className="h-0.5 w-4 bg-text" />
                       <span className="h-0.5 w-4 bg-text" />
                     </button>
                     {teamMenuOpen && (
-                      <div className="absolute right-0 mt-2 min-w-[160px] border-2 border-border bg-panel p-2 text-left">
+                      <div className="absolute right-0 mt-2 min-w-[160px] rounded-md border border-border bg-panel p-2 text-left shadow-sm">
                         <button
                           type="button"
                           onClick={handleChangeTeam}
-                          className="w-full border-2 border-border bg-panel2 px-3 py-2 text-xs uppercase tracking-[0.2em] text-text"
+                          className="w-full rounded-md border border-border bg-panel2 px-3 py-2 text-xs font-medium text-text"
                         >
                           Change Team
                         </button>
@@ -260,61 +258,59 @@ export function PlayEventPage() {
         <div className="grid gap-4 lg:grid-cols-[1.4fr,1fr]">
           <div className={isLive ? 'lg:col-span-2' : undefined}>
             <Panel title="Now Showing">
-            {!teamId ? (
-              <div className="text-xs uppercase tracking-[0.2em] text-muted">
-                Join or create a team to view the live question.
-              </div>
-            ) : isLive ? (
-              <div className="flex flex-col gap-4">
-                <div className="border-2 border-border bg-panel2 p-4">
-                  <div className="text-xs uppercase tracking-[0.2em] text-muted">Current Round</div>
-                  <div className="mt-2 text-base font-display uppercase tracking-[0.2em]">
-                    Round {activeRound.round_number}
-                  </div>
-                  <div className="mt-1 text-xs uppercase tracking-[0.2em] text-muted">{activeRound.label}</div>
+              {!teamId ? (
+                <div className="text-sm text-muted">
+                  Join or create a team to view the live question.
                 </div>
-                {data.current_item ? (
-                  <>
-                    <div className="border-2 border-border bg-panel2 p-4">
-                      <div className="text-xs uppercase tracking-[0.2em] text-muted">{questionLabel}</div>
-                      <div className="mt-2 text-lg font-display uppercase tracking-[0.2em]">
-                        {data.current_item.prompt}
+              ) : isLive ? (
+                <div className="flex flex-col gap-6">
+                  <div className="rounded-md bg-panel2 p-4">
+                    <div className="ui-label">Current Round</div>
+                    <div className="mt-2 text-lg font-display">Round {activeRound.round_number}</div>
+                    <div className="mt-1 text-sm text-muted">{activeRound.label}</div>
+                  </div>
+                  {data.current_item ? (
+                    <>
+                      <div className="rounded-md bg-panel2 p-4">
+                        <div className="ui-label">{questionLabel}</div>
+                        <div className="mt-3 text-3xl font-display leading-tight md:text-5xl">
+                          {data.current_item.prompt}
+                        </div>
+                        {data.current_item.media_type === 'image' && data.current_item.media_key && (
+                          <div className="mt-4 rounded-md border border-border bg-panel p-2">
+                            <img
+                              className="max-h-[50vh] w-full object-contain"
+                              src={api.mediaUrl(data.current_item.media_key)}
+                              alt="Media"
+                            />
+                          </div>
+                        )}
+                        {data.current_item.media_type === 'audio' && data.current_item.media_key && (
+                          <audio className="mt-4 w-full" controls src={api.mediaUrl(data.current_item.media_key)} />
+                        )}
                       </div>
-                      {data.current_item.media_type === 'image' && data.current_item.media_key && (
-                        <div className="mt-4 border-2 border-border bg-panel p-2">
-                          <img
-                            className="max-h-[50vh] w-full object-contain"
-                            src={api.mediaUrl(data.current_item.media_key)}
-                            alt="Media"
-                          />
+                      {data.live?.reveal_answer && answerText && (
+                        <div className="rounded-md bg-panel p-4">
+                          <div className="ui-label">Answer</div>
+                          <div className="mt-2 text-xl font-display md:text-2xl">
+                            {answerText}
+                          </div>
                         </div>
                       )}
-                      {data.current_item.media_type === 'audio' && data.current_item.media_key && (
-                        <audio className="mt-4 w-full" controls src={api.mediaUrl(data.current_item.media_key)} />
-                      )}
-                    </div>
-                    {data.live?.reveal_answer && answerText && (
-                      <div className="border-2 border-border bg-panel p-4">
-                        <div className="text-xs uppercase tracking-[0.2em] text-muted">Answer</div>
-                        <div className="mt-2 text-base font-display uppercase tracking-[0.2em]">
-                          {answerText}
+                      {data.live?.reveal_fun_fact && data.current_item.fun_fact && (
+                        <div className="rounded-md bg-panel p-4">
+                          <div className="ui-label">Factoid</div>
+                          <div className="mt-2 text-base text-text">{data.current_item.fun_fact}</div>
                         </div>
-                      </div>
-                    )}
-                    {data.live?.reveal_fun_fact && data.current_item.fun_fact && (
-                      <div className="border-2 border-border bg-panel p-4">
-                        <div className="text-xs uppercase tracking-[0.2em] text-muted">Factoid</div>
-                        <div className="mt-2 text-sm text-text">{data.current_item.fun_fact}</div>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  waitingRoom
-                )}
-              </div>
-            ) : (
-              waitingRoom
-            )}
+                      )}
+                    </>
+                  ) : (
+                    waitingRoom
+                  )}
+                </div>
+              ) : (
+                waitingRoom
+              )}
             </Panel>
           </div>
 
@@ -322,8 +318,8 @@ export function PlayEventPage() {
             {!teamId && !isClosed && (
               <Panel title="Join a Team">
                 <div className="flex flex-col gap-3">
-                  <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-                    Select Team
+                  <label className="flex flex-col gap-2">
+                    <span className="ui-label">Select Team</span>
                     <select
                       className="h-10 px-3"
                       value={teamId}
@@ -337,9 +333,9 @@ export function PlayEventPage() {
                       ))}
                     </select>
                   </label>
-                  <div className="text-center text-xs uppercase tracking-[0.2em] text-muted">Or</div>
-                  <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-                    New Team Name
+                  <div className="text-center text-xs text-muted">Or</div>
+                  <label className="flex flex-col gap-2">
+                    <span className="ui-label">New Team Name</span>
                     <input
                       className="h-10 px-3"
                       value={teamName}
@@ -354,20 +350,20 @@ export function PlayEventPage() {
               <Panel title="Leaderboard">
                 <div className="mt-1 flex flex-col gap-2">
                   {data.leaderboard.length === 0 && (
-                    <div className="text-xs uppercase tracking-[0.2em] text-muted">No scores yet.</div>
+                    <div className="text-sm text-muted">No scores yet.</div>
                   )}
                   {data.leaderboard.map((entry, index) => (
                     <div
                       key={entry.team_id}
-                      className={`flex items-center justify-between border-2 px-3 py-2 ${
+                      className={`flex items-center justify-between rounded-md border px-3 py-2 ${
                         teamId && entry.team_id === teamId
-                          ? 'border-accent bg-panel text-text'
+                          ? 'border-accent-ink bg-accent-soft text-text'
                           : 'border-border bg-panel2'
                       }`}
                     >
-                      <div className="text-xs uppercase tracking-[0.2em] text-muted">#{index + 1}</div>
-                      <div className="text-xs uppercase tracking-[0.2em] text-text">{entry.name}</div>
-                      <div className="text-xs uppercase tracking-[0.2em] text-muted">{entry.total}</div>
+                      <div className="text-xs text-muted">#{index + 1}</div>
+                      <div className="text-sm font-medium">{entry.name}</div>
+                      <div className="text-xs text-muted">{entry.total}</div>
                     </div>
                   ))}
                 </div>
@@ -382,11 +378,11 @@ export function PlayEventPage() {
               {data.rounds
                 .filter((round) => round.status !== 'canceled')
                 .map((round) => (
-                  <div key={round.id} className="border-2 border-border bg-panel2 px-3 py-2">
-                    <div className="text-xs uppercase tracking-[0.2em] text-muted">
+                  <div key={round.id} className="rounded-md border border-border bg-panel2 px-3 py-2">
+                    <div className="text-sm text-muted">
                       {round.round_number}. {round.label}
                     </div>
-                    <div className="text-[10px] uppercase tracking-[0.2em] text-muted">
+                    <div className="text-xs text-muted">
                       {round.status === 'locked' ? 'completed' : round.status}
                     </div>
                   </div>

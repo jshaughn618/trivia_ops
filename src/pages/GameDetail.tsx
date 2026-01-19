@@ -107,7 +107,7 @@ export function GameDetailPage() {
                 <button
                   type="button"
                   onClick={generateDescription}
-                  className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent hover:text-text"
+                  className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
                   disabled={descLoading}
                 >
                   {descLoading ? 'Generating' : 'Generate'}
@@ -132,7 +132,7 @@ export function GameDetailPage() {
           action={
             <Link
               to={`/editions/new?game_id=${game.id}`}
-              className="text-xs font-display uppercase tracking-[0.25em] text-accent"
+              className="text-xs font-display uppercase tracking-[0.25em] text-accent-ink"
             >
               Add Edition
             </Link>
