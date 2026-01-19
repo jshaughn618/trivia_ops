@@ -72,8 +72,7 @@ export function EventDetailPage() {
 
   const publicUrl = useMemo(() => {
     if (!event?.public_code) return '';
-    if (typeof window === 'undefined') return `/play/${event.public_code}`;
-    return `${window.location.origin}/play/${event.public_code}`;
+    return `https://triviaops.com/play/${event.public_code}`;
   }, [event?.public_code]);
 
   useEffect(() => {
