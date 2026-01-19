@@ -29,16 +29,23 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, data }) 
       }
     }
     const cleaned = raw.replace(/\s+/g, '');
-    if (!/^[A-Za-z0-9+/=]+$/.test(cleaned)) {
-      return jsonError({ code: 'invalid_request', message: 'Invalid file encoding' }, 400);
+    if (/^[A-Za-z0-9+/=]+$/.test(cleaned)) {
+      const binary = atob(cleaned);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i += 1) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      buffer = bytes.buffer;
+      size = bytes.byteLength;
+    } else {
+      // Fallback: treat the string as raw binary bytes.
+      const bytes = new Uint8Array(raw.length);
+      for (let i = 0; i < raw.length; i += 1) {
+        bytes[i] = raw.charCodeAt(i) & 0xff;
+      }
+      buffer = bytes.buffer;
+      size = bytes.byteLength;
     }
-    const binary = atob(cleaned);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i += 1) {
-      bytes[i] = binary.charCodeAt(i);
-    }
-    buffer = bytes.buffer;
-    size = bytes.byteLength;
     if (!kind && mime) {
       if (mime.startsWith('audio/')) kind = 'audio';
       if (mime.startsWith('image/')) kind = 'image';
