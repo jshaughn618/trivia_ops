@@ -45,6 +45,7 @@ export const api = {
     }),
   logout: () => apiFetch<{ ok: true }>('/api/logout', { method: 'POST' }),
   listGameTypes: () => apiFetch<GameType[]>('/api/game-types'),
+  listHosts: () => apiFetch<User[]>('/api/hosts'),
   listUsers: () => apiFetch<User[]>('/api/users'),
   createUser: (payload: {
     email: string;

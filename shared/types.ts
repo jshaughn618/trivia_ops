@@ -86,6 +86,7 @@ export type Event = {
   title: string;
   starts_at: string;
   location_id: Id | null;
+  host_user_id: Id | null;
   public_code?: string | null;
   status: EventStatus;
   notes: string | null;

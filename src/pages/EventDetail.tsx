@@ -5,19 +5,22 @@ import { AppShell } from '../components/AppShell';
 import { Panel } from '../components/Panel';
 import { PrimaryButton, SecondaryButton, DangerButton, ButtonLink } from '../components/Buttons';
 import { StampBadge } from '../components/StampBadge';
-import type { Event, EventRound, GameEdition, Team, Location } from '../types';
+import type { Event, EventRound, GameEdition, Game, Team, Location, User } from '../types';
 
 export function EventDetailPage() {
   const { eventId } = useParams();
   const [event, setEvent] = useState<Event | null>(null);
   const [rounds, setRounds] = useState<EventRound[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
+  const [games, setGames] = useState<Game[]>([]);
   const [editions, setEditions] = useState<GameEdition[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
+  const [hosts, setHosts] = useState<User[]>([]);
   const [status, setStatus] = useState('planned');
   const [notes, setNotes] = useState('');
   const [locationId, setLocationId] = useState('');
-  const [roundLabel, setRoundLabel] = useState('');
+  const [hostUserId, setHostUserId] = useState('');
+  const [roundGameId, setRoundGameId] = useState('');
   const [roundEditionId, setRoundEditionId] = useState('');
   const [teamName, setTeamName] = useState('');
   const [teamTable, setTeamTable] = useState('');
@@ -27,23 +30,28 @@ export function EventDetailPage() {
 
   const load = async () => {
     if (!eventId) return;
-    const [eventRes, roundsRes, teamsRes, editionsRes, locationsRes] = await Promise.all([
+    const [eventRes, roundsRes, teamsRes, editionsRes, locationsRes, gamesRes, hostsRes] = await Promise.all([
       api.getEvent(eventId),
       api.listEventRounds(eventId),
       api.listTeams(eventId),
       api.listEditions(),
-      api.listLocations()
+      api.listLocations(),
+      api.listGames(),
+      api.listHosts()
     ]);
     if (eventRes.ok) {
       setEvent(eventRes.data);
       setStatus(eventRes.data.status);
       setNotes(eventRes.data.notes ?? '');
       setLocationId(eventRes.data.location_id ?? '');
+      setHostUserId(eventRes.data.host_user_id ?? '');
     }
     if (roundsRes.ok) setRounds(roundsRes.data.sort((a, b) => a.round_number - b.round_number));
     if (teamsRes.ok) setTeams(teamsRes.data);
     if (editionsRes.ok) setEditions(editionsRes.data);
     if (locationsRes.ok) setLocations(locationsRes.data);
+    if (gamesRes.ok) setGames(gamesRes.data);
+    if (hostsRes.ok) setHosts(hostsRes.data);
   };
 
   useEffect(() => {
@@ -61,21 +69,55 @@ export function EventDetailPage() {
     return rounds.length === 0 ? 1 : Math.max(...rounds.map((round) => round.round_number)) + 1;
   }, [rounds]);
 
+  const editionById = useMemo(() => {
+    return Object.fromEntries(editions.map((edition) => [edition.id, edition]));
+  }, [editions]);
+
+  const gameById = useMemo(() => {
+    return Object.fromEntries(games.map((game) => [game.id, game]));
+  }, [games]);
+
+  const roundEditions = useMemo(() => {
+    if (!roundGameId) return [];
+    return editions.filter((edition) => edition.game_id === roundGameId);
+  }, [editions, roundGameId]);
+
+  const roundDisplay = (round: EventRound) => {
+    const edition = editionById[round.edition_id];
+    const game = edition ? gameById[edition.game_id] : null;
+    const editionLabel = edition?.theme ?? edition?.title ?? 'Edition';
+    const gameLabel = game?.name ?? 'Game';
+    return {
+      title: `Round ${round.round_number}`,
+      detail: `${gameLabel} — ${editionLabel}`
+    };
+  };
+
   const updateEvent = async () => {
     if (!eventId) return;
-    const res = await api.updateEvent(eventId, { status, notes, location_id: locationId || null });
+    const res = await api.updateEvent(eventId, {
+      status,
+      notes,
+      location_id: locationId || null,
+      host_user_id: hostUserId || null
+    });
     if (res.ok) setEvent(res.data);
   };
 
   const createRound = async () => {
-    if (!eventId || !roundEditionId || !roundLabel.trim()) return;
+    if (!eventId || !roundGameId || !roundEditionId) return;
+    const edition = editionById[roundEditionId];
+    const game = edition ? gameById[edition.game_id] : gameById[roundGameId];
+    const editionLabel = edition?.theme ?? edition?.title ?? 'Edition';
+    const gameLabel = game?.name ?? 'Game';
+    const label = `${gameLabel} — ${editionLabel}`;
     await api.createEventRound(eventId, {
       round_number: roundNumber,
-      label: roundLabel,
+      label,
       edition_id: roundEditionId,
       status: 'planned'
     });
-    setRoundLabel('');
+    setRoundGameId('');
     setRoundEditionId('');
     load();
   };
@@ -168,6 +210,25 @@ export function EventDetailPage() {
               </select>
             </label>
             <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+              Host
+              <select
+                className="h-10 px-3"
+                value={hostUserId}
+                onChange={(event) => setHostUserId(event.target.value)}
+              >
+                <option value="">Select host</option>
+                {hosts.map((host) => (
+                  <option key={host.id} value={host.id}>
+                    {host.first_name || host.last_name
+                      ? `${host.first_name ?? ''} ${host.last_name ?? ''}`.trim()
+                      : host.username ?? host.email}
+                    {' '}
+                    ({host.user_type})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
               Status
               <select className="h-10 px-3" value={status} onChange={(event) => setStatus(event.target.value)}>
                 <option value="planned">Planned</option>
@@ -192,32 +253,50 @@ export function EventDetailPage() {
             {rounds.length === 0 && (
               <div className="text-xs uppercase tracking-[0.2em] text-muted">No rounds yet.</div>
             )}
-            {rounds.map((round) => (
-              <div key={round.id} className="border-2 border-border bg-panel2 p-3">
-                <div className="flex items-center justify-between">
-                  <div className="text-sm font-display uppercase tracking-[0.2em]">
-                    {round.round_number}. {round.label}
+            {rounds.map((round) => {
+              const display = roundDisplay(round);
+              return (
+                <div key={round.id} className="border-2 border-border bg-panel2 p-3">
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm font-display uppercase tracking-[0.2em]">
+                      {display.title}
+                    </div>
+                    <StampBadge label={round.status.toUpperCase()} variant="inspected" />
                   </div>
-                  <StampBadge label={round.status.toUpperCase()} variant="inspected" />
+                  <div className="mt-2 text-xs uppercase tracking-[0.2em] text-muted">{display.detail}</div>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <Link
+                      to={`/events/${event.id}/run?round=${round.id}`}
+                      className="text-xs uppercase tracking-[0.2em] text-accent"
+                    >
+                      Open Runner
+                    </Link>
+                    <DangerButton onClick={() => deleteRound(round.id)}>Delete</DangerButton>
+                  </div>
                 </div>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <Link
-                    to={`/events/${event.id}/run?round=${round.id}`}
-                    className="text-xs uppercase tracking-[0.2em] text-accent"
-                  >
-                    Open Runner
-                  </Link>
-                  <DangerButton onClick={() => deleteRound(round.id)}>Delete</DangerButton>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
           <div className="mt-4 border-t-2 border-border pt-4">
             <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">Add Round</div>
             <div className="mt-3 flex flex-col gap-3">
               <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-                Label
-                <input className="h-10 px-3" value={roundLabel} onChange={(event) => setRoundLabel(event.target.value)} />
+                Game
+                <select
+                  className="h-10 px-3"
+                  value={roundGameId}
+                  onChange={(event) => {
+                    setRoundGameId(event.target.value);
+                    setRoundEditionId('');
+                  }}
+                >
+                  <option value="">Select game</option>
+                  {games.map((game) => (
+                    <option key={game.id} value={game.id}>
+                      {game.name}
+                    </option>
+                  ))}
+                </select>
               </label>
               <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
                 Edition
@@ -225,9 +304,10 @@ export function EventDetailPage() {
                   className="h-10 px-3"
                   value={roundEditionId}
                   onChange={(event) => setRoundEditionId(event.target.value)}
+                  disabled={!roundGameId}
                 >
-                  <option value="">Select edition</option>
-                  {editions.map((edition) => (
+                  <option value="">{roundGameId ? 'Select edition' : 'Select a game first'}</option>
+                  {roundEditions.map((edition) => (
                     <option key={edition.id} value={edition.id}>
                       {edition.theme ?? 'Untitled Theme'}
                     </option>
@@ -289,7 +369,7 @@ export function EventDetailPage() {
                 <option value="">Choose round</option>
                 {rounds.map((round) => (
                   <option key={round.id} value={round.id}>
-                    {round.round_number}. {round.label}
+                    {roundDisplay(round).title} — {roundDisplay(round).detail}
                   </option>
                 ))}
               </select>

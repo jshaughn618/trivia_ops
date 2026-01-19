@@ -152,7 +152,7 @@ export function PlayEventPage() {
                 )}
                 {data.live?.reveal_fun_fact && data.current_item.fun_fact && (
                   <div className="border-2 border-border bg-panel p-4">
-                    <div className="text-xs uppercase tracking-[0.2em] text-muted">Fun Fact</div>
+                    <div className="text-xs uppercase tracking-[0.2em] text-muted">Factoid</div>
                     <div className="mt-2 text-sm text-text">{data.current_item.fun_fact}</div>
                   </div>
                 )}

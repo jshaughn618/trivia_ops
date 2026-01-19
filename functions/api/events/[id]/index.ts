@@ -27,11 +27,12 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request })
   const data = { ...existing, ...parsed.data };
   await execute(
     env,
-    `UPDATE events SET title = ?, starts_at = ?, location_id = ?, status = ?, notes = ? WHERE id = ?`,
+    `UPDATE events SET title = ?, starts_at = ?, location_id = ?, host_user_id = ?, status = ?, notes = ? WHERE id = ?`,
     [
       data.title,
       data.starts_at,
       data.location_id ?? null,
+      data.host_user_id ?? null,
       data.status,
       data.notes ?? null,
       params.id

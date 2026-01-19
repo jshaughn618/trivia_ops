@@ -97,6 +97,7 @@ export const eventCreateSchema = z.object({
   title: z.string().min(1),
   starts_at: z.string().min(1),
   location_id: idSchema.nullable().optional(),
+  host_user_id: idSchema.nullable().optional(),
   status: eventStatusSchema.default('planned'),
   notes: z.string().nullable().optional()
 });
@@ -105,6 +106,7 @@ export const eventUpdateSchema = z.object({
   title: z.string().min(1).optional(),
   starts_at: z.string().min(1).optional(),
   location_id: idSchema.nullable().optional(),
+  host_user_id: idSchema.nullable().optional(),
   status: eventStatusSchema.optional(),
   notes: z.string().nullable().optional()
 });

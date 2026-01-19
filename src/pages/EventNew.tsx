@@ -4,13 +4,15 @@ import { api } from '../api';
 import { AppShell } from '../components/AppShell';
 import { Panel } from '../components/Panel';
 import { PrimaryButton, SecondaryButton } from '../components/Buttons';
-import type { Location } from '../types';
+import type { Location, User } from '../types';
 
 export function EventNewPage() {
   const [locations, setLocations] = useState<Location[]>([]);
+  const [hosts, setHosts] = useState<User[]>([]);
   const [title, setTitle] = useState('');
   const [startsAt, setStartsAt] = useState('');
   const [locationId, setLocationId] = useState('');
+  const [hostUserId, setHostUserId] = useState('');
   const [notes, setNotes] = useState('');
   const navigate = useNavigate();
 
@@ -18,15 +20,19 @@ export function EventNewPage() {
     api.listLocations().then((res) => {
       if (res.ok) setLocations(res.data);
     });
+    api.listHosts().then((res) => {
+      if (res.ok) setHosts(res.data);
+    });
   }, []);
 
   const handleCreate = async () => {
-    if (!title.trim() || !startsAt) return;
+    if (!title.trim() || !startsAt || !hostUserId) return;
     const iso = new Date(startsAt).toISOString();
     const res = await api.createEvent({
       title,
       starts_at: iso,
       location_id: locationId || null,
+      host_user_id: hostUserId,
       status: 'planned',
       notes
     });
@@ -59,6 +65,21 @@ export function EventNewPage() {
               {locations.map((location) => (
                 <option key={location.id} value={location.id}>
                   {location.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+            Host
+            <select className="h-10 px-3" value={hostUserId} onChange={(event) => setHostUserId(event.target.value)}>
+              <option value="">Select host</option>
+              {hosts.map((host) => (
+                <option key={host.id} value={host.id}>
+                  {host.first_name || host.last_name
+                    ? `${host.first_name ?? ''} ${host.last_name ?? ''}`.trim()
+                    : host.username ?? host.email}
+                  {' '}
+                  ({host.user_type})
                 </option>
               ))}
             </select>

@@ -5,7 +5,7 @@ import { AppShell } from '../components/AppShell';
 import { Panel } from '../components/Panel';
 import { PrimaryButton, SecondaryButton, DangerButton } from '../components/Buttons';
 import { StampBadge } from '../components/StampBadge';
-import type { EditionItem, Event, EventRound } from '../types';
+import type { EditionItem, Event, EventRound, Game, GameEdition } from '../types';
 
 function useQuery() {
   return new URLSearchParams(useLocation().search);
@@ -16,6 +16,8 @@ export function EventRunPage() {
   const query = useQuery();
   const [event, setEvent] = useState<Event | null>(null);
   const [rounds, setRounds] = useState<EventRound[]>([]);
+  const [editions, setEditions] = useState<GameEdition[]>([]);
+  const [games, setGames] = useState<Game[]>([]);
   const [roundId, setRoundId] = useState('');
   const [items, setItems] = useState<EditionItem[]>([]);
   const [index, setIndex] = useState(0);
@@ -24,9 +26,16 @@ export function EventRunPage() {
 
   const load = async () => {
     if (!eventId) return;
-    const [eventRes, roundsRes] = await Promise.all([api.getEvent(eventId), api.listEventRounds(eventId)]);
+    const [eventRes, roundsRes, editionsRes, gamesRes] = await Promise.all([
+      api.getEvent(eventId),
+      api.listEventRounds(eventId),
+      api.listEditions(),
+      api.listGames()
+    ]);
     if (eventRes.ok) setEvent(eventRes.data);
     if (roundsRes.ok) setRounds(roundsRes.data);
+    if (editionsRes.ok) setEditions(editionsRes.data);
+    if (gamesRes.ok) setGames(gamesRes.data);
     const preselect = query.get('round') ?? '';
     if (preselect) setRoundId(preselect);
   };
@@ -58,6 +67,25 @@ export function EventRunPage() {
   useEffect(() => {
     if (roundId) loadItems(roundId);
   }, [roundId]);
+
+  const editionById = useMemo(() => {
+    return Object.fromEntries(editions.map((edition) => [edition.id, edition]));
+  }, [editions]);
+
+  const gameById = useMemo(() => {
+    return Object.fromEntries(games.map((game) => [game.id, game]));
+  }, [games]);
+
+  const roundDisplay = (round: EventRound) => {
+    const edition = editionById[round.edition_id];
+    const game = edition ? gameById[edition.game_id] : null;
+    const editionLabel = edition?.theme ?? edition?.title ?? 'Edition';
+    const gameLabel = game?.name ?? 'Game';
+    return {
+      title: `Round ${round.round_number}`,
+      detail: `${gameLabel} — ${editionLabel}`
+    };
+  };
 
   const activeRound = useMemo(() => rounds.find((round) => round.id === roundId) ?? null, [rounds, roundId]);
   const item = items[index];
@@ -105,7 +133,9 @@ export function EventRunPage() {
           {activeRound ? (
             <div className="flex flex-col gap-4">
               <div className="flex items-center justify-between">
-                <div className="text-xs uppercase tracking-[0.2em] text-muted">{activeRound.label}</div>
+                <div className="text-xs uppercase tracking-[0.2em] text-muted">
+                  {roundDisplay(activeRound).title} — {roundDisplay(activeRound).detail}
+                </div>
                 <StampBadge label={activeRound.status.toUpperCase()} variant="verified" />
               </div>
               {item ? (
@@ -138,7 +168,7 @@ export function EventRunPage() {
               )}
               {item && showFact && item.fun_fact && (
                 <div className="border-2 border-border bg-panel p-4">
-                  <div className="text-xs uppercase tracking-[0.2em] text-muted">Fun Fact</div>
+                  <div className="text-xs uppercase tracking-[0.2em] text-muted">Factoid</div>
                   <div className="mt-2 text-sm text-text">{item.fun_fact}</div>
                 </div>
               )}
@@ -191,7 +221,7 @@ export function EventRunPage() {
                 <option value="">Choose round</option>
                 {rounds.map((round) => (
                   <option key={round.id} value={round.id}>
-                    {round.round_number}. {round.label}
+                    {roundDisplay(round).title} — {roundDisplay(round).detail}
                   </option>
                 ))}
               </select>

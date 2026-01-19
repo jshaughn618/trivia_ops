@@ -24,14 +24,15 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
 
   await execute(
     env,
-    `INSERT INTO events (id, title, starts_at, location_id, status, notes, created_at, public_code)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO events (id, title, starts_at, location_id, host_user_id, status, notes, created_at, public_code)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ,
     [
       id,
       data.title,
       data.starts_at,
       data.location_id ?? null,
+      data.host_user_id ?? null,
       data.status,
       data.notes ?? null,
       createdAt,

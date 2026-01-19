@@ -45,6 +45,7 @@ export function EditionDetailPage() {
   const [infoOpen, setInfoOpen] = useState(true);
   const [mediaUploading, setMediaUploading] = useState(false);
   const [mediaError, setMediaError] = useState<string | null>(null);
+  const [itemValidationError, setItemValidationError] = useState<string | null>(null);
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkText, setBulkText] = useState('');
   const [bulkLoading, setBulkLoading] = useState(false);
@@ -118,12 +119,20 @@ export function EditionDetailPage() {
 
   const handleCreateItem = async () => {
     if (!editionId) return;
-    if (!itemDraft.prompt.trim()) return;
-    if (gameTypeId === 'audio') {
-      if (!itemDraft.answer_a.trim() || !itemDraft.answer_b.trim()) return;
-    } else if (!itemDraft.answer.trim()) {
+    if (!itemDraft.prompt.trim()) {
+      setItemValidationError('Prompt is required.');
       return;
     }
+    if (gameTypeId === 'audio') {
+      if (!itemDraft.answer_a.trim() || !itemDraft.answer_b.trim()) {
+        setItemValidationError('Answer A and Answer B are required for audio items.');
+        return;
+      }
+    } else if (!itemDraft.answer.trim()) {
+      setItemValidationError('Answer is required.');
+      return;
+    }
+    setItemValidationError(null);
     const answerValue = gameTypeId === 'audio' ? undefined : itemDraft.answer.trim();
     const res = await api.createEditionItem(editionId, {
       prompt: itemDraft.prompt,
@@ -140,6 +149,7 @@ export function EditionDetailPage() {
     if (res.ok) {
       setItemDraft({ ...emptyItem });
       setActiveItemId(null);
+      setItemValidationError(null);
       load();
     }
   };
@@ -149,6 +159,7 @@ export function EditionDetailPage() {
     setRefineOpen(false);
     setRefineOptions([]);
     setRefineError(null);
+    setItemValidationError(null);
     setItemDraft({
       prompt: item.prompt,
       answer: item.answer,
@@ -165,10 +176,24 @@ export function EditionDetailPage() {
   const cancelEdit = () => {
     setActiveItemId(null);
     setItemDraft({ ...emptyItem });
+    setItemValidationError(null);
   };
 
   const saveEdit = async (item: EditionItem) => {
-    if (gameTypeId !== 'audio' && !itemDraft.answer.trim()) return;
+    if (!itemDraft.prompt.trim()) {
+      setItemValidationError('Prompt is required.');
+      return;
+    }
+    if (gameTypeId === 'audio') {
+      if (!itemDraft.answer_a.trim() || !itemDraft.answer_b.trim()) {
+        setItemValidationError('Answer A and Answer B are required for audio items.');
+        return;
+      }
+    } else if (!itemDraft.answer.trim()) {
+      setItemValidationError('Answer is required.');
+      return;
+    }
+    setItemValidationError(null);
     const answerValue = gameTypeId === 'audio' ? undefined : itemDraft.answer.trim();
     const res = await api.updateEditionItem(item.id, {
       prompt: itemDraft.prompt,
@@ -255,6 +280,7 @@ export function EditionDetailPage() {
     setRefineOptions([]);
     setRefineError(null);
     setItemDraft({ ...emptyItem });
+    setItemValidationError(null);
   };
 
   const startRefine = async () => {
@@ -336,7 +362,7 @@ export function EditionDetailPage() {
     if (!itemDraft.prompt.trim() && !itemDraft.answer.trim()) return;
     setFactLoading(true);
     setFactError(null);
-    const prompt = `Write one short, interesting pub-trivia fun fact related to the question and answer. Keep it under 20 words.\n\nQuestion: ${itemDraft.prompt.trim()}\nAnswer: ${itemDraft.answer.trim()}`;
+    const prompt = `Write one short, interesting pub-trivia factoid related to the question and answer. Keep it under 20 words.\n\nQuestion: ${itemDraft.prompt.trim()}\nAnswer: ${itemDraft.answer.trim()}`;
     const res = await api.aiGenerate({ prompt, max_output_tokens: 80 });
     setFactLoading(false);
     if (!res.ok) {
@@ -395,26 +421,35 @@ export function EditionDetailPage() {
     }
 
     const baseOrdinal = nextOrdinal;
+    let added = 0;
     for (let index = 0; index < parsed.length; index += 1) {
       const entry = parsed[index];
-      if (!entry.prompt) continue;
+      const promptText = entry.prompt?.trim();
+      if (!promptText) continue;
+      const answerText = entry.answer?.trim();
+      const answerAText = entry.answer_a?.trim();
+      const answerBText = entry.answer_b?.trim();
+      const answerALabel = entry.answer_a_label?.trim();
+      const answerBLabel = entry.answer_b_label?.trim();
+      const funFact = entry.fun_fact?.trim();
       if (gameTypeId === 'audio') {
-        if (!entry.answer_a || !entry.answer_b) continue;
-      } else if (!entry.answer) {
+        if (!answerAText || !answerBText) continue;
+      } else if (!answerText) {
         continue;
       }
       await api.createEditionItem(editionId!, {
-        prompt: entry.prompt,
-        answer: entry.answer ?? '',
-        answer_a: entry.answer_a ?? null,
-        answer_b: entry.answer_b ?? null,
-        answer_a_label: entry.answer_a_label ?? null,
-        answer_b_label: entry.answer_b_label ?? null,
-        fun_fact: entry.fun_fact ?? null,
+        prompt: promptText,
+        answer: gameTypeId === 'audio' ? undefined : answerText,
+        answer_a: gameTypeId === 'audio' ? answerAText : undefined,
+        answer_b: gameTypeId === 'audio' ? answerBText : undefined,
+        answer_a_label: gameTypeId === 'audio' && answerALabel ? answerALabel : undefined,
+        answer_b_label: gameTypeId === 'audio' && answerBLabel ? answerBLabel : undefined,
+        fun_fact: funFact ? funFact : null,
         ordinal: baseOrdinal + index
       });
+      added += 1;
     }
-    setBulkResult(`Added ${parsed.length} items`);
+    setBulkResult(`Added ${added} items`);
     setBulkText('');
     setBulkOpen(false);
     load();
@@ -672,7 +707,7 @@ export function EditionDetailPage() {
                       )}
                       <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
                         <span className="flex items-center justify-between">
-                          Fun Fact
+                          Factoid
                           <button
                             type="button"
                             onClick={generateFunFact}
@@ -689,35 +724,51 @@ export function EditionDetailPage() {
                         />
                         {factError && <span className="text-[10px] tracking-[0.2em] text-danger">{factError}</span>}
                       </label>
-                      <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-                        Media Upload
-                        <div className="flex flex-wrap items-center gap-2">
-                          <input
-                            ref={editUploadRef}
-                            type="file"
-                            accept={gameTypeId === 'audio' ? 'audio/mpeg' : 'image/png,image/jpeg,image/webp'}
-                            onChange={(event) => {
-                              const file = event.target.files?.[0];
-                              if (file) handleUpload(item, file);
-                            }}
-                            className="hidden"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => editUploadRef.current?.click()}
-                            className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent hover:text-text"
-                          >
-                            {mediaUploading ? 'Uploading' : 'Upload MP3'}
-                          </button>
-                          {itemDraft.media_key && (
-                            <span className="text-[10px] uppercase tracking-[0.2em] text-muted">Audio attached</span>
+                      {(gameTypeId === 'audio' || gameTypeId === 'visual') && (
+                        <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+                          Media Upload
+                          <div className="flex flex-wrap items-center gap-2">
+                            <input
+                              ref={editUploadRef}
+                              type="file"
+                              accept={gameTypeId === 'audio' ? 'audio/mpeg' : 'image/png,image/jpeg,image/webp'}
+                              onChange={(event) => {
+                                const file = event.target.files?.[0];
+                                if (file) handleUpload(item, file);
+                              }}
+                              className="hidden"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => editUploadRef.current?.click()}
+                              className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent hover:text-text"
+                            >
+                              {mediaUploading
+                                ? 'Uploading'
+                                : gameTypeId === 'audio'
+                                  ? 'Upload MP3'
+                                  : 'Upload Image'}
+                            </button>
+                            {itemDraft.media_key && (
+                              <span className="text-[10px] uppercase tracking-[0.2em] text-muted">
+                                {gameTypeId === 'audio' ? 'Audio attached' : 'Image attached'}
+                              </span>
+                            )}
+                          </div>
+                          {gameTypeId === 'audio' && (
+                            <span className="text-[10px] tracking-[0.2em] text-muted">MP3 only for audio rounds.</span>
                           )}
+                          {gameTypeId === 'visual' && (
+                            <span className="text-[10px] tracking-[0.2em] text-muted">PNG, JPG, or WEBP only.</span>
+                          )}
+                          {mediaError && <span className="text-[10px] tracking-[0.2em] text-danger">{mediaError}</span>}
+                        </label>
+                      )}
+                      {itemValidationError && (
+                        <div className="border-2 border-danger bg-panel px-3 py-2 text-xs uppercase tracking-[0.2em] text-danger">
+                          {itemValidationError}
                         </div>
-                        {gameTypeId === 'audio' && (
-                          <span className="text-[10px] tracking-[0.2em] text-muted">MP3 only for audio rounds.</span>
-                        )}
-                        {mediaError && <span className="text-[10px] tracking-[0.2em] text-danger">{mediaError}</span>}
-                      </label>
+                      )}
                       <div className="flex flex-wrap gap-2">
                         <PrimaryButton onClick={() => saveEdit(item)}>Save</PrimaryButton>
                         <SecondaryButton onClick={cancelEdit}>Cancel</SecondaryButton>
@@ -858,7 +909,7 @@ export function EditionDetailPage() {
               )}
               <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
                 <span className="flex items-center justify-between">
-                  Fun Fact
+                  Factoid
                   <button
                     type="button"
                     onClick={generateFunFact}
@@ -875,35 +926,51 @@ export function EditionDetailPage() {
                 />
                 {factError && <span className="text-[10px] tracking-[0.2em] text-danger">{factError}</span>}
               </label>
-              <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-                Media Upload
-                <div className="flex flex-wrap items-center gap-2">
-                  <input
-                    ref={newUploadRef}
-                    type="file"
-                    accept={gameTypeId === 'audio' ? 'audio/mpeg' : 'image/png,image/jpeg,image/webp'}
-                    onChange={(event) => {
-                      const file = event.target.files?.[0];
-                      if (file) handleDraftUpload(file);
-                    }}
-                    className="hidden"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => newUploadRef.current?.click()}
-                    className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent hover:text-text"
-                  >
-                    {mediaUploading ? 'Uploading' : 'Upload MP3'}
-                  </button>
-                  {itemDraft.media_key && (
-                    <span className="text-[10px] uppercase tracking-[0.2em] text-muted">Audio attached</span>
+              {(gameTypeId === 'audio' || gameTypeId === 'visual') && (
+                <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+                  Media Upload
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      ref={newUploadRef}
+                      type="file"
+                      accept={gameTypeId === 'audio' ? 'audio/mpeg' : 'image/png,image/jpeg,image/webp'}
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        if (file) handleDraftUpload(file);
+                      }}
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => newUploadRef.current?.click()}
+                      className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent hover:text-text"
+                    >
+                      {mediaUploading
+                        ? 'Uploading'
+                        : gameTypeId === 'audio'
+                          ? 'Upload MP3'
+                          : 'Upload Image'}
+                    </button>
+                    {itemDraft.media_key && (
+                      <span className="text-[10px] uppercase tracking-[0.2em] text-muted">
+                        {gameTypeId === 'audio' ? 'Audio attached' : 'Image attached'}
+                      </span>
+                    )}
+                  </div>
+                  {gameTypeId === 'audio' && (
+                    <span className="text-[10px] tracking-[0.2em] text-muted">MP3 only for audio rounds.</span>
                   )}
+                  {gameTypeId === 'visual' && (
+                    <span className="text-[10px] tracking-[0.2em] text-muted">PNG, JPG, or WEBP only.</span>
+                  )}
+                  {mediaError && <span className="text-[10px] tracking-[0.2em] text-danger">{mediaError}</span>}
+                </label>
+              )}
+              {itemValidationError && (
+                <div className="border-2 border-danger bg-panel px-3 py-2 text-xs uppercase tracking-[0.2em] text-danger">
+                  {itemValidationError}
                 </div>
-                {gameTypeId === 'audio' && (
-                  <span className="text-[10px] tracking-[0.2em] text-muted">MP3 only for audio rounds.</span>
-                )}
-                {mediaError && <span className="text-[10px] tracking-[0.2em] text-danger">{mediaError}</span>}
-              </label>
+              )}
               <div className="flex flex-wrap gap-2">
                 <PrimaryButton onClick={handleCreateItem}>Save</PrimaryButton>
                 <SecondaryButton onClick={cancelEdit}>Cancel</SecondaryButton>
