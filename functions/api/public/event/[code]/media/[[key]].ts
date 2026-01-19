@@ -1,8 +1,8 @@
-import type { Env } from '../../../../types';
-import { jsonError } from '../../../../responses';
-import { normalizeCode } from '../../../../public';
-import { queryFirst } from '../../../../db';
-import { logError, logInfo, logWarn } from '../../../../_lib/log';
+import type { Env } from '../../../../../types';
+import { jsonError } from '../../../../../responses';
+import { normalizeCode } from '../../../../../public';
+import { queryFirst } from '../../../../../db';
+import { logError, logInfo, logWarn } from '../../../../../_lib/log';
 
 export const onRequestGet: PagesFunction<Env> = async ({ env, params, request, data }) => {
   const requestId = data.requestId ?? request.headers.get('x-request-id') ?? 'unknown';
