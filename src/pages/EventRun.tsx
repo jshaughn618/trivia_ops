@@ -438,7 +438,7 @@ export function EventRunPage() {
                     Go Offline
                   </SecondaryButton>
                 )}
-                {activeRound?.status !== 'completed' && (
+                {activeRound?.status !== 'completed' && item && index === items.length - 1 && (
                   <SecondaryButton onClick={setCompleted} disabled={!activeRound}>
                     Mark Completed
                   </SecondaryButton>
