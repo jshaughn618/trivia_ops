@@ -6,7 +6,7 @@ import { execute, nowIso, queryAll } from '../db';
 import { generateEventCode } from '../public';
 
 export const onRequestGet: PagesFunction<Env> = async ({ env }) => {
-  const rows = await queryAll(env, 'SELECT * FROM events ORDER BY starts_at DESC');
+  const rows = await queryAll(env, 'SELECT * FROM events WHERE deleted = 0 ORDER BY starts_at DESC');
   return jsonOk(rows);
 };
 
@@ -40,6 +40,6 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     ]
   );
 
-  const rows = await queryAll(env, 'SELECT * FROM events WHERE id = ?', [id]);
+  const rows = await queryAll(env, 'SELECT * FROM events WHERE id = ? AND deleted = 0', [id]);
   return jsonOk(rows[0]);
 };

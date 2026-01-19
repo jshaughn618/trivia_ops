@@ -7,7 +7,7 @@ import { execute, nowIso, queryAll } from '../db';
 export const onRequestGet: PagesFunction<Env> = async ({ env, request }) => {
   const url = new URL(request.url);
   const params: unknown[] = [];
-  const where: string[] = [];
+  const where: string[] = ['deleted = 0'];
 
   const gameId = url.searchParams.get('game_id');
   const status = url.searchParams.get('status');
@@ -61,6 +61,6 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     ]
   );
 
-  const rows = await queryAll(env, 'SELECT * FROM editions WHERE id = ?', [id]);
+  const rows = await queryAll(env, 'SELECT * FROM editions WHERE id = ? AND deleted = 0', [id]);
   return jsonOk(rows[0]);
 };

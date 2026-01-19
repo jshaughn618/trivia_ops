@@ -5,7 +5,11 @@ import { teamCreateSchema } from '../../../../shared/validators';
 import { execute, nowIso, queryAll } from '../../../db';
 
 export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
-  const rows = await queryAll(env, 'SELECT * FROM teams WHERE event_id = ? ORDER BY created_at ASC', [params.id]);
+  const rows = await queryAll(
+    env,
+    'SELECT * FROM teams WHERE event_id = ? AND deleted = 0 ORDER BY created_at ASC',
+    [params.id]
+  );
   return jsonOk(rows);
 };
 
@@ -28,6 +32,6 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request }
     [id, params.id, data.name, data.table_label ?? null, createdAt]
   );
 
-  const rows = await queryAll(env, 'SELECT * FROM teams WHERE id = ?', [id]);
+  const rows = await queryAll(env, 'SELECT * FROM teams WHERE id = ? AND deleted = 0', [id]);
   return jsonOk(rows[0]);
 };

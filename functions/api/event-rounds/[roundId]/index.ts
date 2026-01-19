@@ -2,7 +2,7 @@ import type { Env } from '../../../types';
 import { jsonError, jsonOk } from '../../../responses';
 import { parseJson } from '../../../request';
 import { eventRoundUpdateSchema } from '../../../../shared/validators';
-import { execute, queryFirst } from '../../../db';
+import { execute, nowIso, queryFirst } from '../../../db';
 
 export const onRequestPut: PagesFunction<Env> = async ({ env, params, request }) => {
   const payload = await parseJson(request);
@@ -11,7 +11,7 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request })
     return jsonError({ code: 'validation_error', message: 'Invalid round update', details: parsed.error.flatten() }, 400);
   }
 
-  const existing = await queryFirst(env, 'SELECT * FROM event_rounds WHERE id = ?', [params.roundId]);
+  const existing = await queryFirst(env, 'SELECT * FROM event_rounds WHERE id = ? AND deleted = 0', [params.roundId]);
   if (!existing) {
     return jsonError({ code: 'not_found', message: 'Round not found' }, 404);
   }
@@ -23,11 +23,20 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request })
     [data.round_number, data.label, data.edition_id, data.status, params.roundId]
   );
 
-  const row = await queryFirst(env, 'SELECT * FROM event_rounds WHERE id = ?', [params.roundId]);
+  const row = await queryFirst(env, 'SELECT * FROM event_rounds WHERE id = ? AND deleted = 0', [params.roundId]);
   return jsonOk(row);
 };
 
 export const onRequestDelete: PagesFunction<Env> = async ({ env, params }) => {
-  await execute(env, 'DELETE FROM event_rounds WHERE id = ?', [params.roundId]);
+  const existing = await queryFirst(env, 'SELECT id FROM event_rounds WHERE id = ? AND deleted = 0', [params.roundId]);
+  if (!existing) {
+    return jsonError({ code: 'not_found', message: 'Round not found' }, 404);
+  }
+  const now = nowIso();
+  await execute(
+    env,
+    'UPDATE event_rounds SET deleted = 1, deleted_at = ?, updated_at = ? WHERE id = ?',
+    [now, now, params.roundId]
+  );
   return jsonOk({ ok: true });
 };

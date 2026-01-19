@@ -7,7 +7,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ env }) => {
     env,
     `SELECT id, email, username, first_name, last_name, user_type, created_at
      FROM users
-     WHERE user_type IN ('admin', 'host')
+     WHERE user_type IN ('admin', 'host') AND deleted = 0
      ORDER BY last_name, first_name, email`
   );
   return jsonOk(rows);

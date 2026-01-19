@@ -7,7 +7,7 @@ import { execute, nowIso, queryAll } from '../../../db';
 export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
   const rows = await queryAll(
     env,
-    'SELECT * FROM event_rounds WHERE event_id = ? ORDER BY round_number ASC',
+    'SELECT * FROM event_rounds WHERE event_id = ? AND deleted = 0 ORDER BY round_number ASC',
     [params.id]
   );
   return jsonOk(rows);
@@ -34,7 +34,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request }
 
   const editionItems = await queryAll<{ id: string; ordinal: number }>(
     env,
-    'SELECT id, ordinal FROM edition_items WHERE edition_id = ? ORDER BY ordinal ASC',
+    'SELECT id, ordinal FROM edition_items WHERE edition_id = ? AND deleted = 0 ORDER BY ordinal ASC',
     [data.edition_id]
   );
 
@@ -48,6 +48,6 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request }
     );
   }
 
-  const rows = await queryAll(env, 'SELECT * FROM event_rounds WHERE id = ?', [id]);
+  const rows = await queryAll(env, 'SELECT * FROM event_rounds WHERE id = ? AND deleted = 0', [id]);
   return jsonOk(rows[0]);
 };

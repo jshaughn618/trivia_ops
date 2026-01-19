@@ -2,9 +2,13 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PrimaryButton } from '../components/Buttons';
 import { useAuth } from '../auth';
-import logo from '../assets/trivia_ops_logo.png';
+import { useTheme } from '../lib/theme';
+import logoDark from '../assets/trivia_ops_logo_dark.png';
+import logoLight from '../assets/trivia_ops_logo_light.png';
 
 export function LoginPage() {
+  const { theme } = useTheme();
+  const logo = theme === 'light' ? logoLight : logoDark;
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [code, setCode] = useState('');

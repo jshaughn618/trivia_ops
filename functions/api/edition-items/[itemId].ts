@@ -2,7 +2,7 @@ import type { Env } from '../../types';
 import { jsonError, jsonOk } from '../../responses';
 import { parseJson } from '../../request';
 import { editionItemUpdateSchema } from '../../../shared/validators';
-import { execute, queryFirst } from '../../db';
+import { execute, nowIso, queryFirst } from '../../db';
 
 export const onRequestPut: PagesFunction<Env> = async ({ env, params, request }) => {
   const payload = await parseJson(request);
@@ -11,7 +11,7 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request })
     return jsonError({ code: 'validation_error', message: 'Invalid item update', details: parsed.error.flatten() }, 400);
   }
 
-  const existing = await queryFirst(env, 'SELECT * FROM edition_items WHERE id = ?', [params.itemId]);
+  const existing = await queryFirst(env, 'SELECT * FROM edition_items WHERE id = ? AND deleted = 0', [params.itemId]);
   if (!existing) {
     return jsonError({ code: 'not_found', message: 'Item not found' }, 404);
   }
@@ -38,11 +38,20 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request })
     ]
   );
 
-  const row = await queryFirst(env, 'SELECT * FROM edition_items WHERE id = ?', [params.itemId]);
+  const row = await queryFirst(env, 'SELECT * FROM edition_items WHERE id = ? AND deleted = 0', [params.itemId]);
   return jsonOk(row);
 };
 
 export const onRequestDelete: PagesFunction<Env> = async ({ env, params }) => {
-  await execute(env, 'DELETE FROM edition_items WHERE id = ?', [params.itemId]);
+  const existing = await queryFirst(env, 'SELECT id FROM edition_items WHERE id = ? AND deleted = 0', [params.itemId]);
+  if (!existing) {
+    return jsonError({ code: 'not_found', message: 'Item not found' }, 404);
+  }
+  const now = nowIso();
+  await execute(
+    env,
+    'UPDATE edition_items SET deleted = 1, deleted_at = ?, updated_at = ? WHERE id = ?',
+    [now, now, params.itemId]
+  );
   return jsonOk({ ok: true });
 };

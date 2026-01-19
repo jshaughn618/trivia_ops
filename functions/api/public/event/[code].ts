@@ -81,13 +81,13 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
         ei.answer_b,
         ei.answer_a_label,
         ei.answer_b_label,
-        COALESCE(eri.overridden_fun_fact, ei.fun_fact) AS fun_fact,
-        ei.media_type,
-        ei.media_key,
-        ei.media_caption
+       COALESCE(eri.overridden_fun_fact, ei.fun_fact) AS fun_fact,
+       ei.media_type,
+       ei.media_key,
+       ei.media_caption
        FROM event_round_items eri
        JOIN edition_items ei ON ei.id = eri.edition_item_id
-       WHERE eri.event_round_id = ? AND eri.ordinal = ?
+       WHERE eri.event_round_id = ? AND eri.ordinal = ? AND eri.deleted = 0 AND ei.deleted = 0
        LIMIT 1`,
       [live.active_round_id, live.current_item_ordinal]
     );

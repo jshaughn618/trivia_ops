@@ -2,10 +2,10 @@ import type { Env } from '../../../types';
 import { jsonError, jsonOk } from '../../../responses';
 import { parseJson } from '../../../request';
 import { eventUpdateSchema } from '../../../../shared/validators';
-import { execute, queryFirst } from '../../../db';
+import { execute, nowIso, queryFirst } from '../../../db';
 
 export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
-  const row = await queryFirst(env, 'SELECT * FROM events WHERE id = ?', [params.id]);
+  const row = await queryFirst(env, 'SELECT * FROM events WHERE id = ? AND deleted = 0', [params.id]);
   if (!row) {
     return jsonError({ code: 'not_found', message: 'Event not found' }, 404);
   }
@@ -19,7 +19,7 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request })
     return jsonError({ code: 'validation_error', message: 'Invalid event update', details: parsed.error.flatten() }, 400);
   }
 
-  const existing = await queryFirst(env, 'SELECT * FROM events WHERE id = ?', [params.id]);
+  const existing = await queryFirst(env, 'SELECT * FROM events WHERE id = ? AND deleted = 0', [params.id]);
   if (!existing) {
     return jsonError({ code: 'not_found', message: 'Event not found' }, 404);
   }
@@ -39,11 +39,20 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request })
     ]
   );
 
-  const row = await queryFirst(env, 'SELECT * FROM events WHERE id = ?', [params.id]);
+  const row = await queryFirst(env, 'SELECT * FROM events WHERE id = ? AND deleted = 0', [params.id]);
   return jsonOk(row);
 };
 
 export const onRequestDelete: PagesFunction<Env> = async ({ env, params }) => {
-  await execute(env, 'DELETE FROM events WHERE id = ?', [params.id]);
+  const existing = await queryFirst(env, 'SELECT id FROM events WHERE id = ? AND deleted = 0', [params.id]);
+  if (!existing) {
+    return jsonError({ code: 'not_found', message: 'Event not found' }, 404);
+  }
+  const now = nowIso();
+  await execute(
+    env,
+    'UPDATE events SET deleted = 1, deleted_at = ?, updated_at = ? WHERE id = ?',
+    [now, now, params.id]
+  );
   return jsonOk({ ok: true });
 };

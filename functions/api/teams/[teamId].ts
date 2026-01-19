@@ -2,7 +2,7 @@ import type { Env } from '../../types';
 import { jsonError, jsonOk } from '../../responses';
 import { parseJson } from '../../request';
 import { teamUpdateSchema } from '../../../shared/validators';
-import { execute, queryFirst } from '../../db';
+import { execute, nowIso, queryFirst } from '../../db';
 
 export const onRequestPut: PagesFunction<Env> = async ({ env, params, request }) => {
   const payload = await parseJson(request);
@@ -11,7 +11,7 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request })
     return jsonError({ code: 'validation_error', message: 'Invalid team update', details: parsed.error.flatten() }, 400);
   }
 
-  const existing = await queryFirst(env, 'SELECT * FROM teams WHERE id = ?', [params.teamId]);
+  const existing = await queryFirst(env, 'SELECT * FROM teams WHERE id = ? AND deleted = 0', [params.teamId]);
   if (!existing) {
     return jsonError({ code: 'not_found', message: 'Team not found' }, 404);
   }
@@ -23,11 +23,20 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request })
     [data.name, data.table_label ?? null, params.teamId]
   );
 
-  const row = await queryFirst(env, 'SELECT * FROM teams WHERE id = ?', [params.teamId]);
+  const row = await queryFirst(env, 'SELECT * FROM teams WHERE id = ? AND deleted = 0', [params.teamId]);
   return jsonOk(row);
 };
 
 export const onRequestDelete: PagesFunction<Env> = async ({ env, params }) => {
-  await execute(env, 'DELETE FROM teams WHERE id = ?', [params.teamId]);
+  const existing = await queryFirst(env, 'SELECT id FROM teams WHERE id = ? AND deleted = 0', [params.teamId]);
+  if (!existing) {
+    return jsonError({ code: 'not_found', message: 'Team not found' }, 404);
+  }
+  const now = nowIso();
+  await execute(
+    env,
+    'UPDATE teams SET deleted = 1, deleted_at = ?, updated_at = ? WHERE id = ?',
+    [now, now, params.teamId]
+  );
   return jsonOk({ ok: true });
 };

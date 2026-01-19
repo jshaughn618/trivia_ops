@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import { useAuth } from '../auth';
-import logo from '../assets/trivia_ops_logo.png';
+import { useTheme } from '../lib/theme';
+import logoDark from '../assets/trivia_ops_logo_dark.png';
+import logoLight from '../assets/trivia_ops_logo_light.png';
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   `px-3 py-2 text-xs font-display uppercase tracking-[0.25em] border-2 transition-colors ${
@@ -14,6 +16,8 @@ export function HeaderBar() {
   const [open, setOpen] = useState(false);
   const auth = useAuth();
   const isAdmin = auth.user?.user_type === 'admin';
+  const { theme } = useTheme();
+  const logo = theme === 'light' ? logoLight : logoDark;
 
   return (
     <header className="border-b-2 border-border bg-panel px-4 py-3">

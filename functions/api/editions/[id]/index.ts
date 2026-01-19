@@ -5,7 +5,7 @@ import { editionUpdateSchema } from '../../../../shared/validators';
 import { execute, nowIso, queryFirst } from '../../../db';
 
 export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
-  const row = await queryFirst(env, 'SELECT * FROM editions WHERE id = ?', [params.id]);
+  const row = await queryFirst(env, 'SELECT * FROM editions WHERE id = ? AND deleted = 0', [params.id]);
   if (!row) {
     return jsonError({ code: 'not_found', message: 'Edition not found' }, 404);
   }
@@ -19,7 +19,7 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request })
     return jsonError({ code: 'validation_error', message: 'Invalid edition update', details: parsed.error.flatten() }, 400);
   }
 
-  const existing = await queryFirst(env, 'SELECT * FROM editions WHERE id = ?', [params.id]);
+  const existing = await queryFirst(env, 'SELECT * FROM editions WHERE id = ? AND deleted = 0', [params.id]);
   if (!existing) {
     return jsonError({ code: 'not_found', message: 'Edition not found' }, 404);
   }
@@ -41,11 +41,20 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request })
     ]
   );
 
-  const row = await queryFirst(env, 'SELECT * FROM editions WHERE id = ?', [params.id]);
+  const row = await queryFirst(env, 'SELECT * FROM editions WHERE id = ? AND deleted = 0', [params.id]);
   return jsonOk(row);
 };
 
 export const onRequestDelete: PagesFunction<Env> = async ({ env, params }) => {
-  await execute(env, 'DELETE FROM editions WHERE id = ?', [params.id]);
+  const existing = await queryFirst(env, 'SELECT id FROM editions WHERE id = ? AND deleted = 0', [params.id]);
+  if (!existing) {
+    return jsonError({ code: 'not_found', message: 'Edition not found' }, 404);
+  }
+  const now = nowIso();
+  await execute(
+    env,
+    'UPDATE editions SET deleted = 1, deleted_at = ?, updated_at = ? WHERE id = ?',
+    [now, now, params.id]
+  );
   return jsonOk({ ok: true });
 };

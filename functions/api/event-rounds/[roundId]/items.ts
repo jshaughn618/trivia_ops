@@ -16,14 +16,14 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
       ei.answer_b_label,
       COALESCE(eri.overridden_fun_fact, ei.fun_fact) AS fun_fact,
       eri.ordinal AS ordinal,
-      ei.media_type,
-      ei.media_key,
-      ei.media_caption,
-      ei.created_at
-     FROM event_round_items eri
-     JOIN edition_items ei ON ei.id = eri.edition_item_id
-     WHERE eri.event_round_id = ?
-     ORDER BY eri.ordinal ASC`,
+     ei.media_type,
+     ei.media_key,
+     ei.media_caption,
+     ei.created_at
+    FROM event_round_items eri
+    JOIN edition_items ei ON ei.id = eri.edition_item_id
+    WHERE eri.event_round_id = ? AND eri.deleted = 0 AND ei.deleted = 0
+    ORDER BY eri.ordinal ASC`,
     [params.roundId]
   );
 

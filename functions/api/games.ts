@@ -5,7 +5,7 @@ import { gameCreateSchema } from '../../shared/validators';
 import { execute, nowIso, queryAll, queryFirst } from '../db';
 
 export const onRequestGet: PagesFunction<Env> = async ({ env }) => {
-  const rows = await queryAll(env, 'SELECT * FROM games ORDER BY created_at DESC');
+  const rows = await queryAll(env, 'SELECT * FROM games WHERE deleted = 0 ORDER BY created_at DESC');
   return jsonOk(rows);
 };
 
@@ -36,6 +36,6 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     [id, data.name, data.game_type_id, data.description ?? null, defaultSettings, createdAt]
   );
 
-  const rows = await queryAll(env, 'SELECT * FROM games WHERE id = ?', [id]);
+  const rows = await queryAll(env, 'SELECT * FROM games WHERE id = ? AND deleted = 0', [id]);
   return jsonOk(rows[0]);
 };

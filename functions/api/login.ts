@@ -23,7 +23,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     user_type: string;
   }>(
     env,
-    'SELECT id, email, password_hash, created_at, username, first_name, last_name, user_type FROM users WHERE email = ?',
+    'SELECT id, email, password_hash, created_at, username, first_name, last_name, user_type FROM users WHERE email = ? AND deleted = 0',
     [parsed.data.email]
   );
 
