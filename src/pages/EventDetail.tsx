@@ -255,13 +255,14 @@ export function EventDetailPage() {
             )}
             {rounds.map((round) => {
               const display = roundDisplay(round);
+              const statusLabel = round.status === 'locked' ? 'COMPLETED' : round.status.toUpperCase();
               return (
                 <div key={round.id} className="border-2 border-border bg-panel2 p-3">
                   <div className="flex items-center justify-between">
                     <div className="text-sm font-display uppercase tracking-[0.2em]">
                       {display.title}
                     </div>
-                    <StampBadge label={round.status.toUpperCase()} variant="inspected" />
+                    <StampBadge label={statusLabel} variant="inspected" />
                   </div>
                   <div className="mt-2 text-xs uppercase tracking-[0.2em] text-muted">{display.detail}</div>
                   <div className="mt-2 flex flex-wrap gap-2">

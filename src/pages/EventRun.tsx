@@ -3,7 +3,7 @@ import { useLocation, useParams } from 'react-router-dom';
 import { api } from '../api';
 import { AppShell } from '../components/AppShell';
 import { Panel } from '../components/Panel';
-import { PrimaryButton, SecondaryButton, DangerButton } from '../components/Buttons';
+import { PrimaryButton, SecondaryButton } from '../components/Buttons';
 import { StampBadge } from '../components/StampBadge';
 import { logError, logInfo } from '../lib/log';
 import type { EditionItem, Event, EventRound, Game, GameEdition } from '../types';
@@ -93,7 +93,7 @@ export function EventRunPage() {
   }, [roundId]);
   useEffect(() => {
     if (roundId || rounds.length === 0) return;
-    const nextRound = rounds.find((round) => round.status !== 'completed') ?? rounds[0];
+    const nextRound = rounds.find((round) => round.status !== 'completed' && round.status !== 'locked') ?? rounds[0];
     if (nextRound) setRoundId(nextRound.id);
   }, [rounds, roundId]);
 
@@ -115,6 +115,9 @@ export function EventRunPage() {
       detail: `${gameLabel} — ${editionLabel}`
     };
   };
+
+  const roundStatusLabel = (status: EventRound['status']) =>
+    status === 'locked' ? 'COMPLETED' : status.toUpperCase();
 
   const activeRound = useMemo(() => rounds.find((round) => round.id === roundId) ?? null, [rounds, roundId]);
   const item = items[index];
@@ -246,14 +249,12 @@ export function EventRunPage() {
     }
   };
 
-  const lockRound = async () => {
-    if (!activeRound) return;
-    await api.updateEventRound(activeRound.id, { status: 'locked' });
-    await load();
-  };
-
   const setLive = async () => {
     if (!activeRound) return;
+    const otherLive = rounds.filter((round) => round.id !== activeRound.id && round.status === 'live');
+    if (otherLive.length > 0) {
+      await Promise.all(otherLive.map((round) => api.updateEventRound(round.id, { status: 'planned' })));
+    }
     await api.updateEventRound(activeRound.id, { status: 'live' });
     await load();
   };
@@ -275,6 +276,12 @@ export function EventRunPage() {
   const setCompleted = async () => {
     if (!activeRound) return;
     await api.updateEventRound(activeRound.id, { status: 'completed' });
+    await load();
+  };
+
+  const reopenRound = async () => {
+    if (!activeRound) return;
+    await api.updateEventRound(activeRound.id, { status: 'planned' });
     await load();
   };
 
@@ -318,7 +325,7 @@ export function EventRunPage() {
                 <div className="text-xs uppercase tracking-[0.2em] text-muted">
                   {roundDisplay(activeRound).title} — {roundDisplay(activeRound).detail}
                 </div>
-                <StampBadge label={activeRound.status.toUpperCase()} variant="verified" />
+                <StampBadge label={roundStatusLabel(activeRound.status)} variant="verified" />
               </div>
               {item ? (
                 <div className="relative border-2 border-border bg-panel2 p-4">
@@ -419,13 +426,9 @@ export function EventRunPage() {
                 <PrimaryButton onClick={nextItem} disabled={!item} className="py-4 text-sm">
                   Next
                 </PrimaryButton>
-                {activeRound?.status !== 'locked' ? (
-                  <DangerButton onClick={lockRound} disabled={!activeRound} className="py-4 text-sm">
-                    Lock In
-                  </DangerButton>
-                ) : (
-                  <SecondaryButton onClick={setPlanned} disabled={!activeRound} className="py-4 text-sm">
-                    Unlock
+                {(activeRound?.status === 'completed' || activeRound?.status === 'locked') && (
+                  <SecondaryButton onClick={reopenRound} disabled={!activeRound} className="py-4 text-sm">
+                    Reopen Round
                   </SecondaryButton>
                 )}
                 {activeRound?.status !== 'live' && (
@@ -438,7 +441,7 @@ export function EventRunPage() {
                     Go Offline
                   </SecondaryButton>
                 )}
-                {activeRound?.status !== 'completed' && item && index === items.length - 1 && (
+                {activeRound?.status !== 'completed' && activeRound?.status !== 'locked' && item && index === items.length - 1 && (
                   <SecondaryButton onClick={setCompleted} disabled={!activeRound}>
                     Mark Completed
                   </SecondaryButton>
@@ -461,7 +464,8 @@ export function EventRunPage() {
               {rounds.map((round) => {
                 const display = roundDisplay(round);
                 const selected = round.id === roundId;
-                const isCompleted = round.status === 'completed';
+                const isCompleted = round.status === 'completed' || round.status === 'locked';
+                const statusLabel = round.status === 'locked' ? 'COMPLETED' : round.status.toUpperCase();
                 return (
                   <button
                     key={round.id}
@@ -477,7 +481,7 @@ export function EventRunPage() {
                   >
                     <div className="flex items-center justify-between">
                       <div className="text-xs font-display uppercase tracking-[0.2em]">{display.title}</div>
-                      <StampBadge label={round.status.toUpperCase()} variant="inspected" />
+                      <StampBadge label={statusLabel} variant="inspected" />
                     </div>
                     <div className="text-[10px] uppercase tracking-[0.2em] text-muted">{display.detail}</div>
                   </button>
@@ -490,7 +494,7 @@ export function EventRunPage() {
               <div className="text-xs uppercase tracking-[0.2em] text-muted">Event</div>
               <div className="text-sm font-display uppercase tracking-[0.2em]">{event.title}</div>
               <div className="border-2 border-border bg-panel2 p-3 text-xs uppercase tracking-[0.2em] text-muted">
-                {activeRound ? `Status: ${activeRound.status}` : 'Awaiting round selection'}
+                {activeRound ? `Status: ${roundStatusLabel(activeRound.status)}` : 'Awaiting round selection'}
               </div>
             </div>
           </Panel>

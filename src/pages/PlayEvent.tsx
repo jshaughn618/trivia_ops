@@ -334,7 +334,9 @@ export function PlayEventPage() {
                   <div className="text-xs uppercase tracking-[0.2em] text-muted">
                     {round.round_number}. {round.label}
                   </div>
-                  <div className="text-[10px] uppercase tracking-[0.2em] text-muted">{round.status}</div>
+                  <div className="text-[10px] uppercase tracking-[0.2em] text-muted">
+                    {round.status === 'locked' ? 'completed' : round.status}
+                  </div>
                 </div>
               ))}
             </div>
