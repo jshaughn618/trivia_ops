@@ -5,9 +5,19 @@ import { queryAll, queryFirst } from '../../../db';
 
 export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
   const code = normalizeCode(params.code as string);
-  const event = await queryFirst<{ id: string; title: string; starts_at: string; status: string; public_code: string }>(
+  const event = await queryFirst<{
+    id: string;
+    title: string;
+    starts_at: string;
+    status: string;
+    public_code: string;
+    location_name: string | null;
+  }>(
     env,
-    'SELECT id, title, starts_at, status, public_code FROM events WHERE public_code = ? AND deleted = 0',
+    `SELECT e.id, e.title, e.starts_at, e.status, e.public_code, l.name AS location_name
+     FROM events e
+     LEFT JOIN locations l ON l.id = e.location_id
+     WHERE e.public_code = ? AND e.deleted = 0`,
     [code]
   );
 

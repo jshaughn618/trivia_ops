@@ -120,7 +120,7 @@ export function EditionDetailPage() {
   const handleCreateItem = async () => {
     if (!editionId) return;
     if (!itemDraft.prompt.trim()) {
-      setItemValidationError('Prompt is required.');
+      setItemValidationError('Question is required.');
       return;
     }
     if (gameTypeId === 'audio') {
@@ -181,7 +181,7 @@ export function EditionDetailPage() {
 
   const saveEdit = async (item: EditionItem) => {
     if (!itemDraft.prompt.trim()) {
-      setItemValidationError('Prompt is required.');
+      setItemValidationError('Question is required.');
       return;
     }
     if (gameTypeId === 'audio') {
@@ -617,9 +617,11 @@ export function EditionDetailPage() {
                       ? `${item.answer_a_label ? `${item.answer_a_label}: ` : 'A: '}${item.answer_a} / ${item.answer_b_label ? `${item.answer_b_label}: ` : 'B: '}${item.answer_b}`
                       : 'Answer missing')}
                   </div>
-                  <div className="mt-2 text-[10px] uppercase tracking-[0.2em] text-muted">
-                    {item.media_key ? `${item.media_type} attached` : 'No media'} • Drag to reorder
-                  </div>
+                  {(gameTypeId === 'audio' || gameTypeId === 'visual') && (
+                    <div className="mt-2 text-[10px] uppercase tracking-[0.2em] text-muted">
+                      {item.media_key ? `${item.media_type} attached` : 'No media'} • Drag to reorder
+                    </div>
+                  )}
                 </div>
                 {activeItemId === item.id && (
                   <div className="border-2 border-border bg-panel p-3">
@@ -629,7 +631,7 @@ export function EditionDetailPage() {
                     <div className="mt-3 grid gap-3">
                       <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
                         <span className="flex items-center justify-between">
-                          Prompt
+                          Question
                           <button
                             type="button"
                             onClick={startRefine}
@@ -775,7 +777,7 @@ export function EditionDetailPage() {
                       </div>
                       {refineOpen && (
                         <div className="border-2 border-border bg-panel2 p-3">
-                          <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">Refined Prompts</div>
+                          <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">Refined Questions</div>
                           {refineLoading && (
                             <div className="mt-2 text-xs uppercase tracking-[0.2em] text-muted">Generating…</div>
                           )}
@@ -831,7 +833,7 @@ export function EditionDetailPage() {
               <div className="mt-3 grid gap-3">
                 <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
                   <span className="flex items-center justify-between">
-                    Prompt
+                    Question
                   <button
                     type="button"
                     onClick={startRefine}
@@ -977,7 +979,7 @@ export function EditionDetailPage() {
               </div>
               {refineOpen && (
                 <div className="border-2 border-border bg-panel2 p-3">
-                  <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">Refined Prompts</div>
+                  <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">Refined Questions</div>
                   {refineLoading && (
                     <div className="mt-2 text-xs uppercase tracking-[0.2em] text-muted">Generating…</div>
                   )}

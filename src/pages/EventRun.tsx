@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
 import { api } from '../api';
 import { AppShell } from '../components/AppShell';
@@ -23,6 +23,8 @@ export function EventRunPage() {
   const [index, setIndex] = useState(0);
   const [showAnswer, setShowAnswer] = useState(false);
   const [showFact, setShowFact] = useState(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const timerRef = useRef<number | null>(null);
 
   const load = async () => {
     if (!eventId) return;
@@ -68,6 +70,25 @@ export function EventRunPage() {
     if (roundId) loadItems(roundId);
   }, [roundId]);
 
+  useEffect(() => {
+    if (timerRef.current) {
+      window.clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    setElapsedSeconds(0);
+    if (activeRound?.status === 'live' && items.length > 0) {
+      timerRef.current = window.setInterval(() => {
+        setElapsedSeconds((prev) => prev + 1);
+      }, 1000);
+    }
+    return () => {
+      if (timerRef.current) {
+        window.clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, [activeRound?.status, roundId, index, items.length]);
+
   const editionById = useMemo(() => {
     return Object.fromEntries(editions.map((edition) => [edition.id, edition]));
   }, [editions]);
@@ -106,6 +127,22 @@ export function EventRunPage() {
     }
   };
 
+  const prevItem = () => {
+    if (index > 0) {
+      const prevIndex = index - 1;
+      setIndex(prevIndex);
+      setShowAnswer(false);
+      setShowFact(false);
+      if (eventId) {
+        api.updateLiveState(eventId, {
+          current_item_ordinal: items[prevIndex]?.ordinal ?? null,
+          reveal_answer: false,
+          reveal_fun_fact: false
+        });
+      }
+    }
+  };
+
   const lockRound = async () => {
     if (!activeRound) return;
     await api.updateEventRound(activeRound.id, { status: 'locked' });
@@ -118,6 +155,18 @@ export function EventRunPage() {
     await load();
   };
 
+  const setPlanned = async () => {
+    if (!activeRound) return;
+    await api.updateEventRound(activeRound.id, { status: 'planned' });
+    await load();
+  };
+
+  const timerLabel = useMemo(() => {
+    const minutes = Math.floor(elapsedSeconds / 60);
+    const seconds = elapsedSeconds % 60;
+    return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  }, [elapsedSeconds]);
+
   if (!event) {
     return (
       <AppShell title="Round Runner">
@@ -129,7 +178,7 @@ export function EventRunPage() {
   return (
     <AppShell title="Round Runner">
       <div className="grid gap-4 lg:grid-cols-[1fr,320px]">
-        <Panel title="Active Prompt">
+        <Panel title="Active Question">
           {activeRound ? (
             <div className="flex flex-col gap-4">
               <div className="flex items-center justify-between">
@@ -139,8 +188,8 @@ export function EventRunPage() {
                 <StampBadge label={activeRound.status.toUpperCase()} variant="verified" />
               </div>
               {item ? (
-                <div className="border-2 border-border bg-panel2 p-4">
-                  <div className="text-xs uppercase tracking-[0.2em] text-muted">Prompt</div>
+                <div className="relative border-2 border-border bg-panel2 p-4">
+                  <div className="text-xs uppercase tracking-[0.2em] text-muted">Question</div>
                   <div className="mt-2 text-lg font-display uppercase tracking-[0.2em]">{item.prompt}</div>
                   {item.media_type === 'image' && item.media_key && (
                     <img
@@ -152,6 +201,9 @@ export function EventRunPage() {
                   {item.media_type === 'audio' && item.media_key && (
                     <audio className="mt-4 w-full" controls src={api.mediaUrl(item.media_key)} />
                   )}
+                  <div className="absolute bottom-3 right-3 border-2 border-border bg-panel px-2 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted">
+                    {timerLabel}
+                  </div>
                 </div>
               ) : (
                 <div className="text-xs uppercase tracking-[0.2em] text-muted">No items in this round.</div>
@@ -166,40 +218,56 @@ export function EventRunPage() {
                   </div>
                 </div>
               )}
-              {item && showFact && item.fun_fact && (
+              {item && showFact && (
                 <div className="border-2 border-border bg-panel p-4">
                   <div className="text-xs uppercase tracking-[0.2em] text-muted">Factoid</div>
-                  <div className="mt-2 text-sm text-text">{item.fun_fact}</div>
+                  <div className="mt-2 text-sm text-text">{item.fun_fact || 'No factoid provided.'}</div>
                 </div>
               )}
               <div className="flex flex-wrap gap-2">
+                <SecondaryButton onClick={prevItem} disabled={index === 0}>
+                  Back
+                </SecondaryButton>
                 <PrimaryButton
                   onClick={() => {
-                    setShowAnswer(true);
-                    if (eventId) api.updateLiveState(eventId, { reveal_answer: true });
+                    const next = !showAnswer;
+                    setShowAnswer(next);
+                    if (eventId) api.updateLiveState(eventId, { reveal_answer: next });
                   }}
                   disabled={!item}
                 >
-                  Reveal Answer
+                  {showAnswer ? 'Hide Answer' : 'Reveal Answer'}
                 </PrimaryButton>
                 <SecondaryButton
                   onClick={() => {
-                    setShowFact(true);
-                    if (eventId) api.updateLiveState(eventId, { reveal_fun_fact: true });
+                    const next = !showFact;
+                    setShowFact(next);
+                    if (eventId) api.updateLiveState(eventId, { reveal_fun_fact: next });
                   }}
                   disabled={!item}
                 >
-                  Reveal Fact
+                  {showFact ? 'Hide Fact' : 'Reveal Fact'}
                 </SecondaryButton>
                 <PrimaryButton onClick={nextItem} disabled={!item} className="py-4 text-sm">
                   Next
                 </PrimaryButton>
-                <DangerButton onClick={lockRound} disabled={!activeRound} className="py-4 text-sm">
-                  Lock In
-                </DangerButton>
+                {activeRound?.status !== 'locked' ? (
+                  <DangerButton onClick={lockRound} disabled={!activeRound} className="py-4 text-sm">
+                    Lock In
+                  </DangerButton>
+                ) : (
+                  <SecondaryButton onClick={setPlanned} disabled={!activeRound} className="py-4 text-sm">
+                    Unlock
+                  </SecondaryButton>
+                )}
                 {activeRound?.status !== 'live' && (
                   <SecondaryButton onClick={setLive} disabled={!activeRound}>
                     Go Live
+                  </SecondaryButton>
+                )}
+                {activeRound?.status === 'live' && (
+                  <SecondaryButton onClick={setPlanned} disabled={!activeRound}>
+                    Go Offline
                   </SecondaryButton>
                 )}
               </div>

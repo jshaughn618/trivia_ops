@@ -7,7 +7,14 @@ import { PrimaryButton, SecondaryButton } from '../components/Buttons';
 const POLL_MS = 4000;
 
 type PublicEventResponse = {
-  event: { id: string; title: string; starts_at: string; status: string; public_code: string };
+  event: {
+    id: string;
+    title: string;
+    starts_at: string;
+    status: string;
+    public_code: string;
+    location_name: string | null;
+  };
   rounds: { id: string; round_number: number; label: string; status: string }[];
   teams: { id: string; name: string }[];
   leaderboard: { team_id: string; name: string; total: number }[];
@@ -38,6 +45,7 @@ export function PlayEventPage() {
   const [error, setError] = useState<string | null>(null);
   const [teamId, setTeamId] = useState('');
   const [teamName, setTeamName] = useState('');
+  const [teamNameLabel, setTeamNameLabel] = useState<string | null>(null);
   const normalizedCode = useMemo(() => (code ?? '').trim().toUpperCase(), [code]);
 
   const load = async () => {
@@ -65,6 +73,12 @@ export function PlayEventPage() {
     if (stored) setTeamId(stored);
   }, [data?.event?.id]);
 
+  useEffect(() => {
+    if (!data) return;
+    const matched = data.teams.find((team) => team.id === teamId);
+    setTeamNameLabel(matched?.name ?? null);
+  }, [data, teamId]);
+
   const handleJoin = async () => {
     if (!data) return;
     if (!teamId && !teamName.trim()) return;
@@ -72,9 +86,18 @@ export function PlayEventPage() {
     const res = await api.publicJoin(data.event.public_code, payload);
     if (res.ok) {
       setTeamId(res.data.team.id);
+      setTeamNameLabel(res.data.team.name);
       localStorage.setItem(`player_team_${data.event.id}`, res.data.team.id);
       setTeamName('');
     }
+  };
+
+  const handleChangeTeam = () => {
+    if (!data?.event?.id) return;
+    localStorage.removeItem(`player_team_${data.event.id}`);
+    setTeamId('');
+    setTeamNameLabel(null);
+    setTeamName('');
   };
 
   if (!normalizedCode) {
@@ -116,45 +139,71 @@ export function PlayEventPage() {
     <div className="min-h-screen bg-bg text-text">
       <div className="mx-auto max-w-5xl px-4 py-6">
         <div className="mb-6 border-b-2 border-border pb-3">
-          <div className="text-xs uppercase tracking-[0.2em] text-muted">Event Code</div>
-          <div className="text-2xl font-display uppercase tracking-[0.3em]">{data.event.public_code}</div>
-          <div className="mt-1 text-sm uppercase tracking-[0.2em] text-muted">{data.event.title}</div>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="text-xs uppercase tracking-[0.2em] text-muted">Event Code</div>
+              <div className="text-2xl font-display uppercase tracking-[0.3em]">{data.event.public_code}</div>
+              <div className="mt-1 text-sm uppercase tracking-[0.2em] text-muted">{data.event.title}</div>
+              <div className="mt-1 text-xs uppercase tracking-[0.2em] text-muted">
+                {data.event.location_name ?? 'Location TBD'} • {new Date(data.event.starts_at).toLocaleString()}
+              </div>
+            </div>
+            {teamId && (
+              <SecondaryButton onClick={handleChangeTeam}>Change Team</SecondaryButton>
+            )}
+          </div>
         </div>
 
         <div className="grid gap-4 lg:grid-cols-[1.4fr,1fr]">
           <Panel title="Now Showing">
-            {activeRound && data.current_item ? (
+            {!teamId ? (
+              <div className="text-xs uppercase tracking-[0.2em] text-muted">
+                Join or create a team to view the live question.
+              </div>
+            ) : activeRound ? (
               <div className="flex flex-col gap-4">
-                <div className="text-xs uppercase tracking-[0.2em] text-muted">{activeRound.label}</div>
                 <div className="border-2 border-border bg-panel2 p-4">
-                  <div className="text-xs uppercase tracking-[0.2em] text-muted">Prompt</div>
-                  <div className="mt-2 text-lg font-display uppercase tracking-[0.2em]">
-                    {data.current_item.prompt}
+                  <div className="text-xs uppercase tracking-[0.2em] text-muted">Current Round</div>
+                  <div className="mt-2 text-base font-display uppercase tracking-[0.2em]">
+                    Round {activeRound.round_number}
                   </div>
-                  {data.current_item.media_type === 'image' && data.current_item.media_key && (
-                    <img
-                      className="mt-4 max-h-64 w-full object-cover border-2 border-border"
-                      src={api.mediaUrl(data.current_item.media_key)}
-                      alt="Media"
-                    />
-                  )}
-                  {data.current_item.media_type === 'audio' && data.current_item.media_key && (
-                    <audio className="mt-4 w-full" controls src={api.mediaUrl(data.current_item.media_key)} />
-                  )}
+                  <div className="mt-1 text-xs uppercase tracking-[0.2em] text-muted">{activeRound.label}</div>
                 </div>
-                {data.live?.reveal_answer && answerText && (
-                  <div className="border-2 border-border bg-panel p-4">
-                    <div className="text-xs uppercase tracking-[0.2em] text-muted">Answer</div>
-                    <div className="mt-2 text-base font-display uppercase tracking-[0.2em]">
-                      {answerText}
+                {data.current_item ? (
+                  <>
+                    <div className="border-2 border-border bg-panel2 p-4">
+                      <div className="text-xs uppercase tracking-[0.2em] text-muted">Question</div>
+                      <div className="mt-2 text-lg font-display uppercase tracking-[0.2em]">
+                        {data.current_item.prompt}
+                      </div>
+                      {data.current_item.media_type === 'image' && data.current_item.media_key && (
+                        <img
+                          className="mt-4 max-h-64 w-full object-cover border-2 border-border"
+                          src={api.mediaUrl(data.current_item.media_key)}
+                          alt="Media"
+                        />
+                      )}
+                      {data.current_item.media_type === 'audio' && data.current_item.media_key && (
+                        <audio className="mt-4 w-full" controls src={api.mediaUrl(data.current_item.media_key)} />
+                      )}
                     </div>
-                  </div>
-                )}
-                {data.live?.reveal_fun_fact && data.current_item.fun_fact && (
-                  <div className="border-2 border-border bg-panel p-4">
-                    <div className="text-xs uppercase tracking-[0.2em] text-muted">Factoid</div>
-                    <div className="mt-2 text-sm text-text">{data.current_item.fun_fact}</div>
-                  </div>
+                    {data.live?.reveal_answer && answerText && (
+                      <div className="border-2 border-border bg-panel p-4">
+                        <div className="text-xs uppercase tracking-[0.2em] text-muted">Answer</div>
+                        <div className="mt-2 text-base font-display uppercase tracking-[0.2em]">
+                          {answerText}
+                        </div>
+                      </div>
+                    )}
+                    {data.live?.reveal_fun_fact && data.current_item.fun_fact && (
+                      <div className="border-2 border-border bg-panel p-4">
+                        <div className="text-xs uppercase tracking-[0.2em] text-muted">Factoid</div>
+                        <div className="mt-2 text-sm text-text">{data.current_item.fun_fact}</div>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="text-xs uppercase tracking-[0.2em] text-muted">Waiting for the host...</div>
                 )}
               </div>
             ) : (
@@ -163,33 +212,42 @@ export function PlayEventPage() {
           </Panel>
 
           <div className="flex flex-col gap-4">
-            <Panel title="Join a Team">
+            <Panel title={teamId ? 'Your Team' : 'Join a Team'}>
               <div className="flex flex-col gap-3">
-                <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-                  Select Team
-                  <select
-                    className="h-10 px-3"
-                    value={teamId}
-                    onChange={(event) => setTeamId(event.target.value)}
-                  >
-                    <option value="">Choose team</option>
-                    {data.teams.map((team) => (
-                      <option key={team.id} value={team.id}>
-                        {team.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <div className="text-center text-xs uppercase tracking-[0.2em] text-muted">Or</div>
-                <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-                  New Team Name
-                  <input
-                    className="h-10 px-3"
-                    value={teamName}
-                    onChange={(event) => setTeamName(event.target.value)}
-                  />
-                </label>
-                <PrimaryButton onClick={handleJoin}>Join</PrimaryButton>
+                {teamId && teamNameLabel ? (
+                  <div className="border-2 border-border bg-panel2 px-3 py-3">
+                    <div className="text-xs uppercase tracking-[0.2em] text-muted">Team</div>
+                    <div className="mt-2 text-sm font-display uppercase tracking-[0.2em]">{teamNameLabel}</div>
+                  </div>
+                ) : (
+                  <>
+                    <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+                      Select Team
+                      <select
+                        className="h-10 px-3"
+                        value={teamId}
+                        onChange={(event) => setTeamId(event.target.value)}
+                      >
+                        <option value="">Choose team</option>
+                        {data.teams.map((team) => (
+                          <option key={team.id} value={team.id}>
+                            {team.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <div className="text-center text-xs uppercase tracking-[0.2em] text-muted">Or</div>
+                    <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+                      New Team Name
+                      <input
+                        className="h-10 px-3"
+                        value={teamName}
+                        onChange={(event) => setTeamName(event.target.value)}
+                      />
+                    </label>
+                    <PrimaryButton onClick={handleJoin}>Join</PrimaryButton>
+                  </>
+                )}
               </div>
             </Panel>
 
