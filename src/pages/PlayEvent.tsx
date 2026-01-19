@@ -465,9 +465,7 @@ export function PlayEventPage() {
                 title="Leaderboard"
                 action={
                   <SecondaryButton
-                    onClick={() =>
-                      window.open(`/events/${data.event.id}/leaderboard?from=participant&code=${data.event.public_code}`, '_blank')
-                    }
+                    onClick={() => window.open(`/play/${data.event.public_code}/leaderboard`, '_blank')}
                   >
                     View Full Leaderboard
                   </SecondaryButton>

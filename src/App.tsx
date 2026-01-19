@@ -12,6 +12,7 @@ import { EventNewPage } from './pages/EventNew';
 import { EventDetailPage } from './pages/EventDetail';
 import { EventRunPage } from './pages/EventRun';
 import { EventLeaderboardPage } from './pages/EventLeaderboard';
+import { PlayLeaderboardPage } from './pages/PlayLeaderboard';
 import { LocationsPage } from './pages/Locations';
 import { LocationDetailPage } from './pages/LocationDetail';
 import { SettingsPage } from './pages/Settings';
@@ -24,6 +25,7 @@ export function App() {
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/play/:code" element={<PlayEventPage />} />
+      <Route path="/play/:code/leaderboard" element={<PlayLeaderboardPage />} />
       <Route
         path="/dashboard"
         element={
