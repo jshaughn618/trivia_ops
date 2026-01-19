@@ -27,7 +27,11 @@ export function EventRunPage() {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const timerRef = useRef<number | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [audioLoading, setAudioLoading] = useState(false);
   const [audioError, setAudioError] = useState<string | null>(null);
+  const [audioRequestId, setAudioRequestId] = useState<string | null>(null);
+  const [audioRetryToken, setAudioRetryToken] = useState(0);
 
   const load = async () => {
     if (!eventId) return;
@@ -99,12 +103,61 @@ export function EventRunPage() {
     setAudioError(null);
   }, [item?.id]);
 
+  useEffect(() => {
+    let cancelled = false;
+    if (audioUrl) {
+      URL.revokeObjectURL(audioUrl);
+      setAudioUrl(null);
+    }
+    setAudioError(null);
+    setAudioRequestId(null);
+    if (!item || item.media_type !== 'audio' || !item.media_key) {
+      setAudioLoading(false);
+      return () => {};
+    }
+    setAudioLoading(true);
+    api.fetchMedia(item.media_key).then((res) => {
+      if (cancelled) return;
+      setAudioLoading(false);
+      if (res.ok) {
+        let blob = res.data.blob;
+        if (!blob.type || blob.type === 'application/octet-stream') {
+          const ext = item.media_key.split('.').pop()?.toLowerCase();
+          const typeMap: Record<string, string> = {
+            mp3: 'audio/mpeg',
+            wav: 'audio/wav',
+            ogg: 'audio/ogg'
+          };
+          if (ext && typeMap[ext]) {
+            blob = blob.slice(0, blob.size, typeMap[ext]);
+          }
+        }
+        const url = URL.createObjectURL(blob);
+        setAudioUrl(url);
+        setAudioRequestId(res.requestId ?? null);
+      } else {
+        setAudioError('Failed to load audio.');
+        setAudioRequestId(res.requestId ?? null);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [item?.id, item?.media_key, item?.media_type, audioRetryToken]);
+
+  useEffect(() => {
+    return () => {
+      if (audioUrl) URL.revokeObjectURL(audioUrl);
+    };
+  }, [audioUrl]);
+
   const handleAudioEvent = (event: string) => {
     const error = audioRef.current?.error;
     logInfo('audio_event', {
       event,
       itemId: item?.id ?? null,
       mediaKey: item?.media_key ?? null,
+      requestId: audioRequestId,
       errorCode: error?.code ?? null,
       errorMessage: error?.message ?? null
     });
@@ -115,6 +168,7 @@ export function EventRunPage() {
     logError('audio_error', {
       itemId: item?.id ?? null,
       mediaKey: item?.media_key ?? null,
+      requestId: audioRequestId,
       errorCode: error?.code ?? null,
       errorMessage: error?.message ?? null
     });
@@ -229,22 +283,31 @@ export function EventRunPage() {
                   )}
                   {item.media_type === 'audio' && item.media_key && (
                     <div className="mt-4 flex flex-col gap-2">
+                      {audioLoading && (
+                        <div className="text-xs uppercase tracking-[0.2em] text-muted">Loading audio…</div>
+                      )}
                       {audioError && (
                         <div className="border-2 border-danger bg-panel px-3 py-2 text-xs uppercase tracking-[0.2em] text-danger">
                           {audioError}
+                          {audioRequestId ? ` (ref ${audioRequestId})` : ''}
                         </div>
                       )}
                       <audio
                         ref={audioRef}
                         className="w-full"
                         controls
-                        src={api.mediaUrl(item.media_key)}
+                        src={audioUrl ?? undefined}
                         onLoadedMetadata={() => handleAudioEvent('loadedmetadata')}
                         onCanPlay={() => handleAudioEvent('canplay')}
                         onPlay={() => handleAudioEvent('audio_play_click')}
                         onPause={() => handleAudioEvent('pause')}
                         onError={handleAudioError}
                       />
+                      {audioError && (
+                        <SecondaryButton onClick={() => setAudioRetryToken((prev) => prev + 1)}>
+                          Retry Audio
+                        </SecondaryButton>
+                      )}
                     </div>
                   )}
                   <div className="absolute bottom-3 right-3 border-2 border-border bg-panel px-2 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted">

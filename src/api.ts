@@ -197,16 +197,16 @@ export const api = {
   uploadMedia: async (file: File, kind: 'image' | 'audio') => {
     const requestId = createRequestId();
     const start = performance.now();
-    const form = new FormData();
-    const fallbackName = kind === 'audio' ? 'upload.mp3' : 'upload.png';
-    form.append('file', file, file.name || fallbackName);
-    form.append('kind', kind);
-
     const res = await fetch('/api/media/upload', {
       method: 'POST',
-      body: form,
+      body: await file.arrayBuffer(),
       credentials: 'include',
-      headers: { 'x-request-id': requestId }
+      headers: {
+        'x-request-id': requestId,
+        'x-media-kind': kind,
+        'x-media-filename': file.name || (kind === 'audio' ? 'upload.mp3' : 'upload.png'),
+        'Content-Type': file.type || 'application/octet-stream'
+      }
     });
     const text = await res.text();
     let json: unknown = null;

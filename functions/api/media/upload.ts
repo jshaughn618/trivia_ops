@@ -16,6 +16,53 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, data }) 
     return jsonError({ code: 'unauthorized', message: 'Authentication required' }, 401);
   }
 
+  const contentTypeHeader = request.headers.get('content-type') ?? '';
+  if (!contentTypeHeader.includes('multipart/form-data')) {
+    const kindHeader = request.headers.get('x-media-kind');
+    let kind = typeof kindHeader === 'string' && kindHeader ? kindHeader : null;
+    const buffer = await request.arrayBuffer();
+    const size = buffer.byteLength;
+
+    const sniff = sniffMedia(new Uint8Array(buffer));
+    if (!sniff) {
+      logWarn(env, 'media_invalid_sniff', { requestId, kind, detected: 'unknown' });
+      return jsonError({ code: 'invalid_media', message: 'Unsupported media type' }, 400);
+    }
+
+    if (!kind) {
+      kind = sniff.kind;
+    }
+
+    if (kind !== sniff.kind) {
+      logWarn(env, 'media_invalid_kind', { requestId, kind, detected: sniff.kind });
+      return jsonError({ code: 'invalid_request', message: 'Invalid media kind' }, 400);
+    }
+
+    const maxBytes = kind === 'image' ? MAX_IMAGE_BYTES : MAX_AUDIO_BYTES;
+    if (size > maxBytes) {
+      logWarn(env, 'media_too_large', { requestId, kind, size, maxBytes });
+      return jsonError({ code: 'file_too_large', message: 'File exceeds size limit' }, 400);
+    }
+
+    const key = `user/${data.user.id}/${kind}/${crypto.randomUUID()}.${sniff.extension}`;
+    const putStart = performance.now();
+    await env.BUCKET.put(key, buffer, {
+      httpMetadata: { contentType: sniff.contentType }
+    });
+    const putDurationMs = Math.round(performance.now() - putStart);
+    logInfo(env, 'r2_put', {
+      requestId,
+      key,
+      kind,
+      size,
+      contentType: sniff.contentType,
+      durationMs: putDurationMs,
+      uploadMode: 'binary'
+    });
+
+    return jsonOk({ key, media_type: sniff.kind, content_type: sniff.contentType });
+  }
+
   let form: FormData;
   try {
     form = await request.formData();
