@@ -42,7 +42,9 @@ export function DashboardPage() {
   return (
     <AppShell title="Dashboard">
       <div className="grid gap-4 md:grid-cols-3">
-        <StatTile label="Live Events" value={String(liveCount)} helper="On Air" />
+        <Link to="/events?status=live">
+          <StatTile label="Live Events" value={String(liveCount)} helper="On Air" />
+        </Link>
         <Link to="/events?status=planned">
           <StatTile label="Planned Events" value={String(plannedCount)} helper="Scheduled" />
         </Link>
