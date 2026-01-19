@@ -61,7 +61,7 @@ export function EventRunPage() {
       }
     }
     const preselect = query.get('round') ?? '';
-    if (preselect) setRoundId(preselect);
+    if (!roundId && preselect) setRoundId(preselect);
   };
 
   const loadItems = async (selectedRoundId: string) => {
