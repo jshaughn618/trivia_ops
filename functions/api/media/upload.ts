@@ -50,35 +50,62 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, data }) 
         raw = match[2];
       }
     }
-    const cleaned = raw.replace(/\s+/g, '');
-    let decoded: Uint8Array | null = null;
-    const base64Candidate = cleaned.replace(/-/g, '+').replace(/_/g, '/');
-    const padLength = (4 - (base64Candidate.length % 4)) % 4;
-    const padded = base64Candidate + '='.repeat(padLength);
-    try {
-      const binary = atob(padded);
-      decoded = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i += 1) {
-        decoded[i] = binary.charCodeAt(i);
-      }
-    } catch {
-      decoded = null;
-    }
-    if (decoded) {
-      buffer = decoded.buffer;
-      size = decoded.byteLength;
-    } else {
-      // Fallback: treat the string as raw binary bytes.
-      const bytes = new Uint8Array(raw.length);
-      for (let i = 0; i < raw.length; i += 1) {
-        bytes[i] = raw.charCodeAt(i) & 0xff;
-      }
-      buffer = bytes.buffer;
-      size = bytes.byteLength;
-    }
     if (!kind && mime) {
       if (mime.startsWith('audio/')) kind = 'audio';
       if (mime.startsWith('image/')) kind = 'image';
+    }
+    const cleaned = raw.replace(/\s+/g, '');
+    const base64Candidate = cleaned.replace(/-/g, '+').replace(/_/g, '/');
+    const padLength = (4 - (base64Candidate.length % 4)) % 4;
+    const padded = base64Candidate + '='.repeat(padLength);
+
+    let base64Bytes: Uint8Array | null = null;
+    try {
+      const binary = atob(padded);
+      base64Bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i += 1) {
+        base64Bytes[i] = binary.charCodeAt(i);
+      }
+    } catch {
+      base64Bytes = null;
+    }
+
+    const rawBytes = new Uint8Array(raw.length);
+    for (let i = 0; i < raw.length; i += 1) {
+      rawBytes[i] = raw.charCodeAt(i) & 0xff;
+    }
+
+    const base64Sniff = base64Bytes ? sniffMedia(base64Bytes) : null;
+    const rawSniff = sniffMedia(rawBytes);
+    const desiredKind = kind ?? null;
+    const matchesKind = (sniff: { kind: string } | null) =>
+      Boolean(sniff && (!desiredKind || sniff.kind === desiredKind));
+
+    let selectedSniff: { kind: string } | null = null;
+    if (matchesKind(base64Sniff)) {
+      buffer = base64Bytes!.buffer;
+      size = base64Bytes!.byteLength;
+      selectedSniff = base64Sniff;
+      logInfo(env, 'media_decode', { requestId, method: 'base64', size });
+    } else if (matchesKind(rawSniff)) {
+      buffer = rawBytes.buffer;
+      size = rawBytes.byteLength;
+      selectedSniff = rawSniff;
+      logInfo(env, 'media_decode', { requestId, method: 'raw', size });
+    } else if (base64Bytes) {
+      buffer = base64Bytes.buffer;
+      size = base64Bytes.byteLength;
+      selectedSniff = base64Sniff;
+      logWarn(env, 'media_decode', { requestId, method: 'base64_fallback', size });
+    } else {
+      buffer = rawBytes.buffer;
+      size = rawBytes.byteLength;
+      selectedSniff = rawSniff;
+      logWarn(env, 'media_decode', { requestId, method: 'raw_fallback', size });
+    }
+
+    if (!kind && selectedSniff) {
+      kind = selectedSniff.kind;
     }
   } else {
     const fileValue = file as unknown;
