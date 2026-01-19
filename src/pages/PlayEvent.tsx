@@ -286,8 +286,29 @@ export function PlayEventPage() {
                             />
                           </div>
                         )}
-                        {data.current_item.media_type === 'audio' && data.current_item.media_key && (
-                          <audio className="mt-4 w-full" controls src={api.mediaUrl(data.current_item.media_key)} />
+                        {data.current_item.media_type === 'audio' && (
+                          <div className="mt-4 flex items-center gap-3 rounded-md border border-border bg-panel px-3 py-3">
+                            <span className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border bg-panel2">
+                              <svg
+                                viewBox="0 0 24 24"
+                                aria-hidden="true"
+                                className="h-5 w-5 text-text"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                                <path d="M15 9a4 4 0 0 1 0 6" />
+                                <path d="M19 7a8 8 0 0 1 0 10" />
+                              </svg>
+                            </span>
+                            <div>
+                              <div className="ui-label">Audio Clue</div>
+                              <div className="text-sm text-muted">Listen for the clip.</div>
+                            </div>
+                          </div>
                         )}
                       </div>
                       {data.live?.reveal_answer && answerText && (
