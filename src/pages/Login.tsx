@@ -43,15 +43,20 @@ export function LoginPage() {
     if (normalized.length !== 4 || joinLoading) return;
     setJoinError(null);
     setJoinLoading(true);
-    const res = await api.publicEvent(normalized);
-    setJoinLoading(false);
-    if (res.ok) {
-      navigate(`/play/${normalized}`);
-      return;
+    try {
+      const res = await api.publicEvent(normalized);
+      if (res.ok) {
+        navigate(`/play/${normalized}`);
+        return;
+      }
+      setJoinError('Event code not found. Check the code and try again.');
+      setCode(['', '', '', '']);
+      codeRefs.current[0]?.focus();
+    } catch {
+      setJoinError('Could not validate the code. Please try again.');
+    } finally {
+      setJoinLoading(false);
     }
-    setJoinError('Event code not found. Check the code and try again.');
-    setCode(['', '', '', '']);
-    codeRefs.current[0]?.focus();
   };
 
   useEffect(() => {
