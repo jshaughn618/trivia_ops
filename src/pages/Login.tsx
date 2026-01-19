@@ -13,6 +13,8 @@ export function LoginPage() {
   const [password, setPassword] = useState('');
   const [code, setCode] = useState(['', '', '', '']);
   const [error, setError] = useState<string | null>(null);
+  const [joinError, setJoinError] = useState<string | null>(null);
+  const [joinLoading, setJoinLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [hostOpen, setHostOpen] = useState(false);
   const codeRefs = useRef<Array<HTMLInputElement | null>>([]);
@@ -36,6 +38,22 @@ export function LoginPage() {
   const codeValue = code.join('');
   const codeReady = code.every((digit) => digit.length === 1);
 
+  const attemptJoin = async (value: string) => {
+    const normalized = sanitized(value);
+    if (normalized.length !== 4 || joinLoading) return;
+    setJoinError(null);
+    setJoinLoading(true);
+    const res = await api.publicEvent(normalized);
+    setJoinLoading(false);
+    if (res.ok) {
+      navigate(`/play/${normalized}`);
+      return;
+    }
+    setJoinError('Event code not found. Check the code and try again.');
+    setCode(['', '', '', '']);
+    codeRefs.current[0]?.focus();
+  };
+
   useEffect(() => {
     codeRefs.current[0]?.focus();
   }, []);
@@ -49,7 +67,7 @@ export function LoginPage() {
           <div className="mt-2 text-sm text-muted">Enter the 4-character code from your host</div>
           <div className="mt-1 text-xs text-muted">Tip: you can paste the full code.</div>
           <div className="mt-3 flex flex-col gap-3">
-            <div className="flex gap-2">
+            <div className="flex justify-center gap-3">
               {code.map((value, index) => (
                 <input
                   key={`code-${index}`}
@@ -59,7 +77,7 @@ export function LoginPage() {
                   inputMode="text"
                   pattern="[A-Za-z0-9]*"
                   maxLength={1}
-                  className="h-12 w-12 border-2 border-strong bg-panel2 text-center text-lg font-display tracking-[0.2em] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+                  className="h-16 w-16 border-2 border-strong bg-panel2 text-center text-2xl font-display tracking-[0.2em] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
                   value={value}
                   onChange={(event) => {
                     const next = sanitized(event.target.value).slice(0, 1);
@@ -67,7 +85,7 @@ export function LoginPage() {
                       const updated = [...prev];
                       updated[index] = next;
                       if (updated.every((digit) => digit)) {
-                        navigate(`/play/${updated.join('')}`);
+                        attemptJoin(updated.join(''));
                       }
                       return updated;
                     });
@@ -80,7 +98,7 @@ export function LoginPage() {
                       codeRefs.current[index - 1]?.focus();
                     }
                     if (event.key === 'Enter' && codeReady) {
-                      navigate(`/play/${codeValue}`);
+                      attemptJoin(codeValue);
                     }
                   }}
                   onPaste={(event) => {
@@ -93,7 +111,7 @@ export function LoginPage() {
                         updated[index + i] = paste[i];
                       }
                       if (updated.every((digit) => digit)) {
-                        navigate(`/play/${updated.join('')}`);
+                        attemptJoin(updated.join(''));
                       }
                       return updated;
                     });
@@ -104,14 +122,19 @@ export function LoginPage() {
                 />
               ))}
             </div>
+            {joinError && (
+              <div className="border border-danger bg-panel2 px-3 py-2 text-xs text-danger-ink">
+                {joinError}
+              </div>
+            )}
             <PrimaryButton
               type="button"
               onClick={() => {
-                if (codeReady) navigate(`/play/${codeValue}`);
+                if (codeReady) attemptJoin(codeValue);
               }}
-              disabled={!codeReady}
+              disabled={!codeReady || joinLoading}
             >
-              Join game
+              {joinLoading ? 'Checking…' : 'Join game'}
             </PrimaryButton>
           </div>
         </div>
