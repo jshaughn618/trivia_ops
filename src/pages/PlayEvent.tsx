@@ -149,10 +149,11 @@ export function PlayEventPage() {
   const answerText = data.current_item?.answer || (data.current_item?.answer_a && data.current_item?.answer_b
     ? `${data.current_item.answer_a_label ? `${data.current_item.answer_a_label}: ` : 'A: '}${data.current_item.answer_a} / ${data.current_item.answer_b_label ? `${data.current_item.answer_b_label}: ` : 'B: '}${data.current_item.answer_b}`
     : null);
-  const nextRound = useMemo(() => {
-    const ordered = [...data.rounds].sort((a, b) => a.round_number - b.round_number);
+  const nextRound = (() => {
+    const rounds = data?.rounds ?? [];
+    const ordered = [...rounds].sort((a, b) => a.round_number - b.round_number);
     return ordered.find((round) => !['completed', 'locked', 'canceled'].includes(round.status)) ?? null;
-  }, [data.rounds]);
+  })();
 
   const waitingRoom = (
     <div className="flex flex-col gap-4">
