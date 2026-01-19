@@ -36,7 +36,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params, request, d
     [event.id]
   );
 
-  if (!live?.active_round_id || !live.current_item_ordinal) {
+  if (!live?.active_round_id) {
     return jsonError({ code: 'not_live', message: 'Event is not live' }, 403);
   }
 
@@ -55,12 +55,11 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params, request, d
      FROM event_round_items eri
      JOIN edition_items ei ON ei.id = eri.edition_item_id
      WHERE eri.event_round_id = ?
-       AND eri.ordinal = ?
        AND ei.media_key = ?
        AND COALESCE(eri.deleted, 0) = 0
        AND COALESCE(ei.deleted, 0) = 0
      LIMIT 1`,
-    [live.active_round_id, live.current_item_ordinal, key]
+    [live.active_round_id, key]
   );
 
   if (!mediaMatch) {
