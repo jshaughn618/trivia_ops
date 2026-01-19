@@ -55,10 +55,10 @@ export const editionUpdateSchema = z.object({
 const editionItemBaseSchema = z.object({
   prompt: z.string().min(1),
   answer: z.string().min(1).optional(),
-  answer_a: z.string().min(1).optional(),
-  answer_b: z.string().min(1).optional(),
-  answer_a_label: z.string().min(1).optional(),
-  answer_b_label: z.string().min(1).optional(),
+  answer_a: z.string().min(1).nullable().optional(),
+  answer_b: z.string().min(1).nullable().optional(),
+  answer_a_label: z.string().min(1).nullable().optional(),
+  answer_b_label: z.string().min(1).nullable().optional(),
   fun_fact: z.string().nullable().optional(),
   ordinal: z.number().int().min(0),
   media_type: z.enum(['image', 'audio']).nullable().optional(),
@@ -66,13 +66,16 @@ const editionItemBaseSchema = z.object({
   media_caption: z.string().nullable().optional()
 });
 
-export const editionItemCreateSchema = editionItemBaseSchema.refine(
-  (data) => Boolean(data.answer) || (Boolean(data.answer_a) && Boolean(data.answer_b)),
-  {
+export const editionItemCreateSchema = editionItemBaseSchema
+  .refine((data) => {
+    if (data.media_type === 'image') {
+      return Boolean(data.answer);
+    }
+    return Boolean(data.answer) || (Boolean(data.answer_a) && Boolean(data.answer_b));
+  }, {
     message: 'Provide an answer or both answer_a and answer_b',
     path: ['answer']
-  }
-);
+  });
 
 export const editionItemUpdateSchema = editionItemBaseSchema
   .partial()
