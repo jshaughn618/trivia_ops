@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PrimaryButton, SecondaryButton } from '../components/Buttons';
+import { api } from '../api';
 import { useAuth } from '../auth';
 import { useTheme } from '../lib/theme';
 import logoDark from '../assets/trivia_ops_logo_dark.png';
