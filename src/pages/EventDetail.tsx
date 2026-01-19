@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import QRCode from 'qrcode';
 import { api } from '../api';
 import { AppShell } from '../components/AppShell';
 import { Panel } from '../components/Panel';
@@ -9,6 +10,7 @@ import type { Event, EventRound, GameEdition, Game, Team, Location, User } from 
 
 export function EventDetailPage() {
   const { eventId } = useParams();
+  const navigate = useNavigate();
   const [event, setEvent] = useState<Event | null>(null);
   const [rounds, setRounds] = useState<EventRound[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
@@ -27,6 +29,9 @@ export function EventDetailPage() {
   const [scoreRoundId, setScoreRoundId] = useState('');
   const [scoreMap, setScoreMap] = useState<Record<string, number>>({});
   const [scoreLoading, setScoreLoading] = useState(false);
+  const [qrUrl, setQrUrl] = useState<string | null>(null);
+  const [qrLoading, setQrLoading] = useState(false);
+  const [qrError, setQrError] = useState<string | null>(null);
 
   const load = async () => {
     if (!eventId) return;
@@ -64,6 +69,27 @@ export function EventDetailPage() {
       loadScores(rounds[0].id);
     }
   }, [rounds, scoreRoundId]);
+
+  const publicUrl = useMemo(() => {
+    if (!event?.public_code) return '';
+    if (typeof window === 'undefined') return `/play/${event.public_code}`;
+    return `${window.location.origin}/play/${event.public_code}`;
+  }, [event?.public_code]);
+
+  useEffect(() => {
+    if (!publicUrl) return;
+    setQrLoading(true);
+    setQrError(null);
+    QRCode.toDataURL(publicUrl, { margin: 1, width: 320 })
+      .then((url) => {
+        setQrUrl(url);
+        setQrLoading(false);
+      })
+      .catch(() => {
+        setQrError('Failed to generate QR code.');
+        setQrLoading(false);
+      });
+  }, [publicUrl]);
 
   const roundNumber = useMemo(() => {
     return rounds.length === 0 ? 1 : Math.max(...rounds.map((round) => round.round_number)) + 1;
@@ -135,6 +161,14 @@ export function EventDetailPage() {
     load();
   };
 
+  const deleteEvent = async () => {
+    if (!eventId) return;
+    const confirmed = window.confirm('Delete this event? This cannot be undone.');
+    if (!confirmed) return;
+    await api.deleteEvent(eventId);
+    navigate('/events');
+  };
+
   const deleteTeam = async (teamId: string) => {
     await api.deleteTeam(teamId);
     load();
@@ -188,6 +222,29 @@ export function EventDetailPage() {
                 <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">Event Code</div>
                 <div className="mt-2 text-lg font-display uppercase tracking-[0.3em]">{event.public_code}</div>
                 <div className="mt-1 text-[10px] uppercase tracking-[0.2em] text-muted">Share for player view</div>
+              </div>
+            )}
+            {event.public_code && (
+              <div className="border-2 border-border bg-panel2 p-3">
+                <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">QR Code</div>
+                {qrLoading && (
+                  <div className="mt-2 text-xs uppercase tracking-[0.2em] text-muted">Generating…</div>
+                )}
+                {qrError && (
+                  <div className="mt-2 text-xs uppercase tracking-[0.2em] text-danger">{qrError}</div>
+                )}
+                {qrUrl && (
+                  <div className="mt-3 flex flex-col items-start gap-3">
+                    <img src={qrUrl} alt="Event QR Code" className="h-40 w-40 border-2 border-border bg-panel" />
+                    <a
+                      href={qrUrl}
+                      download={`trivia-ops-${event.public_code}.png`}
+                      className="text-xs uppercase tracking-[0.2em] text-accent"
+                    >
+                      Download QR Code
+                    </a>
+                  </div>
+                )}
               </div>
             )}
             <div className="flex items-center justify-between border-2 border-border bg-panel2 p-3 text-xs uppercase tracking-[0.2em] text-muted">
@@ -244,6 +301,7 @@ export function EventDetailPage() {
             <div className="flex flex-wrap items-center gap-2">
               <PrimaryButton onClick={updateEvent}>Update Event</PrimaryButton>
               <StampBadge label={event.status.toUpperCase()} variant="verified" />
+              <DangerButton onClick={deleteEvent}>Delete Event</DangerButton>
             </div>
           </div>
         </Panel>
