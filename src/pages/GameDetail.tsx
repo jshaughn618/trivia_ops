@@ -109,7 +109,7 @@ export function GameDetailPage() {
             )}
             {editions.map((edition) => (
               <Link key={edition.id} to={`/editions/${edition.id}`} className="border-2 border-border bg-panel2 p-3">
-                <div className="text-sm font-display uppercase tracking-[0.25em]">{edition.title}</div>
+                <div className="text-sm font-display uppercase tracking-[0.25em]">{edition.theme ?? edition.title}</div>
                 <div className="mt-1 text-xs uppercase tracking-[0.2em] text-muted">
                   {edition.status}
                 </div>

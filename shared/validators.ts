@@ -36,7 +36,7 @@ const userTypeSchema = z.enum(['admin', 'host', 'player']);
 
 export const editionCreateSchema = z.object({
   game_id: idSchema,
-  title: z.string().min(1),
+  title: z.string().min(1).optional(),
   description: z.string().nullable().optional(),
   status: editionStatusSchema.default('draft'),
   tags_csv: z.string().nullable().optional(),

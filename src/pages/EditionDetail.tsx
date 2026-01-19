@@ -4,16 +4,14 @@ import { api } from '../api';
 import { AppShell } from '../components/AppShell';
 import { Panel } from '../components/Panel';
 import { PrimaryButton, SecondaryButton, DangerButton } from '../components/Buttons';
-import { Table } from '../components/Table';
-import type { EditionItem, GameEdition } from '../types';
+import type { EditionItem, Game, GameEdition } from '../types';
 
 const emptyItem = {
   prompt: '',
   answer: '',
   answer_a: '',
   answer_b: '',
-  fun_fact: '',
-  media_caption: ''
+  fun_fact: ''
 };
 
 export function EditionDetailPage() {
@@ -21,38 +19,50 @@ export function EditionDetailPage() {
   const navigate = useNavigate();
   const [edition, setEdition] = useState<GameEdition | null>(null);
   const [items, setItems] = useState<EditionItem[]>([]);
-  const [editingId, setEditingId] = useState<string | null>(null);
+  const [games, setGames] = useState<Game[]>([]);
   const [itemDraft, setItemDraft] = useState({ ...emptyItem });
-  const [title, setTitle] = useState('');
   const [status, setStatus] = useState('draft');
   const [tags, setTags] = useState('');
   const [theme, setTheme] = useState('');
   const [description, setDescription] = useState('');
   const [gameTypeId, setGameTypeId] = useState('');
+  const [gameId, setGameId] = useState('');
   const [refineOpen, setRefineOpen] = useState(false);
   const [refineLoading, setRefineLoading] = useState(false);
   const [refineOptions, setRefineOptions] = useState<string[]>([]);
   const [refineError, setRefineError] = useState<string | null>(null);
   const [refineSeed, setRefineSeed] = useState('');
+  const [metaLoading, setMetaLoading] = useState(false);
+  const [metaError, setMetaError] = useState<string | null>(null);
+  const [answerLoading, setAnswerLoading] = useState(false);
+  const [answerError, setAnswerError] = useState<string | null>(null);
+  const [factLoading, setFactLoading] = useState(false);
+  const [factError, setFactError] = useState<string | null>(null);
+  const [activeItemId, setActiveItemId] = useState<string | null>('new');
+  const [draggedId, setDraggedId] = useState<string | null>(null);
 
   const load = async () => {
     if (!editionId) return;
-    const [editionRes, itemsRes] = await Promise.all([
+    const [editionRes, itemsRes, gamesRes] = await Promise.all([
       api.getEdition(editionId),
-      api.listEditionItems(editionId)
+      api.listEditionItems(editionId),
+      api.listGames()
     ]);
     if (editionRes.ok) {
       setEdition(editionRes.data);
-      setTitle(editionRes.data.title);
       setStatus(editionRes.data.status);
       setTags(editionRes.data.tags_csv ?? '');
       setTheme(editionRes.data.theme ?? '');
       setDescription(editionRes.data.description ?? '');
+      setGameId(editionRes.data.game_id);
       const gameRes = await api.getGame(editionRes.data.game_id);
       if (gameRes.ok) setGameTypeId(gameRes.data.game_type_id);
     }
     if (itemsRes.ok) {
       setItems(itemsRes.data.sort((a, b) => a.ordinal - b.ordinal));
+    }
+    if (gamesRes.ok) {
+      setGames(gamesRes.data);
     }
   };
 
@@ -64,14 +74,24 @@ export function EditionDetailPage() {
     return items.length === 0 ? 1 : Math.max(...items.map((item) => item.ordinal)) + 1;
   }, [items]);
 
+  const orderedItems = useMemo(() => {
+    return [...items].sort((a, b) => a.ordinal - b.ordinal);
+  }, [items]);
+
+  const filteredGames = useMemo(() => {
+    if (!gameTypeId) return games;
+    return games.filter((game) => game.game_type_id === gameTypeId);
+  }, [games, gameTypeId]);
+
   const handleEditionUpdate = async () => {
-    if (!editionId) return;
+    if (!editionId || !gameId) return;
     const res = await api.updateEdition(editionId, {
-      title,
+      title: theme,
       status,
       tags_csv: tags,
       theme,
-      description
+      description,
+      game_id: gameId
     });
     if (res.ok) setEdition(res.data);
   };
@@ -96,29 +116,31 @@ export function EditionDetailPage() {
       answer_a: itemDraft.answer_a || null,
       answer_b: itemDraft.answer_b || null,
       fun_fact: itemDraft.fun_fact || null,
-      media_caption: itemDraft.media_caption || null,
       ordinal: nextOrdinal
     });
     if (res.ok) {
       setItemDraft({ ...emptyItem });
+      setActiveItemId('new');
       load();
     }
   };
 
   const startEdit = (item: EditionItem) => {
-    setEditingId(item.id);
+    setActiveItemId(item.id);
+    setRefineOpen(false);
+    setRefineOptions([]);
+    setRefineError(null);
     setItemDraft({
       prompt: item.prompt,
       answer: item.answer,
       answer_a: item.answer_a ?? '',
       answer_b: item.answer_b ?? '',
-      fun_fact: item.fun_fact ?? '',
-      media_caption: item.media_caption ?? ''
+      fun_fact: item.fun_fact ?? ''
     });
   };
 
   const cancelEdit = () => {
-    setEditingId(null);
+    setActiveItemId(null);
     setItemDraft({ ...emptyItem });
   };
 
@@ -128,25 +150,28 @@ export function EditionDetailPage() {
       answer: itemDraft.answer,
       answer_a: itemDraft.answer_a || null,
       answer_b: itemDraft.answer_b || null,
-      fun_fact: itemDraft.fun_fact || null,
-      media_caption: itemDraft.media_caption || null
+      fun_fact: itemDraft.fun_fact || null
     });
     if (res.ok) {
       cancelEdit();
+      setActiveItemId(null);
       load();
     }
   };
 
-  const moveItem = async (index: number, direction: -1 | 1) => {
-    const targetIndex = index + direction;
-    if (targetIndex < 0 || targetIndex >= items.length) return;
-    const current = items[index];
-    const target = items[targetIndex];
-    await Promise.all([
-      api.updateEditionItem(current.id, { ordinal: target.ordinal }),
-      api.updateEditionItem(target.id, { ordinal: current.ordinal })
-    ]);
-    load();
+  const reorderItems = async (sourceId: string, targetId: string) => {
+    if (sourceId === targetId) return;
+    const ordered = [...items].sort((a, b) => a.ordinal - b.ordinal);
+    const fromIndex = ordered.findIndex((item) => item.id === sourceId);
+    const toIndex = ordered.findIndex((item) => item.id === targetId);
+    if (fromIndex < 0 || toIndex < 0) return;
+    const [moved] = ordered.splice(fromIndex, 1);
+    ordered.splice(toIndex, 0, moved);
+    const updated = ordered.map((item, index) => ({ ...item, ordinal: index + 1 }));
+    setItems(updated);
+    await Promise.all(
+      updated.map((item) => api.updateEditionItem(item.id, { ordinal: item.ordinal }))
+    );
   };
 
   const handleUpload = async (item: EditionItem, file: File) => {
@@ -155,11 +180,18 @@ export function EditionDetailPage() {
     if (uploadRes.ok) {
       await api.updateEditionItem(item.id, {
         media_type: uploadRes.data.media_type,
-        media_key: uploadRes.data.key,
-        media_caption: item.media_caption
+        media_key: uploadRes.data.key
       });
       load();
     }
+  };
+
+  const startNewItem = () => {
+    setActiveItemId('new');
+    setRefineOpen(false);
+    setRefineOptions([]);
+    setRefineError(null);
+    setItemDraft({ ...emptyItem });
   };
 
   const startRefine = async () => {
@@ -194,6 +226,64 @@ export function EditionDetailPage() {
     setRefineOpen(false);
   };
 
+  const generateMeta = async () => {
+    if (!theme.trim() && !description.trim() && items.length === 0) return;
+    setMetaLoading(true);
+    setMetaError(null);
+    const itemLines = items
+      .slice(0, 12)
+      .map((item, index) => {
+        const alt = `${item.answer_a ?? ''} / ${item.answer_b ?? ''}`.trim();
+        return `${index + 1}. ${item.prompt} | ${item.answer || alt}`;
+      })
+      .join('\n');
+
+    const prompt = `Based on the trivia edition theme and questions, generate:\n- Description: 1-2 sentences.\n- Theme: short phrase.\n- Tags: 6 concise, comma-separated lowercase tags.\nReturn exactly in this format:\nDescription: ...\nTheme: ...\nTags: tag1, tag2, tag3, tag4, tag5, tag6\n\nTheme: ${theme}\nQuestions:\n${itemLines}`;
+    const res = await api.aiGenerate({ prompt, max_output_tokens: 200 });
+    setMetaLoading(false);
+    if (!res.ok) {
+      setMetaError(res.error.message);
+      return;
+    }
+    const lines = res.data.text.split('\n').map((line) => line.trim());
+    const descriptionLine = lines.find((line) => line.toLowerCase().startsWith('description:'));
+    const themeLine = lines.find((line) => line.toLowerCase().startsWith('theme:'));
+    const tagsLine = lines.find((line) => line.toLowerCase().startsWith('tags:'));
+    if (descriptionLine) setDescription(descriptionLine.replace(/^[^:]*:/, '').trim());
+    if (themeLine) setTheme(themeLine.replace(/^[^:]*:/, '').trim());
+    if (tagsLine) setTags(tagsLine.replace(/^[^:]*:/, '').trim());
+  };
+
+  const generateAnswer = async () => {
+    if (!itemDraft.prompt.trim()) return;
+    setAnswerLoading(true);
+    setAnswerError(null);
+    const prompt = `Provide a concise, correct pub-trivia answer for the question below. Respond with only the answer.\n\nQuestion: ${itemDraft.prompt.trim()}`;
+    const res = await api.aiGenerate({ prompt, max_output_tokens: 80 });
+    setAnswerLoading(false);
+    if (!res.ok) {
+      setAnswerError(res.error.message);
+      return;
+    }
+    const line = res.data.text.split('\n')[0] ?? '';
+    setItemDraft((draft) => ({ ...draft, answer: line.trim() }));
+  };
+
+  const generateFunFact = async () => {
+    if (!itemDraft.prompt.trim() && !itemDraft.answer.trim()) return;
+    setFactLoading(true);
+    setFactError(null);
+    const prompt = `Write one short, interesting pub-trivia fun fact related to the question and answer. Keep it under 20 words.\n\nQuestion: ${itemDraft.prompt.trim()}\nAnswer: ${itemDraft.answer.trim()}`;
+    const res = await api.aiGenerate({ prompt, max_output_tokens: 80 });
+    setFactLoading(false);
+    if (!res.ok) {
+      setFactError(res.error.message);
+      return;
+    }
+    const line = res.data.text.split('\n')[0] ?? '';
+    setItemDraft((draft) => ({ ...draft, fun_fact: line.trim() }));
+  };
+
   if (!edition) {
     return (
       <AppShell title="Edition Detail">
@@ -208,8 +298,19 @@ export function EditionDetailPage() {
         <Panel title="Edition Info">
           <div className="grid gap-4">
             <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-              Title
-              <input className="h-10 px-3" value={title} onChange={(event) => setTitle(event.target.value)} />
+              Game
+              <select
+                className="h-10 px-3"
+                value={gameId}
+                onChange={(event) => setGameId(event.target.value)}
+              >
+                {filteredGames.length === 0 && <option value="">No matching games</option>}
+                {filteredGames.map((game) => (
+                  <option key={game.id} value={game.id}>
+                    {game.name}
+                  </option>
+                ))}
+              </select>
             </label>
             <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
               Status
@@ -220,8 +321,19 @@ export function EditionDetailPage() {
               </select>
             </label>
             <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-              Tags
+              <span className="flex items-center justify-between">
+                Tags
+                <button
+                  type="button"
+                  onClick={generateMeta}
+                  className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent hover:text-text"
+                  disabled={metaLoading}
+                >
+                  {metaLoading ? 'Generating' : 'Generate Details'}
+                </button>
+              </span>
               <input className="h-10 px-3" value={tags} onChange={(event) => setTags(event.target.value)} />
+              {metaError && <span className="text-[10px] tracking-[0.2em] text-danger">{metaError}</span>}
             </label>
             <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
               Theme
@@ -243,49 +355,212 @@ export function EditionDetailPage() {
           </div>
         </Panel>
         <Panel title="Items">
-          <Table headers={["#", "Prompt", "Answer", "Media", "Actions"]}>
-            {items.map((item, index) => (
-              <tr key={item.id} className="bg-panel">
-                <td className="px-3 py-2 text-xs text-muted">{item.ordinal}</td>
-                <td className="px-3 py-2 text-xs text-text">{item.prompt}</td>
-                <td className="px-3 py-2 text-xs text-text">
-                  {item.answer || (item.answer_a && item.answer_b
-                    ? `A: ${item.answer_a} / B: ${item.answer_b}`
-                    : '')}
-                </td>
-                <td className="px-3 py-2 text-xs text-muted">
-                  {item.media_key ? item.media_type : 'None'}
-                </td>
-                <td className="px-3 py-2">
-                  <div className="flex flex-wrap gap-2">
-                    <SecondaryButton onClick={() => moveItem(index, -1)}>Up</SecondaryButton>
-                    <SecondaryButton onClick={() => moveItem(index, 1)}>Down</SecondaryButton>
-                    <SecondaryButton onClick={() => startEdit(item)}>Edit</SecondaryButton>
-                    <DangerButton onClick={() => api.deleteEditionItem(item.id).then(load)}>
-                      Delete
-                    </DangerButton>
+          <div className="flex flex-col gap-3">
+            {orderedItems.length === 0 && (
+              <div className="text-xs uppercase tracking-[0.2em] text-muted">No items yet.</div>
+            )}
+            {orderedItems.map((item, index) => (
+              <div key={item.id} className="flex flex-col gap-3">
+                <div
+                  className={`border-2 ${activeItemId === item.id ? 'border-accent' : 'border-border'} bg-panel2 p-3`}
+                  draggable
+                  onDragStart={() => setDraggedId(item.id)}
+                  onDragOver={(event) => event.preventDefault()}
+                  onDrop={() => {
+                    if (draggedId) {
+                      reorderItems(draggedId, item.id);
+                      setDraggedId(null);
+                    }
+                  }}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">
+                      Item {index + 1}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => startEdit(item)}
+                        className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent hover:text-text"
+                      >
+                        Edit Item
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => api.deleteEditionItem(item.id).then(load)}
+                        className="border-2 border-danger px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-danger hover:border-[#9d2a24]"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </div>
-                  <div className="mt-2 flex flex-col gap-2">
-                    <input
-                      type="file"
-                      accept="image/png,image/jpeg,image/webp,audio/mpeg,audio/wav,audio/ogg"
-                      onChange={(event) => {
-                        const file = event.target.files?.[0];
-                        if (file) handleUpload(item, file);
-                      }}
-                      className="text-xs text-muted"
-                    />
+                  <div className="mt-2 text-sm text-text">{item.prompt}</div>
+                  <div className="mt-1 text-xs uppercase tracking-[0.2em] text-muted">
+                    {item.answer || (item.answer_a && item.answer_b
+                      ? `A: ${item.answer_a} / B: ${item.answer_b}`
+                      : 'Answer missing')}
                   </div>
-                </td>
-              </tr>
+                  <div className="mt-2 text-[10px] uppercase tracking-[0.2em] text-muted">
+                    {item.media_key ? `${item.media_type} attached` : 'No media'} • Drag to reorder
+                  </div>
+                </div>
+                {activeItemId === item.id && (
+                  <div className="border-2 border-border bg-panel p-3">
+                    <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">
+                      Edit Item {index + 1}
+                    </div>
+                    <div className="mt-3 grid gap-3">
+                      <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+                        <span className="flex items-center justify-between">
+                          Prompt
+                          <button
+                            type="button"
+                            onClick={startRefine}
+                            className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent hover:text-text"
+                          >
+                            Refine
+                          </button>
+                        </span>
+                        <input
+                          className="h-10 px-3"
+                          value={itemDraft.prompt}
+                          onChange={(event) => setItemDraft((draft) => ({ ...draft, prompt: event.target.value }))}
+                        />
+                      </label>
+                      <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+                        <span className="flex items-center justify-between">
+                          Answer
+                          <button
+                            type="button"
+                            onClick={generateAnswer}
+                            className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent hover:text-text"
+                            disabled={gameTypeId === 'audio' || answerLoading}
+                          >
+                            {answerLoading ? 'Generating' : 'Generate'}
+                          </button>
+                        </span>
+                        <input
+                          className="h-10 px-3"
+                          value={itemDraft.answer}
+                          onChange={(event) => setItemDraft((draft) => ({ ...draft, answer: event.target.value }))}
+                          disabled={gameTypeId === 'audio'}
+                        />
+                        {answerError && <span className="text-[10px] tracking-[0.2em] text-danger">{answerError}</span>}
+                      </label>
+                      {gameTypeId === 'audio' && (
+                        <>
+                          <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+                            Answer A
+                            <input
+                              className="h-10 px-3"
+                              value={itemDraft.answer_a}
+                              onChange={(event) => setItemDraft((draft) => ({ ...draft, answer_a: event.target.value }))}
+                            />
+                          </label>
+                          <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+                            Answer B
+                            <input
+                              className="h-10 px-3"
+                              value={itemDraft.answer_b}
+                              onChange={(event) => setItemDraft((draft) => ({ ...draft, answer_b: event.target.value }))}
+                            />
+                          </label>
+                        </>
+                      )}
+                      <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+                        <span className="flex items-center justify-between">
+                          Fun Fact
+                          <button
+                            type="button"
+                            onClick={generateFunFact}
+                            className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent hover:text-text"
+                            disabled={factLoading}
+                          >
+                            {factLoading ? 'Generating' : 'Generate'}
+                          </button>
+                        </span>
+                        <textarea
+                          className="min-h-[70px] px-3 py-2"
+                          value={itemDraft.fun_fact}
+                          onChange={(event) => setItemDraft((draft) => ({ ...draft, fun_fact: event.target.value }))}
+                        />
+                        {factError && <span className="text-[10px] tracking-[0.2em] text-danger">{factError}</span>}
+                      </label>
+                      <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+                        Media Upload
+                        <input
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp,audio/mpeg,audio/wav,audio/ogg"
+                          onChange={(event) => {
+                            const file = event.target.files?.[0];
+                            if (file) handleUpload(item, file);
+                          }}
+                          className="text-xs text-muted"
+                        />
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        <PrimaryButton onClick={() => saveEdit(item)}>Save</PrimaryButton>
+                        <SecondaryButton onClick={cancelEdit}>Cancel</SecondaryButton>
+                      </div>
+                      {refineOpen && (
+                        <div className="border-2 border-border bg-panel2 p-3">
+                          <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">Refined Prompts</div>
+                          {refineLoading && (
+                            <div className="mt-2 text-xs uppercase tracking-[0.2em] text-muted">Generating…</div>
+                          )}
+                          {refineError && (
+                            <div className="mt-2 text-xs uppercase tracking-[0.2em] text-danger">{refineError}</div>
+                          )}
+                          <div className="mt-3 flex flex-col gap-2">
+                            {refineOptions.map((option) => (
+                              <button
+                                key={option}
+                                type="button"
+                                onClick={() => applyRefine(option)}
+                                className="border-2 border-border bg-panel px-3 py-2 text-left text-xs uppercase tracking-[0.2em] text-text hover:border-accent"
+                              >
+                                {option}
+                              </button>
+                            ))}
+                          </div>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={startRefine}
+                              className="border-2 border-border px-3 py-2 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent hover:text-text"
+                            >
+                              Generate Again
+                            </button>
+                            <button
+                              type="button"
+                              onClick={keepOriginal}
+                              className="border-2 border-border px-3 py-2 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent hover:text-text"
+                            >
+                              Keep Original
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setRefineOpen(false)}
+                              className="border-2 border-border px-3 py-2 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent hover:text-text"
+                            >
+                              Close
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
             ))}
-          </Table>
-          <div className="mt-4 border-t-2 border-border pt-4">
-            <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">Add Item</div>
-            <div className="mt-3 grid gap-3">
-              <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-                <span className="flex items-center justify-between">
-                  Prompt
+          </div>
+          {activeItemId === 'new' && (
+            <div className="mt-4 border-2 border-border bg-panel p-3">
+              <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">New Item</div>
+              <div className="mt-3 grid gap-3">
+                <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+                  <span className="flex items-center justify-between">
+                    Prompt
                   <button
                     type="button"
                     onClick={startRefine}
@@ -301,13 +576,24 @@ export function EditionDetailPage() {
                 />
               </label>
               <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-                Answer
+                <span className="flex items-center justify-between">
+                  Answer
+                  <button
+                    type="button"
+                    onClick={generateAnswer}
+                    className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent hover:text-text"
+                    disabled={gameTypeId === 'audio' || answerLoading}
+                  >
+                    {answerLoading ? 'Generating' : 'Generate'}
+                  </button>
+                </span>
                 <input
                   className="h-10 px-3"
                   value={itemDraft.answer}
                   onChange={(event) => setItemDraft((draft) => ({ ...draft, answer: event.target.value }))}
                   disabled={gameTypeId === 'audio'}
                 />
+                {answerError && <span className="text-[10px] tracking-[0.2em] text-danger">{answerError}</span>}
               </label>
               {gameTypeId === 'audio' && (
                 <>
@@ -330,35 +616,27 @@ export function EditionDetailPage() {
                 </>
               )}
               <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-                Fun Fact
+                <span className="flex items-center justify-between">
+                  Fun Fact
+                  <button
+                    type="button"
+                    onClick={generateFunFact}
+                    className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent hover:text-text"
+                    disabled={factLoading}
+                  >
+                    {factLoading ? 'Generating' : 'Generate'}
+                  </button>
+                </span>
                 <textarea
                   className="min-h-[70px] px-3 py-2"
                   value={itemDraft.fun_fact}
                   onChange={(event) => setItemDraft((draft) => ({ ...draft, fun_fact: event.target.value }))}
                 />
-              </label>
-              <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-                Media Caption
-                <input
-                  className="h-10 px-3"
-                  value={itemDraft.media_caption}
-                  onChange={(event) => setItemDraft((draft) => ({ ...draft, media_caption: event.target.value }))}
-                />
+                {factError && <span className="text-[10px] tracking-[0.2em] text-danger">{factError}</span>}
               </label>
               <div className="flex flex-wrap gap-2">
-                {editingId ? (
-                  <>
-                    <PrimaryButton onClick={() => {
-                      const item = items.find((current) => current.id === editingId);
-                      if (item) saveEdit(item);
-                    }}>
-                      Save Changes
-                    </PrimaryButton>
-                    <SecondaryButton onClick={cancelEdit}>Cancel</SecondaryButton>
-                  </>
-                ) : (
-                  <PrimaryButton onClick={handleCreateItem}>Add Item</PrimaryButton>
-                )}
+                <PrimaryButton onClick={handleCreateItem}>Save</PrimaryButton>
+                <SecondaryButton onClick={cancelEdit}>Cancel</SecondaryButton>
               </div>
               {refineOpen && (
                 <div className="border-2 border-border bg-panel2 p-3">
@@ -407,6 +685,10 @@ export function EditionDetailPage() {
                 </div>
               )}
             </div>
+            </div>
+          )}
+          <div className="mt-4 border-t-2 border-border pt-4">
+            <SecondaryButton onClick={startNewItem}>New Item</SecondaryButton>
           </div>
         </Panel>
       </div>

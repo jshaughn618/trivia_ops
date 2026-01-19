@@ -9,7 +9,6 @@ import type { Game } from '../types';
 export function EditionNewPage() {
   const [games, setGames] = useState<Game[]>([]);
   const [gameId, setGameId] = useState('');
-  const [title, setTitle] = useState('');
   const [tags, setTags] = useState('');
   const [theme, setTheme] = useState('');
   const [description, setDescription] = useState('');
@@ -22,10 +21,9 @@ export function EditionNewPage() {
   }, []);
 
   const handleCreate = async () => {
-    if (!gameId || !title.trim()) return;
+    if (!gameId || !theme.trim()) return;
     const res = await api.createEdition({
       game_id: gameId,
-      title,
       tags_csv: tags,
       theme,
       description,
@@ -50,10 +48,6 @@ export function EditionNewPage() {
                 </option>
               ))}
             </select>
-          </label>
-          <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-            Title
-            <input className="h-10 px-3" value={title} onChange={(event) => setTitle(event.target.value)} />
           </label>
           <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
             Tags (comma separated)

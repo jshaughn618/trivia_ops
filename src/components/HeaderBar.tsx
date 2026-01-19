@@ -43,9 +43,6 @@ export function HeaderBar() {
             <NavLink to="/games" className={navLinkClass} onClick={() => setOpen(false)}>
               Games
             </NavLink>
-            <NavLink to="/editions" className={navLinkClass} onClick={() => setOpen(false)}>
-              Editions
-            </NavLink>
             <NavLink to="/events" className={navLinkClass} onClick={() => setOpen(false)}>
               Events
             </NavLink>

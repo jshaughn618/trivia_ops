@@ -97,7 +97,7 @@ export function DashboardPage() {
                 to={`/editions/${edition.id}`}
                 className="border-2 border-border bg-panel2 p-3"
               >
-                <div className="text-sm font-display uppercase tracking-[0.25em]">{edition.title}</div>
+                <div className="text-sm font-display uppercase tracking-[0.25em]">{edition.theme ?? edition.title}</div>
                 <div className="mt-2 flex items-center justify-between text-xs text-muted uppercase tracking-[0.2em]">
                   <span>Updated {new Date(edition.updated_at).toLocaleDateString()}</span>
                   <StampBadge label="DRAFT" variant="inspected" />

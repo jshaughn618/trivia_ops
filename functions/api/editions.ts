@@ -41,6 +41,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const id = crypto.randomUUID();
   const createdAt = nowIso();
   const data = parsed.data;
+  const title = data.title ?? data.theme ?? 'Untitled Edition';
 
   await execute(
     env,
@@ -50,7 +51,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     [
       id,
       data.game_id,
-      data.title,
+      title,
       data.description ?? null,
       data.status,
       data.tags_csv ?? null,
