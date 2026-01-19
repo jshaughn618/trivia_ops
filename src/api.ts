@@ -158,7 +158,8 @@ export const api = {
 
   uploadMedia: async (file: File, kind: 'image' | 'audio') => {
     const form = new FormData();
-    form.append('file', file);
+    const fallbackName = kind === 'audio' ? 'upload.mp3' : 'upload.png';
+    form.append('file', file, file.name || fallbackName);
     form.append('kind', kind);
 
     const res = await fetch('/api/media/upload', {

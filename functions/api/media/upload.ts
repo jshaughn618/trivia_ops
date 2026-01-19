@@ -10,7 +10,14 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, data }) 
   let kind = typeof kindEntry === 'string' && kindEntry ? kindEntry : null;
 
   if (!fileBlob) {
-    return jsonError({ code: 'invalid_request', message: 'File is required' }, 400);
+    return jsonError(
+      {
+        code: 'invalid_request',
+        message: 'File is required',
+        details: { content_type: request.headers.get('content-type'), form_keys: [...form.keys()] }
+      },
+      400
+    );
   }
 
   if (!kind) {
