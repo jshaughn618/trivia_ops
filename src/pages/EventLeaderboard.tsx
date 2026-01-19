@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api';
 import { AppShell } from '../components/AppShell';
 import { Panel } from '../components/Panel';
@@ -13,6 +13,7 @@ type ScoreMap = Record<string, Record<string, number>>;
 export function EventLeaderboardPage() {
   const { eventId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [event, setEvent] = useState<Event | null>(null);
   const [rounds, setRounds] = useState<EventRound[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
@@ -92,6 +93,16 @@ export function EventLeaderboardPage() {
     );
   }
 
+  const backTarget = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    const from = params.get('from');
+    const code = params.get('code') ?? event?.public_code ?? '';
+    if (from === 'participant' && code) {
+      return { label: 'Back to Event', href: `/play/${code}` };
+    }
+    return { label: 'Back to Event', href: `/events/${eventId}` };
+  }, [location.search, event?.public_code, eventId]);
+
   return (
     <AppShell title="Leaderboard">
       <div className="flex flex-col gap-4">
@@ -103,7 +114,7 @@ export function EventLeaderboardPage() {
             <div className="text-xs uppercase tracking-[0.2em] text-muted">
               {event ? new Date(event.starts_at).toLocaleString() : 'Loading...'}
             </div>
-            <SecondaryButton onClick={() => navigate(`/events/${eventId}`)}>Back to Event</SecondaryButton>
+            <SecondaryButton onClick={() => navigate(backTarget.href)}>{backTarget.label}</SecondaryButton>
           </div>
         </Panel>
         <Panel title="Leaderboard Table">
