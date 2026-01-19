@@ -3,6 +3,7 @@ import { jsonError, jsonOk } from '../responses';
 import { parseJson } from '../request';
 import { editionCreateSchema } from '../../shared/validators';
 import { execute, nowIso, queryAll } from '../db';
+import { logError } from '../_lib/log';
 
 export const onRequestGet: PagesFunction<Env> = async ({ env, request }) => {
   const url = new URL(request.url);
@@ -39,6 +40,9 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, request }) => {
     )`);
     params.push(locationId);
   }
+  const baseWhere = [...where];
+  const baseParams = [...params];
+
   if (search) {
     where.push(`(
       editions.title LIKE ?
@@ -51,12 +55,20 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, request }) => {
     params.push(like, like, like, like, like);
   }
 
-  const sql = `SELECT editions.* FROM editions
-    JOIN games ON games.id = editions.game_id
-    ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
-    ORDER BY editions.updated_at DESC`;
-  const rows = await queryAll(env, sql, params);
-  return jsonOk(rows);
+  const baseSql = `SELECT editions.* FROM editions`;
+  const joinSql = search ? 'JOIN games ON games.id = editions.game_id' : '';
+  const sql = `${baseSql} ${joinSql} ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY editions.updated_at DESC`;
+  try {
+    const rows = await queryAll(env, sql, params);
+    return jsonOk(rows);
+  } catch (error) {
+    logError(env, 'editions_query_failed', {
+      message: error instanceof Error ? error.message : 'unknown_error'
+    });
+    const fallbackSql = `SELECT editions.* FROM editions ${baseWhere.length ? `WHERE ${baseWhere.join(' AND ')}` : ''} ORDER BY editions.updated_at DESC`;
+    const rows = await queryAll(env, fallbackSql, baseParams);
+    return jsonOk(rows);
+  }
 };
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
