@@ -14,10 +14,6 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params, data, requ
     return jsonError({ code: 'unauthorized', message: 'Authentication required' }, 401);
   }
 
-  if (!key.startsWith(`user/${data.user.id}/`)) {
-    return jsonError({ code: 'forbidden', message: 'Access denied' }, 403);
-  }
-
   const rangeHeader = request.headers.get('range');
   logInfo(env, 'media_request_start', {
     requestId,
@@ -45,7 +41,31 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params, data, requ
     });
 
     const totalSize = head.size;
-    const contentType = head.httpMetadata?.contentType ?? 'application/octet-stream';
+    const rawContentType = head.httpMetadata?.contentType ?? 'application/octet-stream';
+    const extension = key.split('.').pop()?.toLowerCase() ?? '';
+    const inferredContentType = (() => {
+      switch (extension) {
+        case 'mp3':
+          return 'audio/mpeg';
+        case 'wav':
+          return 'audio/wav';
+        case 'ogg':
+          return 'audio/ogg';
+        case 'png':
+          return 'image/png';
+        case 'jpg':
+        case 'jpeg':
+          return 'image/jpeg';
+        case 'webp':
+          return 'image/webp';
+        default:
+          return null;
+      }
+    })();
+    const contentType =
+      rawContentType === 'application/octet-stream' && inferredContentType
+        ? inferredContentType
+        : rawContentType;
     let status = 200;
     let body = null as ReadableStream | null;
     const headers = new Headers();
