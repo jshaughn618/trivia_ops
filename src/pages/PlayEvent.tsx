@@ -49,6 +49,7 @@ export function PlayEventPage() {
   const [teamId, setTeamId] = useState('');
   const [teamName, setTeamName] = useState('');
   const [teamNameLabel, setTeamNameLabel] = useState<string | null>(null);
+  const [teamMenuOpen, setTeamMenuOpen] = useState(false);
   const normalizedCode = useMemo(() => (code ?? '').trim().toUpperCase(), [code]);
 
   const load = async () => {
@@ -101,6 +102,7 @@ export function PlayEventPage() {
     setTeamId('');
     setTeamNameLabel(null);
     setTeamName('');
+    setTeamMenuOpen(false);
   };
 
   if (!normalizedCode) {
@@ -155,23 +157,6 @@ export function PlayEventPage() {
           </div>
         )}
       </div>
-      {waitingShowLeaderboard && (
-        <div className="border-2 border-border bg-panel2 p-4">
-          <div className="text-xs uppercase tracking-[0.2em] text-muted">Leaderboard</div>
-          <div className="mt-3 flex flex-col gap-2">
-            {data.leaderboard.length === 0 && (
-              <div className="text-xs uppercase tracking-[0.2em] text-muted">No scores yet.</div>
-            )}
-            {data.leaderboard.map((entry, index) => (
-              <div key={entry.team_id} className="flex items-center justify-between border-2 border-border bg-panel px-3 py-2">
-                <div className="text-xs uppercase tracking-[0.2em] text-muted">#{index + 1}</div>
-                <div className="text-xs uppercase tracking-[0.2em] text-text">{entry.name}</div>
-                <div className="text-xs uppercase tracking-[0.2em] text-muted">{entry.total}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 
@@ -188,17 +173,39 @@ export function PlayEventPage() {
                 {data.event.location_name ?? 'Location TBD'} • {new Date(data.event.starts_at).toLocaleString()}
               </div>
             </div>
-            <div className="flex flex-col items-end gap-2 text-right">
-              {teamId && (
-                <SecondaryButton onClick={handleChangeTeam}>Change Team</SecondaryButton>
-              )}
-              {teamId && teamNameLabel && (
-                <div>
+            {teamId && teamNameLabel && (
+              <div className="flex flex-col items-end gap-2 text-right">
+                <div className="flex items-center gap-2">
                   <div className="text-xs uppercase tracking-[0.2em] text-muted">Your Team</div>
-                  <div className="mt-1 text-sm font-display uppercase tracking-[0.2em]">{teamNameLabel}</div>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      aria-label="Team menu"
+                      aria-haspopup="menu"
+                      aria-expanded={teamMenuOpen}
+                      onClick={() => setTeamMenuOpen((open) => !open)}
+                      className="flex h-8 w-8 flex-col items-center justify-center gap-1 border-2 border-border bg-panel2"
+                    >
+                      <span className="h-0.5 w-4 bg-text" />
+                      <span className="h-0.5 w-4 bg-text" />
+                      <span className="h-0.5 w-4 bg-text" />
+                    </button>
+                    {teamMenuOpen && (
+                      <div className="absolute right-0 mt-2 min-w-[160px] border-2 border-border bg-panel p-2 text-left">
+                        <button
+                          type="button"
+                          onClick={handleChangeTeam}
+                          className="w-full border-2 border-border bg-panel2 px-3 py-2 text-xs uppercase tracking-[0.2em] text-text"
+                        >
+                          Change Team
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              )}
-            </div>
+                <div className="text-sm font-display uppercase tracking-[0.2em]">{teamNameLabel}</div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -260,44 +267,60 @@ export function PlayEventPage() {
           </Panel>
 
           <div className="flex flex-col gap-4">
-            <Panel title={teamId ? 'Your Team' : 'Join a Team'}>
-              <div className="flex flex-col gap-3">
-                {teamId && teamNameLabel ? (
-                  <div className="text-xs uppercase tracking-[0.2em] text-muted">
-                    You&apos;re in a team. Use Change Team to switch.
-                  </div>
-                ) : (
-                  <>
-                    <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-                      Select Team
-                      <select
-                        className="h-10 px-3"
-                        value={teamId}
-                        onChange={(event) => setTeamId(event.target.value)}
-                      >
-                        <option value="">Choose team</option>
-                        {data.teams.map((team) => (
-                          <option key={team.id} value={team.id}>
-                            {team.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <div className="text-center text-xs uppercase tracking-[0.2em] text-muted">Or</div>
-                    <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-                      New Team Name
-                      <input
-                        className="h-10 px-3"
-                        value={teamName}
-                        onChange={(event) => setTeamName(event.target.value)}
-                      />
-                    </label>
-                    <PrimaryButton onClick={handleJoin}>Join</PrimaryButton>
-                  </>
-                )}
-              </div>
-            </Panel>
-
+            {!teamId && (
+              <Panel title="Join a Team">
+                <div className="flex flex-col gap-3">
+                  <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+                    Select Team
+                    <select
+                      className="h-10 px-3"
+                      value={teamId}
+                      onChange={(event) => setTeamId(event.target.value)}
+                    >
+                      <option value="">Choose team</option>
+                      {data.teams.map((team) => (
+                        <option key={team.id} value={team.id}>
+                          {team.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <div className="text-center text-xs uppercase tracking-[0.2em] text-muted">Or</div>
+                  <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+                    New Team Name
+                    <input
+                      className="h-10 px-3"
+                      value={teamName}
+                      onChange={(event) => setTeamName(event.target.value)}
+                    />
+                  </label>
+                  <PrimaryButton onClick={handleJoin}>Join</PrimaryButton>
+                </div>
+              </Panel>
+            )}
+            {!isLive && waitingShowLeaderboard && (
+              <Panel title="Leaderboard">
+                <div className="mt-1 flex flex-col gap-2">
+                  {data.leaderboard.length === 0 && (
+                    <div className="text-xs uppercase tracking-[0.2em] text-muted">No scores yet.</div>
+                  )}
+                  {data.leaderboard.map((entry, index) => (
+                    <div
+                      key={entry.team_id}
+                      className={`flex items-center justify-between border-2 px-3 py-2 ${
+                        teamId && entry.team_id === teamId
+                          ? 'border-accent bg-panel text-text'
+                          : 'border-border bg-panel2'
+                      }`}
+                    >
+                      <div className="text-xs uppercase tracking-[0.2em] text-muted">#{index + 1}</div>
+                      <div className="text-xs uppercase tracking-[0.2em] text-text">{entry.name}</div>
+                      <div className="text-xs uppercase tracking-[0.2em] text-muted">{entry.total}</div>
+                    </div>
+                  ))}
+                </div>
+              </Panel>
+            )}
           </div>
         </div>
 
