@@ -7,7 +7,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, data }) 
   const file = form.get('file');
   const kind = form.get('kind');
 
-  if (!(file instanceof File) || typeof kind !== 'string') {
+  if (!(file instanceof Blob) || typeof kind !== 'string' || !kind) {
     return jsonError({ code: 'invalid_request', message: 'File and kind are required' }, 400);
   }
 
