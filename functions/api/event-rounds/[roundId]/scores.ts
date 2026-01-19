@@ -29,7 +29,8 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request })
        (id, event_round_id, team_id, score, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?)
        ON CONFLICT(event_round_id, team_id)
-       DO UPDATE SET score = excluded.score, updated_at = excluded.updated_at`,
+       DO UPDATE SET score = excluded.score, updated_at = excluded.updated_at,
+       deleted = 0, deleted_at = NULL, deleted_by = NULL`,
       [crypto.randomUUID(), params.roundId, entry.team_id, entry.score, now, now]
     );
   }

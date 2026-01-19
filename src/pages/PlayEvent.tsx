@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api';
 import { Panel } from '../components/Panel';
 import { PrimaryButton, SecondaryButton } from '../components/Buttons';
+import { logError } from '../lib/log';
 import { useTheme } from '../lib/theme';
 
 const POLL_MS = 1500;
@@ -51,6 +52,7 @@ export function PlayEventPage() {
   const [teamName, setTeamName] = useState('');
   const [teamNameLabel, setTeamNameLabel] = useState<string | null>(null);
   const [teamMenuOpen, setTeamMenuOpen] = useState(false);
+  const [mediaError, setMediaError] = useState<string | null>(null);
   const { theme, toggleTheme } = useTheme();
   const normalizedCode = useMemo(() => (code ?? '').trim().toUpperCase(), [code]);
 
@@ -84,6 +86,10 @@ export function PlayEventPage() {
     const matched = data.teams.find((team) => team.id === teamId);
     setTeamNameLabel(matched?.name ?? null);
   }, [data, teamId]);
+
+  useEffect(() => {
+    setMediaError(null);
+  }, [data?.current_item?.media_key, data?.current_item?.media_type]);
 
   const handleJoin = async () => {
     if (!data) return;
@@ -283,7 +289,19 @@ export function PlayEventPage() {
                               className="max-h-[50vh] w-full object-contain"
                               src={api.publicMediaUrl(data.event.public_code, data.current_item.media_key)}
                               alt="Media"
+                              onError={() => {
+                                setMediaError('Media unavailable.');
+                                logError('participant_media_error', {
+                                  eventId: data.event.id,
+                                  mediaKey: data.current_item?.media_key ?? null
+                                });
+                              }}
                             />
+                          </div>
+                        )}
+                        {mediaError && (
+                          <div className="mt-3 rounded-md border border-danger bg-panel px-3 py-2 text-xs text-danger-ink">
+                            {mediaError}
                           </div>
                         )}
                         {data.current_item.media_type === 'audio' && (

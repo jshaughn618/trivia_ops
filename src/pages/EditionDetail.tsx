@@ -54,6 +54,7 @@ export function EditionDetailPage() {
   const [bulkResult, setBulkResult] = useState<string | null>(null);
   const [activeItemId, setActiveItemId] = useState<string | null>(null);
   const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [itemMenuId, setItemMenuId] = useState<string | null>(null);
   const editUploadRef = useRef<HTMLInputElement | null>(null);
   const newUploadRef = useRef<HTMLInputElement | null>(null);
 
@@ -619,7 +620,7 @@ export function EditionDetailPage() {
             {orderedItems.map((item, index) => (
               <div key={item.id} className="flex flex-col gap-3">
                 <div
-                  className={`border-2 ${activeItemId === item.id ? 'border-accent-ink' : 'border-border'} bg-panel2 p-3`}
+                  className={`border-2 ${activeItemId === item.id ? 'border-accent-ink' : 'border-border'} bg-panel2 p-2`}
                   draggable
                   role="button"
                   tabIndex={0}
@@ -643,27 +644,35 @@ export function EditionDetailPage() {
                     <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">
                       Item {index + 1}
                     </div>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="relative">
                       <button
                         type="button"
+                        aria-label="Item actions"
+                        aria-haspopup="menu"
+                        aria-expanded={itemMenuId === item.id}
                         onClick={(event) => {
                           event.stopPropagation();
-                          startEdit(item);
+                          setItemMenuId((current) => (current === item.id ? null : item.id));
                         }}
-                        className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
+                        className="flex h-7 w-7 items-center justify-center border border-border text-text"
                       >
-                        Edit Item
+                        ⋯
                       </button>
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          api.deleteEditionItem(item.id).then(load);
-                        }}
-                        className="border-2 border-danger px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-danger hover:border-[#9d2a24]"
-                      >
-                        Delete
-                      </button>
+                      {itemMenuId === item.id && (
+                        <div className="absolute right-0 mt-2 min-w-[160px] rounded-md border border-border bg-panel p-2 text-left shadow-sm">
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setItemMenuId(null);
+                              api.deleteEditionItem(item.id).then(load);
+                            }}
+                            className="w-full rounded-md border border-danger bg-panel2 px-3 py-2 text-xs font-medium text-danger-ink"
+                          >
+                            Delete Item
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="mt-2 text-sm text-text">{item.prompt}</div>

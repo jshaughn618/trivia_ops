@@ -4,6 +4,7 @@ import { api } from '../api';
 import { AppShell } from '../components/AppShell';
 import { Panel } from '../components/Panel';
 import { ButtonLink, PrimaryButton, SecondaryButton } from '../components/Buttons';
+import { logError } from '../lib/log';
 import type { Game, GameEdition } from '../types';
 
 export function EditionsPage() {
@@ -12,26 +13,45 @@ export function EditionsPage() {
   const [gameId, setGameId] = useState('');
   const [status, setStatus] = useState('');
   const [tag, setTag] = useState('');
+  const [error, setError] = useState<string | null>(null);
   const location = useLocation();
 
-  const load = async () => {
+  const load = async (filters?: { gameId?: string; status?: string; tag?: string }) => {
+    setError(null);
     const [gamesRes, editionsRes] = await Promise.all([
       api.listGames(),
-      api.listEditions({ game_id: gameId || undefined, status: status || undefined, tag: tag || undefined })
+      api.listEditions({
+        game_id: filters?.gameId ?? gameId || undefined,
+        status: filters?.status ?? status || undefined,
+        tag: filters?.tag ?? tag || undefined
+      })
     ]);
     if (gamesRes.ok) setGames(gamesRes.data);
+    if (!gamesRes.ok) {
+      setError(gamesRes.error.message ?? 'Failed to load games.');
+      logError('editions_games_load_failed', { error: gamesRes.error });
+    }
     if (editionsRes.ok) setEditions(editionsRes.data);
+    if (!editionsRes.ok) {
+      setError(editionsRes.error.message ?? 'Failed to load editions.');
+      logError('editions_load_failed', { error: editionsRes.error });
+    }
   };
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const nextStatus = params.get('status') ?? '';
     setStatus(nextStatus);
-    load();
+    load({ status: nextStatus, gameId, tag });
   }, [location.search]);
 
   return (
     <AppShell title="Editions">
+      {error && (
+        <div className="mb-4 border border-danger bg-panel2 px-3 py-2 text-xs text-danger-ink">
+          {error}
+        </div>
+      )}
       <div className="grid gap-4 lg:grid-cols-[1fr,320px]">
         <Panel title="Edition Library" action={<ButtonLink to="/editions/new" variant="primary">New Edition</ButtonLink>}>
           <div className="flex flex-col gap-3">
@@ -82,7 +102,7 @@ export function EditionsPage() {
               <input className="h-10 px-3" value={tag} onChange={(event) => setTag(event.target.value)} />
             </label>
             <div className="flex items-center gap-2">
-              <PrimaryButton onClick={load}>Apply</PrimaryButton>
+              <PrimaryButton onClick={() => load()}>Apply</PrimaryButton>
               <SecondaryButton
                 onClick={() => {
                   setGameId('');

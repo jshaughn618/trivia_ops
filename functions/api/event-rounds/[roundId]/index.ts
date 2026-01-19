@@ -36,10 +36,11 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request })
     );
     const statuses = roundStatuses.map((round) => round.status);
     const anyNotCompleted = statuses.some((status) => status !== 'completed' && status !== 'locked');
+    const anyLive = statuses.some((status) => status === 'live');
     let nextStatus: string | null = null;
-    if (anyNotCompleted) {
+    if (anyLive) {
       nextStatus = 'live';
-    } else if (event.status === 'completed') {
+    } else if (event.status === 'completed' && anyNotCompleted) {
       nextStatus = 'live';
     }
     if (nextStatus && nextStatus !== event.status) {

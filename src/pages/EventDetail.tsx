@@ -32,6 +32,7 @@ export function EventDetailPage() {
   const [qrUrl, setQrUrl] = useState<string | null>(null);
   const [qrLoading, setQrLoading] = useState(false);
   const [qrError, setQrError] = useState<string | null>(null);
+  const [roundMenuId, setRoundMenuId] = useState<string | null>(null);
 
   const load = async () => {
     if (!eventId) return;
@@ -314,23 +315,46 @@ export function EventDetailPage() {
               const display = roundDisplay(round);
               const statusLabel = round.status === 'locked' ? 'COMPLETED' : round.status.toUpperCase();
               return (
-                <div key={round.id} className="border-2 border-border bg-panel2 p-3">
-                  <div className="flex items-center justify-between">
-                    <div className="text-sm font-display uppercase tracking-[0.2em]">
-                      {display.title}
+                <div key={round.id} className="border-2 border-border bg-panel2 p-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-sm font-display uppercase tracking-[0.2em]">{display.title}</div>
+                    <div className="flex items-center gap-2">
+                      <Link
+                        to={`/events/${event.id}/run?round=${round.id}`}
+                        className="text-[10px] uppercase tracking-[0.2em] text-accent-ink"
+                      >
+                        Open Runner
+                      </Link>
+                      <div className="relative">
+                        <button
+                          type="button"
+                          aria-label="Round actions"
+                          aria-haspopup="menu"
+                          aria-expanded={roundMenuId === round.id}
+                          onClick={() => setRoundMenuId((current) => (current === round.id ? null : round.id))}
+                          className="flex h-7 w-7 items-center justify-center border border-border text-text"
+                        >
+                          ⋯
+                        </button>
+                        {roundMenuId === round.id && (
+                          <div className="absolute right-0 mt-2 min-w-[160px] rounded-md border border-border bg-panel p-2 text-left shadow-sm">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setRoundMenuId(null);
+                                deleteRound(round.id);
+                              }}
+                              className="w-full rounded-md border border-danger bg-panel2 px-3 py-2 text-xs font-medium text-danger-ink"
+                            >
+                              Delete Round
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      <StampBadge label={statusLabel} variant="inspected" />
                     </div>
-                    <StampBadge label={statusLabel} variant="inspected" />
                   </div>
-                  <div className="mt-2 text-xs uppercase tracking-[0.2em] text-muted">{display.detail}</div>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <Link
-                      to={`/events/${event.id}/run?round=${round.id}`}
-                      className="text-xs uppercase tracking-[0.2em] text-accent-ink"
-                    >
-                      Open Runner
-                    </Link>
-                    <DangerButton onClick={() => deleteRound(round.id)}>Delete</DangerButton>
-                  </div>
+                  <div className="mt-1 text-[10px] uppercase tracking-[0.2em] text-muted">{display.detail}</div>
                 </div>
               );
             })}

@@ -6,17 +6,27 @@ import { ButtonLink } from '../components/Buttons';
 import { Panel } from '../components/Panel';
 import { StatTile } from '../components/StatTile';
 import { StampBadge } from '../components/StampBadge';
+import { logError } from '../lib/log';
 import type { Event, GameEdition } from '../types';
 
 export function DashboardPage() {
   const [events, setEvents] = useState<Event[]>([]);
   const [editions, setEditions] = useState<GameEdition[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const load = async () => {
       const [eventsRes, editionsRes] = await Promise.all([api.listEvents(), api.listEditions()]);
       if (eventsRes.ok) setEvents(eventsRes.data);
+      if (!eventsRes.ok) {
+        setError(eventsRes.error.message ?? 'Failed to load events.');
+        logError('dashboard_events_load_failed', { error: eventsRes.error });
+      }
       if (editionsRes.ok) setEditions(editionsRes.data);
+      if (!editionsRes.ok) {
+        setError(editionsRes.error.message ?? 'Failed to load editions.');
+        logError('dashboard_editions_load_failed', { error: editionsRes.error });
+      }
     };
     load();
   }, []);
@@ -41,6 +51,11 @@ export function DashboardPage() {
 
   return (
     <AppShell title="Dashboard">
+      {error && (
+        <div className="mb-4 border border-danger bg-panel2 px-3 py-2 text-xs text-danger-ink">
+          {error}
+        </div>
+      )}
       <div className="grid gap-4 md:grid-cols-3">
         <Link to="/events?status=live">
           <StatTile label="Live Events" value={String(liveCount)} helper="On Air" />

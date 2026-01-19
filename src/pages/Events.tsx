@@ -5,16 +5,24 @@ import { AppShell } from '../components/AppShell';
 import { Panel } from '../components/Panel';
 import { ButtonLink } from '../components/Buttons';
 import { StampBadge } from '../components/StampBadge';
+import { logError } from '../lib/log';
 import type { Event } from '../types';
 
 export function EventsPage() {
   const [events, setEvents] = useState<Event[]>([]);
   const [filter, setFilter] = useState('');
+  const [error, setError] = useState<string | null>(null);
   const location = useLocation();
 
   const load = async () => {
     const res = await api.listEvents();
-    if (res.ok) setEvents(res.data);
+    if (res.ok) {
+      setEvents(res.data);
+      setError(null);
+    } else {
+      setError(res.error.message ?? 'Failed to load events.');
+      logError('events_load_failed', { error: res.error });
+    }
   };
 
   useEffect(() => {
@@ -30,6 +38,11 @@ export function EventsPage() {
 
   return (
     <AppShell title="Events">
+      {error && (
+        <div className="mb-4 border border-danger bg-panel2 px-3 py-2 text-xs text-danger-ink">
+          {error}
+        </div>
+      )}
       <div className="grid gap-4 lg:grid-cols-[1fr,320px]">
         <Panel title="Event Log" action={<ButtonLink to="/events/new" variant="primary">New Event</ButtonLink>}>
           <div className="flex flex-col gap-3">
