@@ -57,6 +57,8 @@ const editionItemBaseSchema = z.object({
   answer: z.string().min(1).optional(),
   answer_a: z.string().min(1).optional(),
   answer_b: z.string().min(1).optional(),
+  answer_a_label: z.string().min(1).optional(),
+  answer_b_label: z.string().min(1).optional(),
   fun_fact: z.string().nullable().optional(),
   ordinal: z.number().int().min(0),
   media_type: z.enum(['image', 'audio']).nullable().optional(),

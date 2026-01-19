@@ -71,6 +71,8 @@ export type EditionItem = {
   answer: string;
   answer_a: string | null;
   answer_b: string | null;
+  answer_a_label: string | null;
+  answer_b_label: string | null;
   fun_fact: string | null;
   ordinal: number;
   media_type: MediaType | null;

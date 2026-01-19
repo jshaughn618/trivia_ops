@@ -27,8 +27,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request }
   await execute(
     env,
     `INSERT INTO edition_items
-     (id, edition_id, prompt, answer, answer_a, answer_b, fun_fact, ordinal, media_type, media_key, media_caption, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+     (id, edition_id, prompt, answer, answer_a, answer_b, answer_a_label, answer_b_label, fun_fact, ordinal, media_type, media_key, media_caption, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ,
     [
       id,
@@ -37,6 +37,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request }
       data.answer ?? '',
       data.answer_a ?? null,
       data.answer_b ?? null,
+      data.answer_a_label ?? null,
+      data.answer_b_label ?? null,
       data.fun_fact ?? null,
       data.ordinal,
       data.media_type ?? null,

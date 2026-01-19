@@ -114,7 +114,7 @@ export function EventRunPage() {
                   <div className="text-xs uppercase tracking-[0.2em] text-muted">Answer</div>
                   <div className="mt-2 text-base font-display uppercase tracking-[0.2em]">
                     {item.answer || (item.answer_a && item.answer_b
-                      ? `A: ${item.answer_a} / B: ${item.answer_b}`
+                      ? `${item.answer_a_label ? `${item.answer_a_label}: ` : 'A: '}${item.answer_a} / ${item.answer_b_label ? `${item.answer_b_label}: ` : 'B: '}${item.answer_b}`
                       : '')}
                   </div>
                 </div>

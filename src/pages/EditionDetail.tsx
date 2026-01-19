@@ -11,6 +11,8 @@ const emptyItem = {
   answer: '',
   answer_a: '',
   answer_b: '',
+  answer_a_label: '',
+  answer_b_label: '',
   fun_fact: ''
 };
 
@@ -115,6 +117,8 @@ export function EditionDetailPage() {
       answer: itemDraft.answer,
       answer_a: itemDraft.answer_a || null,
       answer_b: itemDraft.answer_b || null,
+      answer_a_label: itemDraft.answer_a_label || null,
+      answer_b_label: itemDraft.answer_b_label || null,
       fun_fact: itemDraft.fun_fact || null,
       ordinal: nextOrdinal
     });
@@ -135,6 +139,8 @@ export function EditionDetailPage() {
       answer: item.answer,
       answer_a: item.answer_a ?? '',
       answer_b: item.answer_b ?? '',
+      answer_a_label: item.answer_a_label ?? '',
+      answer_b_label: item.answer_b_label ?? '',
       fun_fact: item.fun_fact ?? ''
     });
   };
@@ -150,6 +156,8 @@ export function EditionDetailPage() {
       answer: itemDraft.answer,
       answer_a: itemDraft.answer_a || null,
       answer_b: itemDraft.answer_b || null,
+      answer_a_label: itemDraft.answer_a_label || null,
+      answer_b_label: itemDraft.answer_b_label || null,
       fun_fact: itemDraft.fun_fact || null
     });
     if (res.ok) {
@@ -397,7 +405,7 @@ export function EditionDetailPage() {
                   <div className="mt-2 text-sm text-text">{item.prompt}</div>
                   <div className="mt-1 text-xs uppercase tracking-[0.2em] text-muted">
                     {item.answer || (item.answer_a && item.answer_b
-                      ? `A: ${item.answer_a} / B: ${item.answer_b}`
+                      ? `${item.answer_a_label ? `${item.answer_a_label}: ` : 'A: '}${item.answer_a} / ${item.answer_b_label ? `${item.answer_b_label}: ` : 'B: '}${item.answer_b}`
                       : 'Answer missing')}
                   </div>
                   <div className="mt-2 text-[10px] uppercase tracking-[0.2em] text-muted">
@@ -427,34 +435,55 @@ export function EditionDetailPage() {
                           onChange={(event) => setItemDraft((draft) => ({ ...draft, prompt: event.target.value }))}
                         />
                       </label>
-                      <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-                        <span className="flex items-center justify-between">
-                          Answer
-                          <button
-                            type="button"
-                            onClick={generateAnswer}
-                            className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent hover:text-text"
-                            disabled={gameTypeId === 'audio' || answerLoading}
-                          >
-                            {answerLoading ? 'Generating' : 'Generate'}
-                          </button>
-                        </span>
-                        <input
-                          className="h-10 px-3"
-                          value={itemDraft.answer}
-                          onChange={(event) => setItemDraft((draft) => ({ ...draft, answer: event.target.value }))}
-                          disabled={gameTypeId === 'audio'}
-                        />
-                        {answerError && <span className="text-[10px] tracking-[0.2em] text-danger">{answerError}</span>}
-                      </label>
+                      {gameTypeId !== 'audio' && (
+                        <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+                          <span className="flex items-center justify-between">
+                            Answer
+                            <button
+                              type="button"
+                              onClick={generateAnswer}
+                              className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent hover:text-text"
+                              disabled={answerLoading}
+                            >
+                              {answerLoading ? 'Generating' : 'Generate'}
+                            </button>
+                          </span>
+                          <input
+                            className="h-10 px-3"
+                            value={itemDraft.answer}
+                            onChange={(event) => setItemDraft((draft) => ({ ...draft, answer: event.target.value }))}
+                          />
+                          {answerError && <span className="text-[10px] tracking-[0.2em] text-danger">{answerError}</span>}
+                        </label>
+                      )}
                       {gameTypeId === 'audio' && (
                         <>
+                          <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+                            Answer A Label
+                            <input
+                              className="h-10 px-3"
+                              value={itemDraft.answer_a_label}
+                              onChange={(event) =>
+                                setItemDraft((draft) => ({ ...draft, answer_a_label: event.target.value }))
+                              }
+                            />
+                          </label>
                           <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
                             Answer A
                             <input
                               className="h-10 px-3"
                               value={itemDraft.answer_a}
                               onChange={(event) => setItemDraft((draft) => ({ ...draft, answer_a: event.target.value }))}
+                            />
+                          </label>
+                          <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+                            Answer B Label
+                            <input
+                              className="h-10 px-3"
+                              value={itemDraft.answer_b_label}
+                              onChange={(event) =>
+                                setItemDraft((draft) => ({ ...draft, answer_b_label: event.target.value }))
+                              }
                             />
                           </label>
                           <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
@@ -490,13 +519,16 @@ export function EditionDetailPage() {
                         Media Upload
                         <input
                           type="file"
-                          accept="image/png,image/jpeg,image/webp,audio/mpeg,audio/wav,audio/ogg"
+                          accept={gameTypeId === 'audio' ? 'audio/mpeg' : 'image/png,image/jpeg,image/webp'}
                           onChange={(event) => {
                             const file = event.target.files?.[0];
                             if (file) handleUpload(item, file);
                           }}
                           className="text-xs text-muted"
                         />
+                        {gameTypeId === 'audio' && (
+                          <span className="text-[10px] tracking-[0.2em] text-muted">MP3 only for audio rounds.</span>
+                        )}
                       </label>
                       <div className="flex flex-wrap gap-2">
                         <PrimaryButton onClick={() => saveEdit(item)}>Save</PrimaryButton>
@@ -575,34 +607,55 @@ export function EditionDetailPage() {
                   onChange={(event) => setItemDraft((draft) => ({ ...draft, prompt: event.target.value }))}
                 />
               </label>
-              <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-                <span className="flex items-center justify-between">
-                  Answer
-                  <button
-                    type="button"
-                    onClick={generateAnswer}
-                    className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent hover:text-text"
-                    disabled={gameTypeId === 'audio' || answerLoading}
-                  >
-                    {answerLoading ? 'Generating' : 'Generate'}
-                  </button>
-                </span>
-                <input
-                  className="h-10 px-3"
-                  value={itemDraft.answer}
-                  onChange={(event) => setItemDraft((draft) => ({ ...draft, answer: event.target.value }))}
-                  disabled={gameTypeId === 'audio'}
-                />
-                {answerError && <span className="text-[10px] tracking-[0.2em] text-danger">{answerError}</span>}
-              </label>
+              {gameTypeId !== 'audio' && (
+                <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+                  <span className="flex items-center justify-between">
+                    Answer
+                    <button
+                      type="button"
+                      onClick={generateAnswer}
+                      className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent hover:text-text"
+                      disabled={answerLoading}
+                    >
+                      {answerLoading ? 'Generating' : 'Generate'}
+                    </button>
+                  </span>
+                  <input
+                    className="h-10 px-3"
+                    value={itemDraft.answer}
+                    onChange={(event) => setItemDraft((draft) => ({ ...draft, answer: event.target.value }))}
+                  />
+                  {answerError && <span className="text-[10px] tracking-[0.2em] text-danger">{answerError}</span>}
+                </label>
+              )}
               {gameTypeId === 'audio' && (
                 <>
+                  <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+                    Answer A Label
+                    <input
+                      className="h-10 px-3"
+                      value={itemDraft.answer_a_label}
+                      onChange={(event) =>
+                        setItemDraft((draft) => ({ ...draft, answer_a_label: event.target.value }))
+                      }
+                    />
+                  </label>
                   <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
                     Answer A
                     <input
                       className="h-10 px-3"
                       value={itemDraft.answer_a}
                       onChange={(event) => setItemDraft((draft) => ({ ...draft, answer_a: event.target.value }))}
+                    />
+                  </label>
+                  <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+                    Answer B Label
+                    <input
+                      className="h-10 px-3"
+                      value={itemDraft.answer_b_label}
+                      onChange={(event) =>
+                        setItemDraft((draft) => ({ ...draft, answer_b_label: event.target.value }))
+                      }
                     />
                   </label>
                   <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
@@ -633,6 +686,18 @@ export function EditionDetailPage() {
                   onChange={(event) => setItemDraft((draft) => ({ ...draft, fun_fact: event.target.value }))}
                 />
                 {factError && <span className="text-[10px] tracking-[0.2em] text-danger">{factError}</span>}
+              </label>
+              <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+                Media Upload
+                <input
+                  type="file"
+                  accept={gameTypeId === 'audio' ? 'audio/mpeg' : 'image/png,image/jpeg,image/webp'}
+                  disabled
+                  className="text-xs text-muted"
+                />
+                <span className="text-[10px] tracking-[0.2em] text-muted">
+                  Save the item first to upload media.
+                </span>
               </label>
               <div className="flex flex-wrap gap-2">
                 <PrimaryButton onClick={handleCreateItem}>Save</PrimaryButton>

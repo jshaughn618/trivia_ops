@@ -20,13 +20,15 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request })
   await execute(
     env,
     `UPDATE edition_items
-     SET prompt = ?, answer = ?, answer_a = ?, answer_b = ?, fun_fact = ?, ordinal = ?, media_type = ?, media_key = ?, media_caption = ?
+     SET prompt = ?, answer = ?, answer_a = ?, answer_b = ?, answer_a_label = ?, answer_b_label = ?, fun_fact = ?, ordinal = ?, media_type = ?, media_key = ?, media_caption = ?
      WHERE id = ?`,
     [
       data.prompt,
       data.answer ?? '',
       data.answer_a ?? null,
       data.answer_b ?? null,
+      data.answer_a_label ?? null,
+      data.answer_b_label ?? null,
       data.fun_fact ?? null,
       data.ordinal,
       data.media_type ?? null,

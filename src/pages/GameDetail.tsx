@@ -15,6 +15,8 @@ export function GameDetailPage() {
   const [name, setName] = useState('');
   const [gameTypeId, setGameTypeId] = useState('');
   const [description, setDescription] = useState('');
+  const [descLoading, setDescLoading] = useState(false);
+  const [descError, setDescError] = useState<string | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -40,6 +42,25 @@ export function GameDetailPage() {
     if (!gameId) return;
     const res = await api.updateGame(gameId, { name, description, game_type_id: gameTypeId });
     if (res.ok) setGame(res.data);
+  };
+
+  const generateDescription = async () => {
+    if (!name.trim() && editions.length === 0) return;
+    setDescLoading(true);
+    setDescError(null);
+    const editionLines = editions
+      .slice(0, 10)
+      .map((edition, index) => `${index + 1}. ${edition.theme ?? edition.title}`)
+      .join('\n');
+    const prompt = `Write a short, punchy 1-2 sentence description for a trivia game named below. Use any editions as context if provided.\n\nGame name: ${name}\nEditions:\n${editionLines}`;
+    const res = await api.aiGenerate({ prompt, max_output_tokens: 120 });
+    setDescLoading(false);
+    if (!res.ok) {
+      setDescError(res.error.message);
+      return;
+    }
+    const line = res.data.text.split('\n')[0] ?? '';
+    setDescription(line.trim());
   };
 
   const handleDelete = async () => {
@@ -82,11 +103,22 @@ export function GameDetailPage() {
             </label>
             <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
               Description
+              <span className="flex items-center justify-end">
+                <button
+                  type="button"
+                  onClick={generateDescription}
+                  className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent hover:text-text"
+                  disabled={descLoading}
+                >
+                  {descLoading ? 'Generating' : 'Generate'}
+                </button>
+              </span>
               <textarea
                 className="min-h-[80px] px-3 py-2"
                 value={description}
                 onChange={(event) => setDescription(event.target.value)}
               />
+              {descError && <span className="text-[10px] tracking-[0.2em] text-danger">{descError}</span>}
             </label>
             <div className="flex flex-wrap items-center gap-2">
               <PrimaryButton onClick={handleUpdate}>Update</PrimaryButton>
