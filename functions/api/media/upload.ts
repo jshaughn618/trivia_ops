@@ -5,10 +5,17 @@ import { MAX_AUDIO_BYTES, MAX_IMAGE_BYTES, sniffMedia } from '../../media';
 export const onRequestPost: PagesFunction<Env> = async ({ request, env, data }) => {
   const form = await request.formData();
   const file = form.get('file');
-  const kind = form.get('kind');
+  const kindEntry = form.get('kind');
+  const fileBlob = file && typeof (file as Blob).arrayBuffer === 'function' ? (file as Blob) : null;
+  let kind = typeof kindEntry === 'string' && kindEntry ? kindEntry : null;
 
-  if (!(file instanceof Blob) || typeof kind !== 'string' || !kind) {
-    return jsonError({ code: 'invalid_request', message: 'File and kind are required' }, 400);
+  if (!fileBlob) {
+    return jsonError({ code: 'invalid_request', message: 'File is required' }, 400);
+  }
+
+  if (!kind) {
+    if (fileBlob.type.startsWith('audio/')) kind = 'audio';
+    if (fileBlob.type.startsWith('image/')) kind = 'image';
   }
 
   if (kind !== 'image' && kind !== 'audio') {
@@ -16,11 +23,11 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, data }) 
   }
 
   const maxBytes = kind === 'image' ? MAX_IMAGE_BYTES : MAX_AUDIO_BYTES;
-  if (file.size > maxBytes) {
+  if (fileBlob.size > maxBytes) {
     return jsonError({ code: 'file_too_large', message: 'File exceeds size limit' }, 400);
   }
 
-  const buffer = await file.arrayBuffer();
+  const buffer = await fileBlob.arrayBuffer();
   const sniff = sniffMedia(new Uint8Array(buffer));
   if (!sniff || sniff.kind !== kind) {
     return jsonError({ code: 'invalid_media', message: 'Unsupported media type' }, 400);
