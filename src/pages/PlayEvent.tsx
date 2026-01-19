@@ -5,7 +5,7 @@ import { Panel } from '../components/Panel';
 import { PrimaryButton, SecondaryButton } from '../components/Buttons';
 import { useTheme } from '../lib/theme';
 
-const POLL_MS = 4000;
+const POLL_MS = 1500;
 
 type PublicEventResponse = {
   event: {
