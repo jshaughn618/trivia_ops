@@ -140,6 +140,9 @@ export function PlayEventPage() {
   const waitingMessage = data.live?.waiting_message?.trim() ?? '';
   const waitingShowLeaderboard = data.live?.waiting_show_leaderboard ?? false;
   const waitingShowNextRound = data.live?.waiting_show_next_round ?? true;
+  const questionLabel = data.live?.current_item_ordinal
+    ? `Question ${data.live.current_item_ordinal}`
+    : 'Question';
   const answerText = data.current_item?.answer || (data.current_item?.answer_a && data.current_item?.answer_b
     ? `${data.current_item.answer_a_label ? `${data.current_item.answer_a_label}: ` : 'A: '}${data.current_item.answer_a} / ${data.current_item.answer_b_label ? `${data.current_item.answer_b_label}: ` : 'B: '}${data.current_item.answer_b}`
     : null);
@@ -175,7 +178,6 @@ export function PlayEventPage() {
             </div>
             {teamId && teamNameLabel && (
               <div className="flex items-center gap-3 text-right">
-                <div className="text-xs uppercase tracking-[0.2em] text-muted">Your Team</div>
                 <div className="text-sm font-display uppercase tracking-[0.2em]">{teamNameLabel}</div>
                 <div className="relative">
                   <button
@@ -208,7 +210,8 @@ export function PlayEventPage() {
         </div>
 
         <div className="grid gap-4 lg:grid-cols-[1.4fr,1fr]">
-          <Panel title="Now Showing">
+          <div className={isLive ? 'lg:col-span-2' : undefined}>
+            <Panel title="Now Showing">
             {!teamId ? (
               <div className="text-xs uppercase tracking-[0.2em] text-muted">
                 Join or create a team to view the live question.
@@ -225,7 +228,7 @@ export function PlayEventPage() {
                 {data.current_item ? (
                   <>
                     <div className="border-2 border-border bg-panel2 p-4">
-                      <div className="text-xs uppercase tracking-[0.2em] text-muted">Question</div>
+                      <div className="text-xs uppercase tracking-[0.2em] text-muted">{questionLabel}</div>
                       <div className="mt-2 text-lg font-display uppercase tracking-[0.2em]">
                         {data.current_item.prompt}
                       </div>
@@ -262,7 +265,8 @@ export function PlayEventPage() {
             ) : (
               waitingRoom
             )}
-          </Panel>
+            </Panel>
+          </div>
 
           <div className="flex flex-col gap-4">
             {!teamId && (

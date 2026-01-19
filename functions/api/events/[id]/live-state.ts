@@ -54,6 +54,7 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request })
   const data = parsed.data;
 
   if (existing) {
+    const waitingMessageProvided = data.waiting_message !== undefined;
     await execute(
       env,
       `UPDATE event_live_state
@@ -61,7 +62,7 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request })
            current_item_ordinal = COALESCE(?, current_item_ordinal),
            reveal_answer = COALESCE(?, reveal_answer),
            reveal_fun_fact = COALESCE(?, reveal_fun_fact),
-           waiting_message = COALESCE(?, waiting_message),
+           waiting_message = CASE WHEN ? = 1 THEN ? ELSE waiting_message END,
            waiting_show_leaderboard = COALESCE(?, waiting_show_leaderboard),
            waiting_show_next_round = COALESCE(?, waiting_show_next_round),
            updated_at = ?
@@ -71,6 +72,7 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request })
         data.current_item_ordinal ?? null,
         data.reveal_answer === undefined ? null : data.reveal_answer ? 1 : 0,
         data.reveal_fun_fact === undefined ? null : data.reveal_fun_fact ? 1 : 0,
+        waitingMessageProvided ? 1 : 0,
         data.waiting_message ?? null,
         data.waiting_show_leaderboard === undefined ? null : data.waiting_show_leaderboard ? 1 : 0,
         data.waiting_show_next_round === undefined ? null : data.waiting_show_next_round ? 1 : 0,

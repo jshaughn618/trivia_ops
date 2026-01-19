@@ -256,6 +256,14 @@ export function EventRunPage() {
   const setPlanned = async () => {
     if (!activeRound) return;
     await api.updateEventRound(activeRound.id, { status: 'planned' });
+    if (eventId) {
+      await api.updateLiveState(eventId, {
+        active_round_id: roundId || activeRound.id,
+        current_item_ordinal: null,
+        reveal_answer: false,
+        reveal_fun_fact: false
+      });
+    }
     await load();
   };
 
