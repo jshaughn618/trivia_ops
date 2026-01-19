@@ -31,11 +31,11 @@ export function EditionsPage() {
     const [gamesRes, editionsRes] = await Promise.all([
       api.listGames(),
       api.listEditions({
-        game_id: filters?.gameId ?? gameId || undefined,
-        status: filters?.status ?? status || undefined,
-        tag: filters?.tag ?? tag || undefined,
-        location_id: filters?.locationId ?? locationId || undefined,
-        search: filters?.search ?? search || undefined
+        game_id: filters?.gameId || gameId || undefined,
+        status: filters?.status || status || undefined,
+        tag: filters?.tag || tag || undefined,
+        location_id: filters?.locationId || locationId || undefined,
+        search: filters?.search || search || undefined
       })
     ]);
     const locationsRes = await api.listLocations();
