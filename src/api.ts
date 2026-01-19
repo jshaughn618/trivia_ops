@@ -264,5 +264,7 @@ export const api = {
     apiFetch<{ ok: true }>(`/api/media/${encodeURI(key)}`, {
       method: 'DELETE'
     }),
-  mediaUrl: (key: string) => `/api/media/${encodeURI(key)}`
+  mediaUrl: (key: string) => `/api/media/${encodeURI(key)}`,
+  publicMediaUrl: (code: string, key: string) =>
+    `/api/public/event/${encodeURIComponent(code)}/media/${encodeURI(key)}`
 };

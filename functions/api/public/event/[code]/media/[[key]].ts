@@ -1,8 +1,10 @@
-import type { Env } from '../../types';
-import { jsonError, jsonOk } from '../../responses';
-import { logError, logInfo, logWarn } from '../../_lib/log';
+import type { Env } from '../../../../types';
+import { jsonError } from '../../../../responses';
+import { normalizeCode } from '../../../../public';
+import { queryFirst } from '../../../../db';
+import { logError, logInfo, logWarn } from '../../../../_lib/log';
 
-export const onRequestGet: PagesFunction<Env> = async ({ env, params, data, request }) => {
+export const onRequestGet: PagesFunction<Env> = async ({ env, params, request, data }) => {
   const requestId = data.requestId ?? request.headers.get('x-request-id') ?? 'unknown';
   const raw = params.key;
   const key = Array.isArray(raw) ? raw.join('/') : raw;
@@ -10,16 +12,66 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params, data, requ
     return jsonError({ code: 'invalid_request', message: 'Missing media key' }, 400);
   }
 
-  if (!data.user) {
-    return jsonError({ code: 'unauthorized', message: 'Authentication required' }, 401);
+  const code = normalizeCode(params.code as string);
+  const event = await queryFirst<{ id: string; status: string }>(
+    env,
+    'SELECT id, status FROM events WHERE public_code = ? AND COALESCE(deleted, 0) = 0',
+    [code]
+  );
+
+  if (!event) {
+    return jsonError({ code: 'not_found', message: 'Event not found' }, 404);
+  }
+
+  if (event.status === 'canceled') {
+    return jsonError({ code: 'event_closed', message: 'Event is closed' }, 403);
+  }
+
+  const live = await queryFirst<{
+    active_round_id: string | null;
+    current_item_ordinal: number | null;
+  }>(
+    env,
+    'SELECT active_round_id, current_item_ordinal FROM event_live_state WHERE event_id = ? AND COALESCE(deleted, 0) = 0',
+    [event.id]
+  );
+
+  if (!live?.active_round_id || !live.current_item_ordinal) {
+    return jsonError({ code: 'not_live', message: 'Event is not live' }, 403);
+  }
+
+  const activeRound = await queryFirst<{ status: string }>(
+    env,
+    'SELECT status FROM event_rounds WHERE id = ? AND event_id = ? AND COALESCE(deleted, 0) = 0',
+    [live.active_round_id, event.id]
+  );
+  if (!activeRound || activeRound.status !== 'live') {
+    return jsonError({ code: 'not_live', message: 'Event is not live' }, 403);
+  }
+
+  const mediaMatch = await queryFirst<{ media_key: string }>(
+    env,
+    `SELECT ei.media_key
+     FROM event_round_items eri
+     JOIN edition_items ei ON ei.id = eri.edition_item_id
+     WHERE eri.event_round_id = ?
+       AND eri.ordinal = ?
+       AND ei.media_key = ?
+       AND COALESCE(eri.deleted, 0) = 0
+       AND COALESCE(ei.deleted, 0) = 0
+     LIMIT 1`,
+    [live.active_round_id, live.current_item_ordinal, key]
+  );
+
+  if (!mediaMatch) {
+    return jsonError({ code: 'forbidden', message: 'Media not available' }, 403);
   }
 
   const rangeHeader = request.headers.get('range');
-  logInfo(env, 'media_request_start', {
+  logInfo(env, 'public_media_request_start', {
     requestId,
     method: request.method,
     key,
-    userId: data.user?.id ?? null,
     hasRange: Boolean(rangeHeader),
     range: rangeHeader ? rangeHeader.slice(0, 64) : null
   });
@@ -29,10 +81,10 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params, data, requ
     const head = await env.BUCKET.head(key);
     const headDurationMs = Math.round(performance.now() - headStart);
     if (!head) {
-      logWarn(env, 'media_not_found', { requestId, key, headDurationMs });
+      logWarn(env, 'public_media_not_found', { requestId, key, headDurationMs });
       return jsonError({ code: 'not_found', message: 'Media not found' }, 404);
     }
-    logInfo(env, 'r2_head', {
+    logInfo(env, 'public_r2_head', {
       requestId,
       key,
       size: head.size,
@@ -71,7 +123,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params, data, requ
     const headers = new Headers();
     headers.set('Content-Type', contentType);
     headers.set('Accept-Ranges', 'bytes');
-    headers.set('Cache-Control', 'private, max-age=300');
+    headers.set('Cache-Control', 'private, max-age=60');
 
     if (rangeHeader) {
       const match = /^bytes=(\d*)-(\d*)$/i.exec(rangeHeader);
@@ -101,10 +153,10 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params, data, requ
       const object = await env.BUCKET.get(key, { range: { offset: start, length } });
       const getDurationMs = Math.round(performance.now() - getStart);
       if (!object) {
-        logWarn(env, 'media_not_found', { requestId, key, durationMs: getDurationMs });
+        logWarn(env, 'public_media_not_found', { requestId, key, durationMs: getDurationMs });
         return jsonError({ code: 'not_found', message: 'Media not found' }, 404);
       }
-      logInfo(env, 'r2_get', {
+      logInfo(env, 'public_r2_get', {
         requestId,
         key,
         offset: start,
@@ -120,15 +172,15 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params, data, requ
       const object = await env.BUCKET.get(key);
       const getDurationMs = Math.round(performance.now() - getStart);
       if (!object) {
-        logWarn(env, 'media_not_found', { requestId, key, durationMs: getDurationMs });
+        logWarn(env, 'public_media_not_found', { requestId, key, durationMs: getDurationMs });
         return jsonError({ code: 'not_found', message: 'Media not found' }, 404);
       }
-      logInfo(env, 'r2_get', { requestId, key, durationMs: getDurationMs });
+      logInfo(env, 'public_r2_get', { requestId, key, durationMs: getDurationMs });
       headers.set('Content-Length', String(totalSize));
       body = object.body;
     }
 
-    logInfo(env, 'media_response', {
+    logInfo(env, 'public_media_response', {
       requestId,
       key,
       status,
@@ -137,51 +189,12 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params, data, requ
     });
     return new Response(body, { status, headers });
   } catch (error) {
-    logError(env, 'media_error', {
+    logError(env, 'public_media_error', {
       requestId,
       key,
       message: error instanceof Error ? error.message : 'unknown_error',
       stack: error instanceof Error ? error.stack : undefined
     });
     return jsonError({ code: 'server_error', message: 'Media fetch failed' }, 500);
-  }
-};
-
-export const onRequestDelete: PagesFunction<Env> = async ({ env, params, data, request }) => {
-  const requestId = data.requestId ?? request.headers.get('x-request-id') ?? 'unknown';
-  const raw = params.key;
-  const key = Array.isArray(raw) ? raw.join('/') : raw;
-  if (!key) {
-    return jsonError({ code: 'invalid_request', message: 'Missing media key' }, 400);
-  }
-
-  if (!data.user) {
-    return jsonError({ code: 'unauthorized', message: 'Authentication required' }, 401);
-  }
-
-  if (!key.startsWith(`user/${data.user.id}/`)) {
-    return jsonError({ code: 'forbidden', message: 'Access denied' }, 403);
-  }
-
-  logInfo(env, 'media_delete_start', {
-    requestId,
-    key,
-    userId: data.user.id
-  });
-
-  try {
-    const start = performance.now();
-    await env.BUCKET.delete(key);
-    const durationMs = Math.round(performance.now() - start);
-    logInfo(env, 'r2_delete', { requestId, key, durationMs });
-    return jsonOk({ ok: true });
-  } catch (error) {
-    logError(env, 'media_delete_error', {
-      requestId,
-      key,
-      message: error instanceof Error ? error.message : 'unknown_error',
-      stack: error instanceof Error ? error.stack : undefined
-    });
-    return jsonError({ code: 'server_error', message: 'Media delete failed' }, 500);
   }
 };

@@ -281,7 +281,7 @@ export function PlayEventPage() {
                           <div className="mt-4 rounded-md border border-border bg-panel p-2">
                             <img
                               className="max-h-[50vh] w-full object-contain"
-                              src={api.mediaUrl(data.current_item.media_key)}
+                              src={api.publicMediaUrl(data.event.public_code, data.current_item.media_key)}
                               alt="Media"
                             />
                           </div>
