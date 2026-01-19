@@ -12,7 +12,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params, data }) =>
 
   const row = await queryFirst(
     env,
-    'SELECT id, email, username, first_name, last_name, user_type, created_at FROM users WHERE id = ? AND deleted = 0',
+    'SELECT id, email, username, first_name, last_name, user_type, created_at FROM users WHERE id = ? AND COALESCE(deleted, 0) = 0',
     [params.id]
   );
   if (!row) {
@@ -31,7 +31,7 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
     return jsonError({ code: 'validation_error', message: 'Invalid user update', details: parsed.error.flatten() }, 400);
   }
 
-  const existing = await queryFirst(env, 'SELECT * FROM users WHERE id = ? AND deleted = 0', [params.id]);
+  const existing = await queryFirst(env, 'SELECT * FROM users WHERE id = ? AND COALESCE(deleted, 0) = 0', [params.id]);
   if (!existing) {
     return jsonError({ code: 'not_found', message: 'User not found' }, 404);
   }
@@ -57,7 +57,7 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
 
   const row = await queryFirst(
     env,
-    'SELECT id, email, username, first_name, last_name, user_type, created_at FROM users WHERE id = ? AND deleted = 0',
+    'SELECT id, email, username, first_name, last_name, user_type, created_at FROM users WHERE id = ? AND COALESCE(deleted, 0) = 0',
     [params.id]
   );
   return jsonOk(row);
@@ -67,7 +67,7 @@ export const onRequestDelete: PagesFunction<Env> = async ({ env, params, data })
   const guard = requireAdmin(env, data.user);
   if (guard) return guard;
 
-  const existing = await queryFirst(env, 'SELECT id FROM users WHERE id = ? AND deleted = 0', [params.id]);
+  const existing = await queryFirst(env, 'SELECT id FROM users WHERE id = ? AND COALESCE(deleted, 0) = 0', [params.id]);
   if (!existing) {
     return jsonError({ code: 'not_found', message: 'User not found' }, 404);
   }

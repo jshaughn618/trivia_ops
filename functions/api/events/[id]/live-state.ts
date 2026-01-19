@@ -20,7 +20,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
     env,
     `SELECT id, event_id, active_round_id, current_item_ordinal, reveal_answer, reveal_fun_fact,
             waiting_message, waiting_show_leaderboard, waiting_show_next_round, updated_at
-     FROM event_live_state WHERE event_id = ? AND deleted = 0`,
+     FROM event_live_state WHERE event_id = ? AND COALESCE(deleted, 0) = 0`,
     [params.id]
   );
   return jsonOk(
@@ -46,7 +46,7 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request })
 
   const existing = await queryFirst<{ id: string }>(
     env,
-    'SELECT id FROM event_live_state WHERE event_id = ? AND deleted = 0',
+    'SELECT id FROM event_live_state WHERE event_id = ? AND COALESCE(deleted, 0) = 0',
     [params.id]
   );
 
@@ -119,7 +119,7 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request })
     env,
     `SELECT id, event_id, active_round_id, current_item_ordinal, reveal_answer, reveal_fun_fact,
             waiting_message, waiting_show_leaderboard, waiting_show_next_round, updated_at
-     FROM event_live_state WHERE event_id = ? AND deleted = 0`,
+     FROM event_live_state WHERE event_id = ? AND COALESCE(deleted, 0) = 0`,
     [params.id]
   );
 

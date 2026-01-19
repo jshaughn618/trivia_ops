@@ -1,0 +1,13 @@
+UPDATE users SET deleted = 0 WHERE deleted IS NULL;
+UPDATE sessions SET deleted = 0 WHERE deleted IS NULL;
+UPDATE locations SET deleted = 0 WHERE deleted IS NULL;
+UPDATE games SET deleted = 0 WHERE deleted IS NULL;
+UPDATE game_types SET deleted = 0 WHERE deleted IS NULL;
+UPDATE editions SET deleted = 0 WHERE deleted IS NULL;
+UPDATE edition_items SET deleted = 0 WHERE deleted IS NULL;
+UPDATE events SET deleted = 0 WHERE deleted IS NULL;
+UPDATE event_rounds SET deleted = 0 WHERE deleted IS NULL;
+UPDATE event_round_items SET deleted = 0 WHERE deleted IS NULL;
+UPDATE teams SET deleted = 0 WHERE deleted IS NULL;
+UPDATE event_live_state SET deleted = 0 WHERE deleted IS NULL;
+UPDATE event_round_scores SET deleted = 0 WHERE deleted IS NULL;

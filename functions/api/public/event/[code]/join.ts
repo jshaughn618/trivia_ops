@@ -15,7 +15,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request }
 
   const event = await queryFirst<{ id: string; status: string }>(
     env,
-    'SELECT id, status FROM events WHERE public_code = ? AND deleted = 0',
+    'SELECT id, status FROM events WHERE public_code = ? AND COALESCE(deleted, 0) = 0',
     [code]
   );
 
@@ -29,7 +29,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request }
   if (parsed.data.team_id) {
     const team = await queryFirst<{ id: string; name: string }>(
       env,
-      'SELECT id, name FROM teams WHERE id = ? AND event_id = ? AND deleted = 0',
+      'SELECT id, name FROM teams WHERE id = ? AND event_id = ? AND COALESCE(deleted, 0) = 0',
       [parsed.data.team_id, event.id]
     );
     if (!team) {
@@ -44,7 +44,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request }
 
   const existing = await queryFirst<{ id: string; name: string }>(
     env,
-    'SELECT id, name FROM teams WHERE event_id = ? AND lower(name) = lower(?) AND deleted = 0',
+    'SELECT id, name FROM teams WHERE event_id = ? AND lower(name) = lower(?) AND COALESCE(deleted, 0) = 0',
     [event.id, parsed.data.team_name]
   );
 

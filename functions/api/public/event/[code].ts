@@ -17,7 +17,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
     `SELECT e.id, e.title, e.starts_at, e.status, e.public_code, l.name AS location_name
      FROM events e
      LEFT JOIN locations l ON l.id = e.location_id
-     WHERE e.public_code = ? AND e.deleted = 0`,
+     WHERE e.public_code = ? AND COALESCE(e.deleted, 0) = 0`,
     [code]
   );
 
@@ -27,13 +27,13 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
 
   const rounds = await queryAll<{ id: string; round_number: number; label: string; status: string }>(
     env,
-    'SELECT id, round_number, label, status FROM event_rounds WHERE event_id = ? AND deleted = 0 ORDER BY round_number ASC',
+    'SELECT id, round_number, label, status FROM event_rounds WHERE event_id = ? AND COALESCE(deleted, 0) = 0 ORDER BY round_number ASC',
     [event.id]
   );
 
   const teams = await queryAll<{ id: string; name: string }>(
     env,
-    'SELECT id, name FROM teams WHERE event_id = ? AND deleted = 0 ORDER BY created_at ASC',
+    'SELECT id, name FROM teams WHERE event_id = ? AND COALESCE(deleted, 0) = 0 ORDER BY created_at ASC',
     [event.id]
   );
 
@@ -41,9 +41,9 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
     env,
     `SELECT t.id AS team_id, t.name, COALESCE(SUM(s.score), 0) AS total
      FROM teams t
-     LEFT JOIN event_round_scores s ON s.team_id = t.id AND s.deleted = 0
+     LEFT JOIN event_round_scores s ON s.team_id = t.id AND COALESCE(s.deleted, 0) = 0
      LEFT JOIN event_rounds r ON r.id = s.event_round_id
-     WHERE t.event_id = ? AND t.deleted = 0
+     WHERE t.event_id = ? AND COALESCE(t.deleted, 0) = 0
      GROUP BY t.id
      ORDER BY total DESC, t.name ASC`,
     [event.id]
@@ -64,7 +64,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
     env,
     `SELECT id, event_id, active_round_id, current_item_ordinal, reveal_answer, reveal_fun_fact,
             waiting_message, waiting_show_leaderboard, waiting_show_next_round, updated_at
-     FROM event_live_state WHERE event_id = ? AND deleted = 0`,
+     FROM event_live_state WHERE event_id = ? AND COALESCE(deleted, 0) = 0`,
     [event.id]
   );
 
@@ -87,7 +87,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
        ei.media_caption
        FROM event_round_items eri
        JOIN edition_items ei ON ei.id = eri.edition_item_id
-       WHERE eri.event_round_id = ? AND eri.ordinal = ? AND eri.deleted = 0 AND ei.deleted = 0
+       WHERE eri.event_round_id = ? AND eri.ordinal = ? AND COALESCE(eri.deleted, 0) = 0 AND COALESCE(ei.deleted, 0) = 0
        LIMIT 1`,
       [live.active_round_id, live.current_item_ordinal]
     );

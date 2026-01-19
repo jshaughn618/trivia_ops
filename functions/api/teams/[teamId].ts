@@ -11,7 +11,7 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request })
     return jsonError({ code: 'validation_error', message: 'Invalid team update', details: parsed.error.flatten() }, 400);
   }
 
-  const existing = await queryFirst(env, 'SELECT * FROM teams WHERE id = ? AND deleted = 0', [params.teamId]);
+  const existing = await queryFirst(env, 'SELECT * FROM teams WHERE id = ? AND COALESCE(deleted, 0) = 0', [params.teamId]);
   if (!existing) {
     return jsonError({ code: 'not_found', message: 'Team not found' }, 404);
   }
@@ -23,12 +23,12 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request })
     [data.name, data.table_label ?? null, params.teamId]
   );
 
-  const row = await queryFirst(env, 'SELECT * FROM teams WHERE id = ? AND deleted = 0', [params.teamId]);
+  const row = await queryFirst(env, 'SELECT * FROM teams WHERE id = ? AND COALESCE(deleted, 0) = 0', [params.teamId]);
   return jsonOk(row);
 };
 
 export const onRequestDelete: PagesFunction<Env> = async ({ env, params }) => {
-  const existing = await queryFirst(env, 'SELECT id FROM teams WHERE id = ? AND deleted = 0', [params.teamId]);
+  const existing = await queryFirst(env, 'SELECT id FROM teams WHERE id = ? AND COALESCE(deleted, 0) = 0', [params.teamId]);
   if (!existing) {
     return jsonError({ code: 'not_found', message: 'Team not found' }, 404);
   }

@@ -11,7 +11,7 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request })
     return jsonError({ code: 'validation_error', message: 'Invalid item update', details: parsed.error.flatten() }, 400);
   }
 
-  const existing = await queryFirst(env, 'SELECT * FROM edition_items WHERE id = ? AND deleted = 0', [params.itemId]);
+  const existing = await queryFirst(env, 'SELECT * FROM edition_items WHERE id = ? AND COALESCE(deleted, 0) = 0', [params.itemId]);
   if (!existing) {
     return jsonError({ code: 'not_found', message: 'Item not found' }, 404);
   }
@@ -38,12 +38,12 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request })
     ]
   );
 
-  const row = await queryFirst(env, 'SELECT * FROM edition_items WHERE id = ? AND deleted = 0', [params.itemId]);
+  const row = await queryFirst(env, 'SELECT * FROM edition_items WHERE id = ? AND COALESCE(deleted, 0) = 0', [params.itemId]);
   return jsonOk(row);
 };
 
 export const onRequestDelete: PagesFunction<Env> = async ({ env, params }) => {
-  const existing = await queryFirst(env, 'SELECT id FROM edition_items WHERE id = ? AND deleted = 0', [params.itemId]);
+  const existing = await queryFirst(env, 'SELECT id FROM edition_items WHERE id = ? AND COALESCE(deleted, 0) = 0', [params.itemId]);
   if (!existing) {
     return jsonError({ code: 'not_found', message: 'Item not found' }, 404);
   }

@@ -276,11 +276,13 @@ export function PlayEventPage() {
                         {data.current_item.prompt}
                       </div>
                       {data.current_item.media_type === 'image' && data.current_item.media_key && (
-                        <img
-                          className="mt-4 max-h-64 w-full object-cover border-2 border-border"
-                          src={api.mediaUrl(data.current_item.media_key)}
-                          alt="Media"
-                        />
+                        <div className="mt-4 border-2 border-border bg-panel p-2">
+                          <img
+                            className="max-h-[50vh] w-full object-contain"
+                            src={api.mediaUrl(data.current_item.media_key)}
+                            alt="Media"
+                          />
+                        </div>
                       )}
                       {data.current_item.media_type === 'audio' && data.current_item.media_key && (
                         <audio className="mt-4 w-full" controls src={api.mediaUrl(data.current_item.media_key)} />

@@ -11,7 +11,7 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request })
     return jsonError({ code: 'validation_error', message: 'Invalid round update', details: parsed.error.flatten() }, 400);
   }
 
-  const existing = await queryFirst(env, 'SELECT * FROM event_rounds WHERE id = ? AND deleted = 0', [params.roundId]);
+  const existing = await queryFirst(env, 'SELECT * FROM event_rounds WHERE id = ? AND COALESCE(deleted, 0) = 0', [params.roundId]);
   if (!existing) {
     return jsonError({ code: 'not_found', message: 'Round not found' }, 404);
   }
@@ -23,12 +23,12 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request })
     [data.round_number, data.label, data.edition_id, data.status, params.roundId]
   );
 
-  const row = await queryFirst(env, 'SELECT * FROM event_rounds WHERE id = ? AND deleted = 0', [params.roundId]);
+  const row = await queryFirst(env, 'SELECT * FROM event_rounds WHERE id = ? AND COALESCE(deleted, 0) = 0', [params.roundId]);
   return jsonOk(row);
 };
 
 export const onRequestDelete: PagesFunction<Env> = async ({ env, params }) => {
-  const existing = await queryFirst(env, 'SELECT id FROM event_rounds WHERE id = ? AND deleted = 0', [params.roundId]);
+  const existing = await queryFirst(env, 'SELECT id FROM event_rounds WHERE id = ? AND COALESCE(deleted, 0) = 0', [params.roundId]);
   if (!existing) {
     return jsonError({ code: 'not_found', message: 'Round not found' }, 404);
   }

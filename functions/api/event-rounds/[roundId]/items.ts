@@ -22,7 +22,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
      ei.created_at
     FROM event_round_items eri
     JOIN edition_items ei ON ei.id = eri.edition_item_id
-    WHERE eri.event_round_id = ? AND eri.deleted = 0 AND ei.deleted = 0
+    WHERE eri.event_round_id = ? AND COALESCE(eri.deleted, 0) = 0 AND COALESCE(ei.deleted, 0) = 0
     ORDER BY eri.ordinal ASC`,
     [params.roundId]
   );

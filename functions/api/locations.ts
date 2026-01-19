@@ -5,7 +5,7 @@ import { locationCreateSchema } from '../../shared/validators';
 import { execute, nowIso, queryAll } from '../db';
 
 export const onRequestGet: PagesFunction<Env> = async ({ env }) => {
-  const rows = await queryAll(env, 'SELECT * FROM locations WHERE deleted = 0 ORDER BY created_at DESC');
+  const rows = await queryAll(env, 'SELECT * FROM locations WHERE COALESCE(deleted, 0) = 0 ORDER BY created_at DESC');
   return jsonOk(rows);
 };
 
@@ -36,6 +36,6 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     ]
   );
 
-  const rows = await queryAll(env, 'SELECT * FROM locations WHERE id = ? AND deleted = 0', [id]);
+  const rows = await queryAll(env, 'SELECT * FROM locations WHERE id = ? AND COALESCE(deleted, 0) = 0', [id]);
   return jsonOk(rows[0]);
 };

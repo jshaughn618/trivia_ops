@@ -12,7 +12,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, data }) => {
 
   const rows = await queryAll(
     env,
-    'SELECT id, email, username, first_name, last_name, user_type, created_at FROM users WHERE deleted = 0 ORDER BY created_at DESC'
+    'SELECT id, email, username, first_name, last_name, user_type, created_at FROM users WHERE COALESCE(deleted, 0) = 0 ORDER BY created_at DESC'
   );
   return jsonOk(rows);
 };
@@ -55,7 +55,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, data }) 
 
   const row = await queryFirst(
     env,
-    'SELECT id, email, username, first_name, last_name, user_type, created_at FROM users WHERE id = ? AND deleted = 0',
+    'SELECT id, email, username, first_name, last_name, user_type, created_at FROM users WHERE id = ? AND COALESCE(deleted, 0) = 0',
     [id]
   );
 

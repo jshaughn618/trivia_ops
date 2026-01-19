@@ -338,11 +338,13 @@ export function EventRunPage() {
                   </div>
                   <div className="mt-2 text-lg font-display uppercase tracking-[0.2em]">{item.prompt}</div>
                   {item.media_type === 'image' && item.media_key && (
-                    <img
-                      className="mt-4 max-h-64 w-full object-cover border-2 border-border"
-                      src={api.mediaUrl(item.media_key)}
-                      alt={item.media_caption ?? 'Media'}
-                    />
+                    <div className="mt-4 border-2 border-border bg-panel p-2">
+                      <img
+                        className="max-h-[60vh] w-full object-contain"
+                        src={api.mediaUrl(item.media_key)}
+                        alt={item.media_caption ?? 'Media'}
+                      />
+                    </div>
                   )}
                   {item.media_type === 'audio' && item.media_key && (
                     <div className="mt-4 flex flex-col gap-2">

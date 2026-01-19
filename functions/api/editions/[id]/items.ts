@@ -7,7 +7,7 @@ import { execute, nowIso, queryAll } from '../../../db';
 export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
   const rows = await queryAll(
     env,
-    'SELECT * FROM edition_items WHERE edition_id = ? AND deleted = 0 ORDER BY ordinal ASC',
+    'SELECT * FROM edition_items WHERE edition_id = ? AND COALESCE(deleted, 0) = 0 ORDER BY ordinal ASC',
     [params.id]
   );
   return jsonOk(rows);
@@ -48,6 +48,6 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request }
     ]
   );
 
-  const rows = await queryAll(env, 'SELECT * FROM edition_items WHERE id = ? AND deleted = 0', [id]);
+  const rows = await queryAll(env, 'SELECT * FROM edition_items WHERE id = ? AND COALESCE(deleted, 0) = 0', [id]);
   return jsonOk(rows[0]);
 };

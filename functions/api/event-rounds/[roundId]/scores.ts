@@ -8,7 +8,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
   const rows = await queryAll<{ team_id: string; score: number }>(
     env,
     `SELECT team_id, score FROM event_round_scores
-     WHERE event_round_id = ? AND deleted = 0`,
+     WHERE event_round_id = ? AND COALESCE(deleted, 0) = 0`,
     [params.roundId]
   );
   return jsonOk(rows);
@@ -37,7 +37,7 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request })
   const rows = await queryAll<{ team_id: string; score: number }>(
     env,
     `SELECT team_id, score FROM event_round_scores
-     WHERE event_round_id = ? AND deleted = 0`,
+     WHERE event_round_id = ? AND COALESCE(deleted, 0) = 0`,
     [params.roundId]
   );
 
