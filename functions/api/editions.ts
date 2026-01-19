@@ -12,6 +12,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, request }) => {
   const gameId = url.searchParams.get('game_id');
   const status = url.searchParams.get('status');
   const tag = url.searchParams.get('tag');
+  const locationId = url.searchParams.get('location_id');
+  const search = url.searchParams.get('search');
 
   if (gameId) {
     where.push('game_id = ?');
@@ -25,8 +27,34 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, request }) => {
     where.push('tags_csv LIKE ?');
     params.push(`%${tag}%`);
   }
+  if (locationId) {
+    where.push(`NOT EXISTS (
+      SELECT 1
+      FROM event_rounds er
+      JOIN events e ON e.id = er.event_id
+      WHERE er.edition_id = editions.id
+        AND e.location_id = ?
+        AND COALESCE(er.deleted, 0) = 0
+        AND COALESCE(e.deleted, 0) = 0
+    )`);
+    params.push(locationId);
+  }
+  if (search) {
+    where.push(`(
+      editions.title LIKE ?
+      OR editions.theme LIKE ?
+      OR editions.description LIKE ?
+      OR editions.tags_csv LIKE ?
+      OR games.name LIKE ?
+    )`);
+    const like = `%${search}%`;
+    params.push(like, like, like, like, like);
+  }
 
-  const sql = `SELECT * FROM editions ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY updated_at DESC`;
+  const sql = `SELECT editions.* FROM editions
+    JOIN games ON games.id = editions.game_id
+    ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+    ORDER BY editions.updated_at DESC`;
   const rows = await queryAll(env, sql, params);
   return jsonOk(rows);
 };

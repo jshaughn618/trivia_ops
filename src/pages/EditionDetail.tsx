@@ -55,6 +55,7 @@ export function EditionDetailPage() {
   const [activeItemId, setActiveItemId] = useState<string | null>(null);
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [itemMenuId, setItemMenuId] = useState<string | null>(null);
+  const itemMenuRef = useRef<HTMLDivElement | null>(null);
   const editUploadRef = useRef<HTMLInputElement | null>(null);
   const newUploadRef = useRef<HTMLInputElement | null>(null);
 
@@ -86,6 +87,18 @@ export function EditionDetailPage() {
   useEffect(() => {
     load();
   }, [editionId]);
+
+  useEffect(() => {
+    if (!itemMenuId) return;
+    const handleClick = (event: MouseEvent) => {
+      if (!itemMenuRef.current) return;
+      if (!itemMenuRef.current.contains(event.target as Node)) {
+        setItemMenuId(null);
+      }
+    };
+    document.addEventListener('click', handleClick);
+    return () => document.removeEventListener('click', handleClick);
+  }, [itemMenuId]);
 
   const nextOrdinal = useMemo(() => {
     return items.length === 0 ? 1 : Math.max(...items.map((item) => item.ordinal)) + 1;
@@ -644,7 +657,7 @@ export function EditionDetailPage() {
                     <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">
                       Item {index + 1}
                     </div>
-                    <div className="relative">
+                    <div className="relative" ref={itemMenuRef}>
                       <button
                         type="button"
                         aria-label="Item actions"

@@ -115,11 +115,13 @@ export const api = {
     apiFetch<Game>(`/api/games/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
   deleteGame: (id: string) => apiFetch<{ ok: true }>(`/api/games/${id}`, { method: 'DELETE' }),
 
-  listEditions: (params?: { game_id?: string; status?: string; tag?: string }) => {
+  listEditions: (params?: { game_id?: string; status?: string; tag?: string; location_id?: string; search?: string }) => {
     const search = new URLSearchParams();
     if (params?.game_id) search.set('game_id', params.game_id);
     if (params?.status) search.set('status', params.status);
     if (params?.tag) search.set('tag', params.tag);
+    if (params?.location_id) search.set('location_id', params.location_id);
+    if (params?.search) search.set('search', params.search);
     const query = search.toString();
     return apiFetch<GameEdition[]>(`/api/editions${query ? `?${query}` : ''}`);
   },
