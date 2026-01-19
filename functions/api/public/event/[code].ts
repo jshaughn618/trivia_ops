@@ -56,10 +56,14 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
     current_item_ordinal: number | null;
     reveal_answer: number;
     reveal_fun_fact: number;
+    waiting_message: string | null;
+    waiting_show_leaderboard: number;
+    waiting_show_next_round: number;
     updated_at: string;
   }>(
     env,
-    `SELECT id, event_id, active_round_id, current_item_ordinal, reveal_answer, reveal_fun_fact, updated_at
+    `SELECT id, event_id, active_round_id, current_item_ordinal, reveal_answer, reveal_fun_fact,
+            waiting_message, waiting_show_leaderboard, waiting_show_next_round, updated_at
      FROM event_live_state WHERE event_id = ? AND deleted = 0`,
     [event.id]
   );
@@ -98,7 +102,10 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
       ? {
           ...live,
           reveal_answer: Boolean(live.reveal_answer),
-          reveal_fun_fact: Boolean(live.reveal_fun_fact)
+          reveal_fun_fact: Boolean(live.reveal_fun_fact),
+          waiting_message: live.waiting_message ?? null,
+          waiting_show_leaderboard: Boolean(live.waiting_show_leaderboard),
+          waiting_show_next_round: Boolean(live.waiting_show_next_round)
         }
       : null,
     current_item: currentItem

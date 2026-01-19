@@ -5,13 +5,36 @@ import { liveStateUpdateSchema } from '../../../../shared/validators';
 import { execute, nowIso, queryFirst } from '../../../db';
 
 export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
-  const row = await queryFirst(
+  const row = await queryFirst<{
+    id: string;
+    event_id: string;
+    active_round_id: string | null;
+    current_item_ordinal: number | null;
+    reveal_answer: number;
+    reveal_fun_fact: number;
+    waiting_message: string | null;
+    waiting_show_leaderboard: number;
+    waiting_show_next_round: number;
+    updated_at: string;
+  }>(
     env,
-    `SELECT id, event_id, active_round_id, current_item_ordinal, reveal_answer, reveal_fun_fact, updated_at
+    `SELECT id, event_id, active_round_id, current_item_ordinal, reveal_answer, reveal_fun_fact,
+            waiting_message, waiting_show_leaderboard, waiting_show_next_round, updated_at
      FROM event_live_state WHERE event_id = ? AND deleted = 0`,
     [params.id]
   );
-  return jsonOk(row);
+  return jsonOk(
+    row
+      ? {
+          ...row,
+          reveal_answer: Boolean(row.reveal_answer),
+          reveal_fun_fact: Boolean(row.reveal_fun_fact),
+          waiting_message: row.waiting_message ?? null,
+          waiting_show_leaderboard: Boolean(row.waiting_show_leaderboard),
+          waiting_show_next_round: Boolean(row.waiting_show_next_round)
+        }
+      : null
+  );
 };
 
 export const onRequestPut: PagesFunction<Env> = async ({ env, params, request }) => {
@@ -38,6 +61,9 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request })
            current_item_ordinal = COALESCE(?, current_item_ordinal),
            reveal_answer = COALESCE(?, reveal_answer),
            reveal_fun_fact = COALESCE(?, reveal_fun_fact),
+           waiting_message = COALESCE(?, waiting_message),
+           waiting_show_leaderboard = COALESCE(?, waiting_show_leaderboard),
+           waiting_show_next_round = COALESCE(?, waiting_show_next_round),
            updated_at = ?
        WHERE event_id = ?`,
       [
@@ -45,6 +71,9 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request })
         data.current_item_ordinal ?? null,
         data.reveal_answer === undefined ? null : data.reveal_answer ? 1 : 0,
         data.reveal_fun_fact === undefined ? null : data.reveal_fun_fact ? 1 : 0,
+        data.waiting_message ?? null,
+        data.waiting_show_leaderboard === undefined ? null : data.waiting_show_leaderboard ? 1 : 0,
+        data.waiting_show_next_round === undefined ? null : data.waiting_show_next_round ? 1 : 0,
         now,
         params.id
       ]
@@ -54,8 +83,9 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request })
     await execute(
       env,
       `INSERT INTO event_live_state
-       (id, event_id, active_round_id, current_item_ordinal, reveal_answer, reveal_fun_fact, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+       (id, event_id, active_round_id, current_item_ordinal, reveal_answer, reveal_fun_fact,
+        waiting_message, waiting_show_leaderboard, waiting_show_next_round, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         params.id,
@@ -63,18 +93,44 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request })
         data.current_item_ordinal ?? null,
         data.reveal_answer ? 1 : 0,
         data.reveal_fun_fact ? 1 : 0,
+        data.waiting_message ?? null,
+        data.waiting_show_leaderboard ? 1 : 0,
+        data.waiting_show_next_round === undefined ? 1 : data.waiting_show_next_round ? 1 : 0,
         now,
         now
       ]
     );
   }
 
-  const row = await queryFirst(
+  const row = await queryFirst<{
+    id: string;
+    event_id: string;
+    active_round_id: string | null;
+    current_item_ordinal: number | null;
+    reveal_answer: number;
+    reveal_fun_fact: number;
+    waiting_message: string | null;
+    waiting_show_leaderboard: number;
+    waiting_show_next_round: number;
+    updated_at: string;
+  }>(
     env,
-    `SELECT id, event_id, active_round_id, current_item_ordinal, reveal_answer, reveal_fun_fact, updated_at
+    `SELECT id, event_id, active_round_id, current_item_ordinal, reveal_answer, reveal_fun_fact,
+            waiting_message, waiting_show_leaderboard, waiting_show_next_round, updated_at
      FROM event_live_state WHERE event_id = ? AND deleted = 0`,
     [params.id]
   );
 
-  return jsonOk(row);
+  return jsonOk(
+    row
+      ? {
+          ...row,
+          reveal_answer: Boolean(row.reveal_answer),
+          reveal_fun_fact: Boolean(row.reveal_fun_fact),
+          waiting_message: row.waiting_message ?? null,
+          waiting_show_leaderboard: Boolean(row.waiting_show_leaderboard),
+          waiting_show_next_round: Boolean(row.waiting_show_next_round)
+        }
+      : null
+  );
 };

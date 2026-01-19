@@ -120,6 +120,9 @@ export type EventLiveState = {
   current_item_ordinal: number | null;
   reveal_answer: boolean;
   reveal_fun_fact: boolean;
+  waiting_message: string | null;
+  waiting_show_leaderboard: boolean;
+  waiting_show_next_round: boolean;
   updated_at: string;
 };
 

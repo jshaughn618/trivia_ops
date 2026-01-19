@@ -183,7 +183,10 @@ export const liveStateUpdateSchema = z.object({
   active_round_id: idSchema.nullable().optional(),
   current_item_ordinal: z.number().int().min(1).nullable().optional(),
   reveal_answer: z.boolean().optional(),
-  reveal_fun_fact: z.boolean().optional()
+  reveal_fun_fact: z.boolean().optional(),
+  waiting_message: z.string().optional().nullable(),
+  waiting_show_leaderboard: z.boolean().optional(),
+  waiting_show_next_round: z.boolean().optional()
 });
 
 export type LocationCreate = z.infer<typeof locationCreateSchema>;

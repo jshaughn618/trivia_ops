@@ -23,6 +23,9 @@ type PublicEventResponse = {
     current_item_ordinal: number | null;
     reveal_answer: boolean;
     reveal_fun_fact: boolean;
+    waiting_message: string | null;
+    waiting_show_leaderboard: boolean;
+    waiting_show_next_round: boolean;
   } | null;
   current_item: {
     prompt: string;
@@ -131,16 +134,42 @@ export function PlayEventPage() {
   }
 
   const activeRound = data.rounds.find((round) => round.id === data.live?.active_round_id) ?? null;
+  const isLive = activeRound?.status === 'live';
+  const waitingMessage = data.live?.waiting_message?.trim() ?? '';
+  const waitingShowLeaderboard = data.live?.waiting_show_leaderboard ?? false;
+  const waitingShowNextRound = data.live?.waiting_show_next_round ?? true;
   const answerText = data.current_item?.answer || (data.current_item?.answer_a && data.current_item?.answer_b
     ? `${data.current_item.answer_a_label ? `${data.current_item.answer_a_label}: ` : 'A: '}${data.current_item.answer_a} / ${data.current_item.answer_b_label ? `${data.current_item.answer_b_label}: ` : 'B: '}${data.current_item.answer_b}`
     : null);
   const waitingRoom = (
-    <div className="border-2 border-border bg-panel2 p-4">
-      <div className="text-xs uppercase tracking-[0.2em] text-muted">Waiting Room</div>
-      <div className="mt-2 text-sm font-display uppercase tracking-[0.2em]">Stand by for the next round.</div>
-      {activeRound && (
-        <div className="mt-2 text-xs uppercase tracking-[0.2em] text-muted">
-          Round {activeRound.round_number} starts soon.
+    <div className="flex flex-col gap-4">
+      <div className="border-2 border-border bg-panel2 p-4">
+        <div className="text-xs uppercase tracking-[0.2em] text-muted">Waiting Room</div>
+        <div className="mt-2 text-sm font-display uppercase tracking-[0.2em]">
+          {waitingMessage || 'Stand by for the next round.'}
+        </div>
+        {waitingShowNextRound && activeRound && (
+          <div className="mt-2 text-xs uppercase tracking-[0.2em] text-muted">
+            Up Next: Round {activeRound.round_number}
+            {activeRound.label ? ` — ${activeRound.label}` : ''}
+          </div>
+        )}
+      </div>
+      {waitingShowLeaderboard && (
+        <div className="border-2 border-border bg-panel2 p-4">
+          <div className="text-xs uppercase tracking-[0.2em] text-muted">Leaderboard</div>
+          <div className="mt-3 flex flex-col gap-2">
+            {data.leaderboard.length === 0 && (
+              <div className="text-xs uppercase tracking-[0.2em] text-muted">No scores yet.</div>
+            )}
+            {data.leaderboard.map((entry, index) => (
+              <div key={entry.team_id} className="flex items-center justify-between border-2 border-border bg-panel px-3 py-2">
+                <div className="text-xs uppercase tracking-[0.2em] text-muted">#{index + 1}</div>
+                <div className="text-xs uppercase tracking-[0.2em] text-text">{entry.name}</div>
+                <div className="text-xs uppercase tracking-[0.2em] text-muted">{entry.total}</div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>
@@ -179,7 +208,7 @@ export function PlayEventPage() {
               <div className="text-xs uppercase tracking-[0.2em] text-muted">
                 Join or create a team to view the live question.
               </div>
-            ) : activeRound ? (
+            ) : isLive ? (
               <div className="flex flex-col gap-4">
                 <div className="border-2 border-border bg-panel2 p-4">
                   <div className="text-xs uppercase tracking-[0.2em] text-muted">Current Round</div>

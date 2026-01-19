@@ -32,19 +32,34 @@ export function EventRunPage() {
   const [audioError, setAudioError] = useState<string | null>(null);
   const [audioRequestId, setAudioRequestId] = useState<string | null>(null);
   const [audioRetryToken, setAudioRetryToken] = useState(0);
+  const [waitingMessage, setWaitingMessage] = useState('');
+  const [waitingShowLeaderboard, setWaitingShowLeaderboard] = useState(false);
+  const [waitingShowNextRound, setWaitingShowNextRound] = useState(true);
+  const [waitingSaving, setWaitingSaving] = useState(false);
+  const [waitingError, setWaitingError] = useState<string | null>(null);
 
   const load = async () => {
     if (!eventId) return;
-    const [eventRes, roundsRes, editionsRes, gamesRes] = await Promise.all([
+    const [eventRes, roundsRes, editionsRes, gamesRes, liveRes] = await Promise.all([
       api.getEvent(eventId),
       api.listEventRounds(eventId),
       api.listEditions(),
-      api.listGames()
+      api.listGames(),
+      api.getLiveState(eventId)
     ]);
     if (eventRes.ok) setEvent(eventRes.data);
     if (roundsRes.ok) setRounds(roundsRes.data);
     if (editionsRes.ok) setEditions(editionsRes.data);
     if (gamesRes.ok) setGames(gamesRes.data);
+    if (liveRes.ok) {
+      if (liveRes.data) {
+        setWaitingMessage(liveRes.data.waiting_message ?? '');
+        setWaitingShowLeaderboard(Boolean(liveRes.data.waiting_show_leaderboard));
+        setWaitingShowNextRound(
+          liveRes.data.waiting_show_next_round === undefined ? true : Boolean(liveRes.data.waiting_show_next_round)
+        );
+      }
+    }
     const preselect = query.get('round') ?? '';
     if (preselect) setRoundId(preselect);
   };
@@ -244,6 +259,22 @@ export function EventRunPage() {
     await load();
   };
 
+  const saveWaitingRoom = async () => {
+    if (!eventId) return;
+    setWaitingSaving(true);
+    setWaitingError(null);
+    const res = await api.updateLiveState(eventId, {
+      waiting_message: waitingMessage.trim() ? waitingMessage.trim() : null,
+      waiting_show_leaderboard: waitingShowLeaderboard,
+      waiting_show_next_round: waitingShowNextRound
+    });
+    if (!res.ok) {
+      setWaitingError(res.error.message ?? 'Failed to update waiting room.');
+      logError('waiting_room_update_failed', { eventId, error: res.error });
+    }
+    setWaitingSaving(false);
+  };
+
   const timerLabel = useMemo(() => {
     const minutes = Math.floor(elapsedSeconds / 60);
     const seconds = elapsedSeconds % 60;
@@ -397,26 +428,64 @@ export function EventRunPage() {
             <div className="text-xs uppercase tracking-[0.2em] text-muted">Select a round to begin.</div>
           )}
         </Panel>
-        <Panel title="Round Control">
-          <div className="flex flex-col gap-4">
-            <div className="text-xs uppercase tracking-[0.2em] text-muted">Event</div>
-            <div className="text-sm font-display uppercase tracking-[0.2em]">{event.title}</div>
-            <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-              Select Round
-              <select className="h-10 px-3" value={roundId} onChange={(event) => setRoundId(event.target.value)}>
-                <option value="">Choose round</option>
-                {rounds.map((round) => (
-                  <option key={round.id} value={round.id}>
-                    {roundDisplay(round).title} — {roundDisplay(round).detail}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <div className="border-2 border-border bg-panel2 p-3 text-xs uppercase tracking-[0.2em] text-muted">
-              {activeRound ? `Status: ${activeRound.status}` : 'Awaiting round selection'}
+        <div className="flex flex-col gap-4">
+          <Panel title="Round Control">
+            <div className="flex flex-col gap-4">
+              <div className="text-xs uppercase tracking-[0.2em] text-muted">Event</div>
+              <div className="text-sm font-display uppercase tracking-[0.2em]">{event.title}</div>
+              <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+                Select Round
+                <select className="h-10 px-3" value={roundId} onChange={(event) => setRoundId(event.target.value)}>
+                  <option value="">Choose round</option>
+                  {rounds.map((round) => (
+                    <option key={round.id} value={round.id}>
+                      {roundDisplay(round).title} — {roundDisplay(round).detail}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="border-2 border-border bg-panel2 p-3 text-xs uppercase tracking-[0.2em] text-muted">
+                {activeRound ? `Status: ${activeRound.status}` : 'Awaiting round selection'}
+              </div>
             </div>
-          </div>
-        </Panel>
+          </Panel>
+          <Panel title="Waiting Room">
+            <div className="flex flex-col gap-3">
+              <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+                Message
+                <textarea
+                  className="min-h-[96px] px-3 py-2"
+                  value={waitingMessage}
+                  onChange={(event) => setWaitingMessage(event.target.value)}
+                />
+              </label>
+              <label className="flex items-center gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+                <input
+                  type="checkbox"
+                  checked={waitingShowLeaderboard}
+                  onChange={(event) => setWaitingShowLeaderboard(event.target.checked)}
+                />
+                Show Leaderboard
+              </label>
+              <label className="flex items-center gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+                <input
+                  type="checkbox"
+                  checked={waitingShowNextRound}
+                  onChange={(event) => setWaitingShowNextRound(event.target.checked)}
+                />
+                Show Next Round Info
+              </label>
+              {waitingError && (
+                <div className="border-2 border-danger bg-panel px-3 py-2 text-xs uppercase tracking-[0.2em] text-danger">
+                  {waitingError}
+                </div>
+              )}
+              <PrimaryButton onClick={saveWaitingRoom} disabled={waitingSaving}>
+                {waitingSaving ? 'Updating…' : 'Update Waiting Room'}
+              </PrimaryButton>
+            </div>
+          </Panel>
+        </div>
       </div>
     </AppShell>
   );
