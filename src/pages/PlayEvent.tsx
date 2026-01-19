@@ -394,24 +394,26 @@ export function PlayEventPage() {
           </div>
         </div>
 
-        <div className="mt-6">
-          <Panel title="Rounds">
-            <div className="flex flex-col gap-2">
-              {data.rounds
-                .filter((round) => round.status !== 'canceled')
-                .map((round) => (
-                  <div key={round.id} className="rounded-md border border-border bg-panel2 px-3 py-2">
-                    <div className="text-sm text-muted">
-                      {round.round_number}. {round.label}
+        {!isLive && (
+          <div className="mt-6">
+            <Panel title="Rounds">
+              <div className="flex flex-col gap-2">
+                {data.rounds
+                  .filter((round) => round.status !== 'canceled')
+                  .map((round) => (
+                    <div key={round.id} className="rounded-md border border-border bg-panel2 px-3 py-2">
+                      <div className="text-sm text-muted">
+                        {round.round_number}. {round.label}
+                      </div>
+                      <div className="text-xs text-muted">
+                        {round.status === 'locked' ? 'completed' : round.status}
+                      </div>
                     </div>
-                    <div className="text-xs text-muted">
-                      {round.status === 'locked' ? 'completed' : round.status}
-                    </div>
-                  </div>
-                ))}
-            </div>
-          </Panel>
-        </div>
+                  ))}
+              </div>
+            </Panel>
+          </div>
+        )}
 
         <div className="mt-6">
           <SecondaryButton onClick={() => navigate('/login')}>Back to Login</SecondaryButton>
