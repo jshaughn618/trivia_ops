@@ -37,6 +37,7 @@ export function EventRunPage() {
   const [waitingShowNextRound, setWaitingShowNextRound] = useState(true);
   const [waitingSaving, setWaitingSaving] = useState(false);
   const [waitingError, setWaitingError] = useState<string | null>(null);
+  const preselectRef = useRef(false);
 
   const load = async () => {
     if (!eventId) return;
@@ -61,7 +62,10 @@ export function EventRunPage() {
       }
     }
     const preselect = query.get('round') ?? '';
-    if (!roundId && preselect) setRoundId(preselect);
+    if (!preselectRef.current && preselect) {
+      setRoundId(preselect);
+      preselectRef.current = true;
+    }
   };
 
   const loadItems = async (selectedRoundId: string) => {
@@ -94,7 +98,10 @@ export function EventRunPage() {
   useEffect(() => {
     if (roundId || rounds.length === 0) return;
     const nextRound = rounds.find((round) => round.status !== 'completed' && round.status !== 'locked') ?? rounds[0];
-    if (nextRound) setRoundId(nextRound.id);
+    if (nextRound) {
+      setRoundId(nextRound.id);
+      preselectRef.current = true;
+    }
   }, [rounds, roundId]);
 
   const editionById = useMemo(() => {
@@ -251,16 +258,22 @@ export function EventRunPage() {
 
   const setLive = async () => {
     if (!activeRound) return;
+    const keepRoundId = roundId || activeRound.id;
     const otherLive = rounds.filter((round) => round.id !== activeRound.id && round.status === 'live');
     if (otherLive.length > 0) {
       await Promise.all(otherLive.map((round) => api.updateEventRound(round.id, { status: 'planned' })));
     }
     await api.updateEventRound(activeRound.id, { status: 'live' });
     await load();
+    if (keepRoundId) {
+      setRoundId(keepRoundId);
+      preselectRef.current = true;
+    }
   };
 
   const setPlanned = async () => {
     if (!activeRound) return;
+    const keepRoundId = roundId || activeRound.id;
     await api.updateEventRound(activeRound.id, { status: 'planned' });
     if (eventId) {
       await api.updateLiveState(eventId, {
@@ -271,18 +284,32 @@ export function EventRunPage() {
       });
     }
     await load();
+    if (keepRoundId) {
+      setRoundId(keepRoundId);
+      preselectRef.current = true;
+    }
   };
 
   const setCompleted = async () => {
     if (!activeRound) return;
+    const keepRoundId = roundId || activeRound.id;
     await api.updateEventRound(activeRound.id, { status: 'completed' });
     await load();
+    if (keepRoundId) {
+      setRoundId(keepRoundId);
+      preselectRef.current = true;
+    }
   };
 
   const reopenRound = async () => {
     if (!activeRound) return;
+    const keepRoundId = roundId || activeRound.id;
     await api.updateEventRound(activeRound.id, { status: 'planned' });
     await load();
+    if (keepRoundId) {
+      setRoundId(keepRoundId);
+      preselectRef.current = true;
+    }
   };
 
   const saveWaitingRoom = async () => {
@@ -478,7 +505,10 @@ export function EventRunPage() {
                   <button
                     key={round.id}
                     type="button"
-                    onClick={() => setRoundId(round.id)}
+                    onClick={() => {
+                      preselectRef.current = true;
+                      setRoundId(round.id);
+                    }}
                     className={`flex w-full flex-col gap-2 border-2 px-3 py-2 text-left ${
                       selected
                         ? 'border-accent-ink bg-panel text-text'
