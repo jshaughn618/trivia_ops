@@ -29,14 +29,22 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, data }) 
       }
     }
     const cleaned = raw.replace(/\s+/g, '');
-    if (/^[A-Za-z0-9+/=]+$/.test(cleaned)) {
-      const binary = atob(cleaned);
-      const bytes = new Uint8Array(binary.length);
+    let decoded: Uint8Array | null = null;
+    const base64Candidate = cleaned.replace(/-/g, '+').replace(/_/g, '/');
+    const padLength = (4 - (base64Candidate.length % 4)) % 4;
+    const padded = base64Candidate + '='.repeat(padLength);
+    try {
+      const binary = atob(padded);
+      decoded = new Uint8Array(binary.length);
       for (let i = 0; i < binary.length; i += 1) {
-        bytes[i] = binary.charCodeAt(i);
+        decoded[i] = binary.charCodeAt(i);
       }
-      buffer = bytes.buffer;
-      size = bytes.byteLength;
+    } catch {
+      decoded = null;
+    }
+    if (decoded) {
+      buffer = decoded.buffer;
+      size = decoded.byteLength;
     } else {
       // Fallback: treat the string as raw binary bytes.
       const bytes = new Uint8Array(raw.length);
