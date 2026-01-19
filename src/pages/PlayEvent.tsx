@@ -97,6 +97,13 @@ export function PlayEventPage() {
   }, [data?.event?.id]);
 
   useEffect(() => {
+    if (!normalizedCode) return;
+    if (teamId) return;
+    const stored = localStorage.getItem(`player_team_code_${normalizedCode}`);
+    if (stored) setTeamId(stored);
+  }, [normalizedCode, teamId]);
+
+  useEffect(() => {
     if (!data) return;
     const matched = data.teams.find((team) => team.id === teamId);
     setTeamNameLabel(matched?.name ?? null);
@@ -119,6 +126,7 @@ export function PlayEventPage() {
       setTeamId(res.data.team.id);
       setTeamNameLabel(res.data.team.name);
       localStorage.setItem(`player_team_${data.event.id}`, res.data.team.id);
+      localStorage.setItem(`player_team_code_${data.event.public_code}`, res.data.team.id);
       setTeamName('');
     }
   };
@@ -126,6 +134,7 @@ export function PlayEventPage() {
   const handleChangeTeam = () => {
     if (!data?.event?.id) return;
     localStorage.removeItem(`player_team_${data.event.id}`);
+    localStorage.removeItem(`player_team_code_${data.event.public_code}`);
     setTeamId('');
     setTeamNameLabel(null);
     setTeamName('');
