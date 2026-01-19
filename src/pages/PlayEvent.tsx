@@ -134,6 +134,17 @@ export function PlayEventPage() {
   const answerText = data.current_item?.answer || (data.current_item?.answer_a && data.current_item?.answer_b
     ? `${data.current_item.answer_a_label ? `${data.current_item.answer_a_label}: ` : 'A: '}${data.current_item.answer_a} / ${data.current_item.answer_b_label ? `${data.current_item.answer_b_label}: ` : 'B: '}${data.current_item.answer_b}`
     : null);
+  const waitingRoom = (
+    <div className="border-2 border-border bg-panel2 p-4">
+      <div className="text-xs uppercase tracking-[0.2em] text-muted">Waiting Room</div>
+      <div className="mt-2 text-sm font-display uppercase tracking-[0.2em]">Stand by for the next round.</div>
+      {activeRound && (
+        <div className="mt-2 text-xs uppercase tracking-[0.2em] text-muted">
+          Round {activeRound.round_number} starts soon.
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-bg text-text">
@@ -148,9 +159,17 @@ export function PlayEventPage() {
                 {data.event.location_name ?? 'Location TBD'} • {new Date(data.event.starts_at).toLocaleString()}
               </div>
             </div>
-            {teamId && (
-              <SecondaryButton onClick={handleChangeTeam}>Change Team</SecondaryButton>
-            )}
+            <div className="flex flex-col items-end gap-2 text-right">
+              {teamId && (
+                <SecondaryButton onClick={handleChangeTeam}>Change Team</SecondaryButton>
+              )}
+              {teamId && teamNameLabel && (
+                <div>
+                  <div className="text-xs uppercase tracking-[0.2em] text-muted">Your Team</div>
+                  <div className="mt-1 text-sm font-display uppercase tracking-[0.2em]">{teamNameLabel}</div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -203,11 +222,11 @@ export function PlayEventPage() {
                     )}
                   </>
                 ) : (
-                  <div className="text-xs uppercase tracking-[0.2em] text-muted">Waiting for the host...</div>
+                  waitingRoom
                 )}
               </div>
             ) : (
-              <div className="text-xs uppercase tracking-[0.2em] text-muted">Waiting for the host...</div>
+              waitingRoom
             )}
           </Panel>
 
@@ -215,9 +234,8 @@ export function PlayEventPage() {
             <Panel title={teamId ? 'Your Team' : 'Join a Team'}>
               <div className="flex flex-col gap-3">
                 {teamId && teamNameLabel ? (
-                  <div className="border-2 border-border bg-panel2 px-3 py-3">
-                    <div className="text-xs uppercase tracking-[0.2em] text-muted">Team</div>
-                    <div className="mt-2 text-sm font-display uppercase tracking-[0.2em]">{teamNameLabel}</div>
+                  <div className="text-xs uppercase tracking-[0.2em] text-muted">
+                    You&apos;re in a team. Use Change Team to switch.
                   </div>
                 ) : (
                   <>
@@ -251,20 +269,6 @@ export function PlayEventPage() {
               </div>
             </Panel>
 
-            <Panel title="Leaderboard">
-              <div className="flex flex-col gap-2">
-                {data.leaderboard.length === 0 && (
-                  <div className="text-xs uppercase tracking-[0.2em] text-muted">No scores yet.</div>
-                )}
-                {data.leaderboard.map((entry, index) => (
-                  <div key={entry.team_id} className="flex items-center justify-between border-2 border-border bg-panel2 px-3 py-2">
-                    <div className="text-xs uppercase tracking-[0.2em] text-muted">#{index + 1}</div>
-                    <div className="text-xs uppercase tracking-[0.2em] text-text">{entry.name}</div>
-                    <div className="text-xs uppercase tracking-[0.2em] text-muted">{entry.total}</div>
-                  </div>
-                ))}
-              </div>
-            </Panel>
           </div>
         </div>
 
