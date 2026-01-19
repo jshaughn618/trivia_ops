@@ -3,6 +3,7 @@ import { jsonError, jsonOk } from '../responses';
 import { parseJson } from '../request';
 import { eventCreateSchema } from '../../shared/validators';
 import { execute, nowIso, queryAll } from '../db';
+import { generateEventCode } from '../public';
 
 export const onRequestGet: PagesFunction<Env> = async ({ env }) => {
   const rows = await queryAll(env, 'SELECT * FROM events ORDER BY starts_at DESC');
@@ -19,11 +20,12 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const id = crypto.randomUUID();
   const createdAt = nowIso();
   const data = parsed.data;
+  const publicCode = await generateEventCode(env);
 
   await execute(
     env,
-    `INSERT INTO events (id, title, starts_at, location_id, status, notes, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO events (id, title, starts_at, location_id, status, notes, created_at, public_code)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
     ,
     [
       id,
@@ -32,7 +34,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
       data.location_id ?? null,
       data.status,
       data.notes ?? null,
-      createdAt
+      createdAt,
+      publicCode
     ]
   );
 

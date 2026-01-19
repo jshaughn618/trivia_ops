@@ -86,6 +86,7 @@ export type Event = {
   title: string;
   starts_at: string;
   location_id: Id | null;
+  public_code?: string | null;
   status: EventStatus;
   notes: string | null;
   created_at: string;
@@ -109,6 +110,23 @@ export type EventRoundItem = {
   overridden_prompt: string | null;
   overridden_answer: string | null;
   overridden_fun_fact: string | null;
+};
+
+export type EventLiveState = {
+  id: Id;
+  event_id: Id;
+  active_round_id: Id | null;
+  current_item_ordinal: number | null;
+  reveal_answer: boolean;
+  reveal_fun_fact: boolean;
+  updated_at: string;
+};
+
+export type EventRoundScore = {
+  id: Id;
+  event_round_id: Id;
+  team_id: Id;
+  score: number;
 };
 
 export type Team = {

@@ -1,0 +1,96 @@
+import type { Env } from '../../../types';
+import { jsonError, jsonOk } from '../../../responses';
+import { normalizeCode } from '../../../public';
+import { queryAll, queryFirst } from '../../../db';
+
+export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
+  const code = normalizeCode(params.code as string);
+  const event = await queryFirst<{ id: string; title: string; starts_at: string; status: string; public_code: string }>(
+    env,
+    'SELECT id, title, starts_at, status, public_code FROM events WHERE public_code = ? AND deleted = 0',
+    [code]
+  );
+
+  if (!event) {
+    return jsonError({ code: 'not_found', message: 'Event not found' }, 404);
+  }
+
+  const rounds = await queryAll<{ id: string; round_number: number; label: string; status: string }>(
+    env,
+    'SELECT id, round_number, label, status FROM event_rounds WHERE event_id = ? AND deleted = 0 ORDER BY round_number ASC',
+    [event.id]
+  );
+
+  const teams = await queryAll<{ id: string; name: string }>(
+    env,
+    'SELECT id, name FROM teams WHERE event_id = ? AND deleted = 0 ORDER BY created_at ASC',
+    [event.id]
+  );
+
+  const leaderboard = await queryAll<{ team_id: string; name: string; total: number }>(
+    env,
+    `SELECT t.id AS team_id, t.name, COALESCE(SUM(s.score), 0) AS total
+     FROM teams t
+     LEFT JOIN event_round_scores s ON s.team_id = t.id AND s.deleted = 0
+     LEFT JOIN event_rounds r ON r.id = s.event_round_id
+     WHERE t.event_id = ? AND t.deleted = 0
+     GROUP BY t.id
+     ORDER BY total DESC, t.name ASC`,
+    [event.id]
+  );
+
+  const live = await queryFirst<{
+    id: string;
+    event_id: string;
+    active_round_id: string | null;
+    current_item_ordinal: number | null;
+    reveal_answer: number;
+    reveal_fun_fact: number;
+    updated_at: string;
+  }>(
+    env,
+    `SELECT id, event_id, active_round_id, current_item_ordinal, reveal_answer, reveal_fun_fact, updated_at
+     FROM event_live_state WHERE event_id = ? AND deleted = 0`,
+    [event.id]
+  );
+
+  let currentItem = null;
+  if (live?.active_round_id && live.current_item_ordinal) {
+    currentItem = await queryFirst(
+      env,
+      `SELECT
+        ei.id,
+        ei.edition_id,
+        COALESCE(eri.overridden_prompt, ei.prompt) AS prompt,
+        COALESCE(eri.overridden_answer, ei.answer) AS answer,
+        ei.answer_a,
+        ei.answer_b,
+        ei.answer_a_label,
+        ei.answer_b_label,
+        COALESCE(eri.overridden_fun_fact, ei.fun_fact) AS fun_fact,
+        ei.media_type,
+        ei.media_key,
+        ei.media_caption
+       FROM event_round_items eri
+       JOIN edition_items ei ON ei.id = eri.edition_item_id
+       WHERE eri.event_round_id = ? AND eri.ordinal = ?
+       LIMIT 1`,
+      [live.active_round_id, live.current_item_ordinal]
+    );
+  }
+
+  return jsonOk({
+    event,
+    rounds,
+    teams,
+    leaderboard,
+    live: live
+      ? {
+          ...live,
+          reveal_answer: Boolean(live.reveal_answer),
+          reveal_fun_fact: Boolean(live.reveal_fun_fact)
+        }
+      : null,
+    current_item: currentItem
+  });
+};

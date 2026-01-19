@@ -35,10 +35,19 @@ export function EventRunPage() {
     if (!selectedRoundId) return;
     const res = await api.listEventRoundItems(selectedRoundId);
     if (res.ok) {
-      setItems(res.data.sort((a, b) => a.ordinal - b.ordinal));
+      const sorted = res.data.sort((a, b) => a.ordinal - b.ordinal);
+      setItems(sorted);
       setIndex(0);
       setShowAnswer(false);
       setShowFact(false);
+      if (eventId) {
+        await api.updateLiveState(eventId, {
+          active_round_id: selectedRoundId,
+          current_item_ordinal: sorted[0]?.ordinal ?? null,
+          reveal_answer: false,
+          reveal_fun_fact: false
+        });
+      }
     }
   };
 
@@ -55,9 +64,17 @@ export function EventRunPage() {
 
   const nextItem = () => {
     if (index < items.length - 1) {
-      setIndex(index + 1);
+      const nextIndex = index + 1;
+      setIndex(nextIndex);
       setShowAnswer(false);
       setShowFact(false);
+      if (eventId) {
+        api.updateLiveState(eventId, {
+          current_item_ordinal: items[nextIndex]?.ordinal ?? null,
+          reveal_answer: false,
+          reveal_fun_fact: false
+        });
+      }
     }
   };
 
@@ -126,10 +143,22 @@ export function EventRunPage() {
                 </div>
               )}
               <div className="flex flex-wrap gap-2">
-                <PrimaryButton onClick={() => setShowAnswer(true)} disabled={!item}>
+                <PrimaryButton
+                  onClick={() => {
+                    setShowAnswer(true);
+                    if (eventId) api.updateLiveState(eventId, { reveal_answer: true });
+                  }}
+                  disabled={!item}
+                >
                   Reveal Answer
                 </PrimaryButton>
-                <SecondaryButton onClick={() => setShowFact(true)} disabled={!item}>
+                <SecondaryButton
+                  onClick={() => {
+                    setShowFact(true);
+                    if (eventId) api.updateLiveState(eventId, { reveal_fun_fact: true });
+                  }}
+                  disabled={!item}
+                >
                   Reveal Fact
                 </SecondaryButton>
                 <PrimaryButton onClick={nextItem} disabled={!item} className="py-4 text-sm">

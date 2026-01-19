@@ -27,3 +27,6 @@
 ## Deployment
 - Build output: dist
 - Cloudflare Pages env vars for secrets
+
+## Commiting and Applying DB Migrations
+- When a set of work is completed, ask if the user would like you to apply db migrations (local and remote) and commit and push.

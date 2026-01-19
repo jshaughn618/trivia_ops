@@ -15,12 +15,14 @@ import { LocationsPage } from './pages/Locations';
 import { LocationDetailPage } from './pages/LocationDetail';
 import { SettingsPage } from './pages/Settings';
 import { UsersPage } from './pages/Users';
+import { PlayEventPage } from './pages/PlayEvent';
 
 export function App() {
   return (
     <Routes>
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/play/:code" element={<PlayEventPage />} />
       <Route
         path="/dashboard"
         element={

@@ -163,6 +163,27 @@ export const userUpdateSchema = z.object({
   user_type: userTypeSchema.optional()
 });
 
+export const publicJoinSchema = z.object({
+  team_id: idSchema.optional(),
+  team_name: z.string().min(1).optional()
+});
+
+export const roundScoreSchema = z.object({
+  team_id: idSchema,
+  score: z.number().int()
+});
+
+export const roundScoresUpdateSchema = z.object({
+  scores: z.array(roundScoreSchema).min(1)
+});
+
+export const liveStateUpdateSchema = z.object({
+  active_round_id: idSchema.nullable().optional(),
+  current_item_ordinal: z.number().int().min(1).nullable().optional(),
+  reveal_answer: z.boolean().optional(),
+  reveal_fun_fact: z.boolean().optional()
+});
+
 export type LocationCreate = z.infer<typeof locationCreateSchema>;
 export type GameCreate = z.infer<typeof gameCreateSchema>;
 export type EditionCreate = z.infer<typeof editionCreateSchema>;

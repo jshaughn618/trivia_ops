@@ -7,6 +7,7 @@ import logo from '../assets/trivia_ops_logo.png';
 export function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -63,6 +64,25 @@ export function LoginPage() {
             {loading ? 'Authorizing' : 'Enter Ops'}
           </PrimaryButton>
         </form>
+        <div className="mt-6 border-t-2 border-border pt-4">
+          <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">Enter Event Code</div>
+          <div className="mt-3 flex flex-col gap-3">
+            <input
+              className="h-10 px-3"
+              value={code}
+              onChange={(event) => setCode(event.target.value.toUpperCase())}
+              placeholder="ABC123"
+            />
+            <PrimaryButton
+              type="button"
+              onClick={() => {
+                if (code.trim()) navigate(`/play/${code.trim().toUpperCase()}`);
+              }}
+            >
+              Enter Event
+            </PrimaryButton>
+          </div>
+        </div>
       </div>
     </div>
   );

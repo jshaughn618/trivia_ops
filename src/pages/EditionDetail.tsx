@@ -40,6 +40,7 @@ export function EditionDetailPage() {
   const [answerError, setAnswerError] = useState<string | null>(null);
   const [factLoading, setFactLoading] = useState(false);
   const [factError, setFactError] = useState<string | null>(null);
+  const [infoOpen, setInfoOpen] = useState(true);
   const [activeItemId, setActiveItemId] = useState<string | null>('new');
   const [draggedId, setDraggedId] = useState<string | null>(null);
 
@@ -302,9 +303,21 @@ export function EditionDetailPage() {
 
   return (
     <AppShell title="Edition Detail">
-      <div className="grid gap-4 lg:grid-cols-[1fr,340px]">
-        <Panel title="Edition Info">
-          <div className="grid gap-4">
+      <div className="flex flex-col gap-4">
+        <Panel
+          title="Edition Info"
+          action={
+            <button
+              type="button"
+              onClick={() => setInfoOpen((prev) => !prev)}
+              className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent hover:text-text"
+            >
+              {infoOpen ? 'Collapse' : 'Expand'}
+            </button>
+          }
+        >
+          {infoOpen && (
+            <div className="grid gap-4">
             <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
               Game
               <select
@@ -360,7 +373,8 @@ export function EditionDetailPage() {
               <DangerButton onClick={handleDeleteEdition}>Delete</DangerButton>
               <SecondaryButton onClick={() => navigate('/editions')}>Back</SecondaryButton>
             </div>
-          </div>
+            </div>
+          )}
         </Panel>
         <Panel title="Items">
           <div className="flex flex-col gap-3">

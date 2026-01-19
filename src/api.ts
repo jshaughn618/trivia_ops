@@ -2,7 +2,9 @@ import type {
   ApiEnvelope,
   EditionItem,
   Event,
+  EventLiveState,
   EventRound,
+  EventRoundScore,
   Game,
   GameEdition,
   GameType,
@@ -126,6 +128,19 @@ export const api = {
     apiFetch<{ ok: true }>(`/api/event-rounds/${roundId}`, { method: 'DELETE' }),
   listEventRoundItems: (roundId: string) =>
     apiFetch<EditionItem[]>(`/api/event-rounds/${roundId}/items`),
+  getLiveState: (eventId: string) => apiFetch<EventLiveState | null>(`/api/events/${eventId}/live-state`),
+  updateLiveState: (eventId: string, payload: Partial<EventLiveState>) =>
+    apiFetch<EventLiveState>(`/api/events/${eventId}/live-state`, {
+      method: 'PUT',
+      body: JSON.stringify(payload)
+    }),
+  listRoundScores: (roundId: string) =>
+    apiFetch<EventRoundScore[]>(`/api/event-rounds/${roundId}/scores`),
+  updateRoundScores: (roundId: string, scores: { team_id: string; score: number }[]) =>
+    apiFetch<EventRoundScore[]>(`/api/event-rounds/${roundId}/scores`, {
+      method: 'PUT',
+      body: JSON.stringify({ scores })
+    }),
 
   listTeams: (eventId: string) => apiFetch<Team[]>(`/api/events/${eventId}/teams`),
   createTeam: (eventId: string, payload: Partial<Team>) =>
@@ -133,6 +148,12 @@ export const api = {
   updateTeam: (teamId: string, payload: Partial<Team>) =>
     apiFetch<Team>(`/api/teams/${teamId}`, { method: 'PUT', body: JSON.stringify(payload) }),
   deleteTeam: (teamId: string) => apiFetch<{ ok: true }>(`/api/teams/${teamId}`, { method: 'DELETE' }),
+  publicEvent: (code: string) => apiFetch<any>(`/api/public/event/${code}`),
+  publicJoin: (code: string, payload: { team_id?: string; team_name?: string }) =>
+    apiFetch<{ team: { id: string; name: string } }>(`/api/public/event/${code}/join`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    }),
 
   uploadMedia: async (file: File, kind: 'image' | 'audio') => {
     const form = new FormData();

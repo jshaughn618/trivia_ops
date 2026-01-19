@@ -21,6 +21,9 @@ export function EventDetailPage() {
   const [roundEditionId, setRoundEditionId] = useState('');
   const [teamName, setTeamName] = useState('');
   const [teamTable, setTeamTable] = useState('');
+  const [scoreRoundId, setScoreRoundId] = useState('');
+  const [scoreMap, setScoreMap] = useState<Record<string, number>>({});
+  const [scoreLoading, setScoreLoading] = useState(false);
 
   const load = async () => {
     if (!eventId) return;
@@ -46,6 +49,13 @@ export function EventDetailPage() {
   useEffect(() => {
     load();
   }, [eventId]);
+
+  useEffect(() => {
+    if (!scoreRoundId && rounds.length > 0) {
+      setScoreRoundId(rounds[0].id);
+      loadScores(rounds[0].id);
+    }
+  }, [rounds, scoreRoundId]);
 
   const roundNumber = useMemo(() => {
     return rounds.length === 0 ? 1 : Math.max(...rounds.map((round) => round.round_number)) + 1;
@@ -88,6 +98,29 @@ export function EventDetailPage() {
     load();
   };
 
+  const loadScores = async (roundId: string) => {
+    if (!roundId) return;
+    const res = await api.listRoundScores(roundId);
+    if (res.ok) {
+      const map: Record<string, number> = {};
+      res.data.forEach((row) => {
+        map[row.team_id] = row.score;
+      });
+      setScoreMap(map);
+    }
+  };
+
+  const saveScores = async () => {
+    if (!scoreRoundId) return;
+    setScoreLoading(true);
+    const scores = teams.map((team) => ({
+      team_id: team.id,
+      score: Number(scoreMap[team.id] ?? 0)
+    }));
+    await api.updateRoundScores(scoreRoundId, scores);
+    setScoreLoading(false);
+  };
+
   if (!event) {
     return (
       <AppShell title="Event Detail">
@@ -108,6 +141,13 @@ export function EventDetailPage() {
               <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">Title</div>
               <div className="mt-2 text-sm font-display uppercase tracking-[0.2em]">{event.title}</div>
             </div>
+            {event.public_code && (
+              <div className="border-2 border-border bg-panel2 p-3">
+                <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">Event Code</div>
+                <div className="mt-2 text-lg font-display uppercase tracking-[0.3em]">{event.public_code}</div>
+                <div className="mt-1 text-[10px] uppercase tracking-[0.2em] text-muted">Share for player view</div>
+              </div>
+            )}
             <div className="flex items-center justify-between border-2 border-border bg-panel2 p-3 text-xs uppercase tracking-[0.2em] text-muted">
               <span>Starts</span>
               <span>{new Date(event.starts_at).toLocaleString()}</span>
@@ -230,6 +270,52 @@ export function EventDetailPage() {
               </label>
               <SecondaryButton onClick={createTeam}>Add Team</SecondaryButton>
             </div>
+          </div>
+        </Panel>
+
+        <Panel title="Round Scores">
+          <div className="flex flex-col gap-4">
+            <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+              Select Round
+              <select
+                className="h-10 px-3"
+                value={scoreRoundId}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setScoreRoundId(value);
+                  loadScores(value);
+                }}
+              >
+                <option value="">Choose round</option>
+                {rounds.map((round) => (
+                  <option key={round.id} value={round.id}>
+                    {round.round_number}. {round.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {teams.length === 0 && (
+              <div className="text-xs uppercase tracking-[0.2em] text-muted">Add teams to score.</div>
+            )}
+            {teams.map((team) => (
+              <label
+                key={team.id}
+                className="flex items-center justify-between gap-3 border-2 border-border bg-panel2 px-3 py-2 text-xs uppercase tracking-[0.2em] text-muted"
+              >
+                <span>{team.name}</span>
+                <input
+                  type="number"
+                  className="h-9 w-20 px-2 text-right"
+                  value={scoreMap[team.id] ?? 0}
+                  onChange={(event) =>
+                    setScoreMap((prev) => ({ ...prev, [team.id]: Number(event.target.value) }))
+                  }
+                />
+              </label>
+            ))}
+            <PrimaryButton onClick={saveScores} disabled={!scoreRoundId || scoreLoading}>
+              {scoreLoading ? 'Saving' : 'Save Scores'}
+            </PrimaryButton>
           </div>
         </Panel>
       </div>
