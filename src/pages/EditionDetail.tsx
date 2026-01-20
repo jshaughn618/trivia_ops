@@ -405,7 +405,7 @@ export function EditionDetailPage() {
     const themeLine = theme.trim() ? `Theme: ${theme.trim()}` : '';
     const parts = [
       'Write one short, interesting pub-trivia factoid. Keep it under 20 words.',
-      'Do not repeat the question or answer. Provide a related but distinct fact.',
+      'Use the question and answer as context. Do not repeat them verbatim; give a specific, related fact.',
       themeLine,
       `Question: ${itemDraft.prompt.trim()}`
     ];
