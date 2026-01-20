@@ -33,6 +33,7 @@ export function EventDetailPage() {
   const [qrLoading, setQrLoading] = useState(false);
   const [qrError, setQrError] = useState<string | null>(null);
   const [roundMenuId, setRoundMenuId] = useState<string | null>(null);
+  const [draggedRoundId, setDraggedRoundId] = useState<string | null>(null);
 
   const load = async () => {
     if (!eventId) return;
@@ -107,6 +108,21 @@ export function EventDetailPage() {
     if (!roundGameId) return [];
     return editions.filter((edition) => edition.game_id === roundGameId);
   }, [editions, roundGameId]);
+
+  const reorderRounds = async (sourceId: string, targetId: string) => {
+    if (sourceId === targetId) return;
+    const ordered = [...rounds].sort((a, b) => a.round_number - b.round_number);
+    const fromIndex = ordered.findIndex((round) => round.id === sourceId);
+    const toIndex = ordered.findIndex((round) => round.id === targetId);
+    if (fromIndex < 0 || toIndex < 0) return;
+    const [moved] = ordered.splice(fromIndex, 1);
+    ordered.splice(toIndex, 0, moved);
+    const updated = ordered.map((round, index) => ({ ...round, round_number: index + 1 }));
+    setRounds(updated);
+    await Promise.all(
+      updated.map((round) => api.updateEventRound(round.id, { round_number: round.round_number }))
+    );
+  };
 
   const roundDisplay = (round: EventRound) => {
     const edition = editionById[round.edition_id];
@@ -324,7 +340,19 @@ export function EventDetailPage() {
               const display = roundDisplay(round);
               const statusLabel = round.status === 'locked' ? 'COMPLETED' : round.status.toUpperCase();
               return (
-                <div key={round.id} className="border-2 border-border bg-panel2 p-2">
+                <div
+                  key={round.id}
+                  className="border-2 border-border bg-panel2 p-2"
+                  draggable
+                  onDragStart={() => setDraggedRoundId(round.id)}
+                  onDragOver={(event) => event.preventDefault()}
+                  onDrop={() => {
+                    if (draggedRoundId) {
+                      reorderRounds(draggedRoundId, round.id);
+                      setDraggedRoundId(null);
+                    }
+                  }}
+                >
                   <div className="flex items-center justify-between gap-3">
                     <div className="text-sm font-display uppercase tracking-[0.2em]">{display.title}</div>
                     <div className="flex items-center gap-2">
