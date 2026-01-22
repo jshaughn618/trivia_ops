@@ -58,6 +58,7 @@ export function EditionDetailPage() {
   const [musicBulkLoading, setMusicBulkLoading] = useState(false);
   const [musicBulkError, setMusicBulkError] = useState<string | null>(null);
   const [musicBulkResult, setMusicBulkResult] = useState<string | null>(null);
+  const [musicBulkStatus, setMusicBulkStatus] = useState<string | null>(null);
   const [activeItemId, setActiveItemId] = useState<string | null>(null);
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [itemMenuId, setItemMenuId] = useState<string | null>(null);
@@ -651,6 +652,7 @@ export function EditionDetailPage() {
     setMusicBulkLoading(true);
     setMusicBulkError(null);
     setMusicBulkResult(null);
+    setMusicBulkStatus(null);
 
     const groups = new Map<number, { question?: File; answer?: File; title?: string }>();
     const errors: string[] = [];
@@ -700,6 +702,9 @@ export function EditionDetailPage() {
     let updated = 0;
 
     const sorted = [...groups.entries()].sort((a, b) => a[0] - b[0]);
+    const totalFiles = files.length;
+    const totalGroups = sorted.length;
+    let uploadedCount = 0;
     for (const [ordinal, entry] of sorted) {
       if (!entry.question) {
         errors.push(`Missing question clip for ${ordinal}`);
@@ -710,7 +715,9 @@ export function EditionDetailPage() {
         continue;
       }
 
+      setMusicBulkStatus(`Uploading ${uploadedCount + 1} of ${totalFiles} files`);
       const uploadQuestion = await api.uploadMedia(entry.question, 'audio');
+      uploadedCount += 1;
       if (!uploadQuestion.ok) {
         errors.push(`Upload failed for ${entry.question.name}`);
         continue;
@@ -719,7 +726,9 @@ export function EditionDetailPage() {
 
       let answerKey: string | null = null;
       if (entry.answer) {
+        setMusicBulkStatus(`Uploading ${uploadedCount + 1} of ${totalFiles} files`);
         const uploadAnswer = await api.uploadMedia(entry.answer, 'audio');
+        uploadedCount += 1;
         if (!uploadAnswer.ok) {
           errors.push(`Upload failed for ${entry.answer.name}`);
         } else {
@@ -727,6 +736,7 @@ export function EditionDetailPage() {
         }
       }
 
+      setMusicBulkStatus(`Saving ${ordinal} of ${totalGroups} items`);
       const existing = itemsByOrdinal.get(ordinal);
       if (existing) {
         const res = await api.updateEditionItem(existing.id, {
@@ -757,6 +767,7 @@ export function EditionDetailPage() {
       setMusicBulkResult(`Created ${created} • Updated ${updated}`);
       load();
     }
+    setMusicBulkStatus(null);
     setMusicBulkLoading(false);
   };
 
@@ -905,6 +916,9 @@ export function EditionDetailPage() {
                   {musicBulkLoading ? 'Uploading' : 'Upload MP3s'}
                 </button>
               </div>
+              {musicBulkStatus && (
+                <div className="mt-2 text-xs uppercase tracking-[0.2em] text-muted">{musicBulkStatus}</div>
+              )}
               {musicBulkError && (
                 <div className="mt-2 text-xs uppercase tracking-[0.2em] text-danger">{musicBulkError}</div>
               )}
