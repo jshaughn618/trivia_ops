@@ -262,14 +262,6 @@ export function PlayEventPage() {
               </div>
             </div>
             <div className="flex items-center gap-3 text-right">
-              <button
-                type="button"
-                aria-pressed={theme === 'light'}
-                onClick={toggleTheme}
-                className="rounded-md border border-border bg-panel2 px-3 py-1 text-xs font-medium text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
-              >
-                {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
-              </button>
               {teamId && teamNameLabel && (
                 <div className="flex items-center gap-3">
                   <div className="text-sm font-medium">{teamNameLabel}</div>
@@ -287,7 +279,15 @@ export function PlayEventPage() {
                       <span className="h-0.5 w-4 bg-text" />
                     </button>
                     {teamMenuOpen && (
-                      <div className="absolute right-0 mt-2 min-w-[160px] rounded-md border border-border bg-panel p-2 text-left shadow-sm">
+                      <div className="absolute right-0 mt-2 min-w-[180px] rounded-md border border-border bg-panel p-2 text-left shadow-sm">
+                        <button
+                          type="button"
+                          aria-pressed={theme === 'light'}
+                          onClick={toggleTheme}
+                          className="mb-2 w-full rounded-md border border-border bg-panel2 px-3 py-2 text-xs font-medium text-text"
+                        >
+                          {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+                        </button>
                         <button
                           type="button"
                           onClick={handleChangeTeam}
@@ -309,15 +309,52 @@ export function PlayEventPage() {
             <div className="flex min-h-[65vh] items-center justify-center">
               <div className="flex w-full flex-col items-center gap-8 text-center">
                 {!teamId ? (
-                  <div className="flex flex-col items-center gap-4">
+                  <div className="flex w-full flex-col items-center gap-6">
                     <div className="text-xs uppercase tracking-[0.35em] text-muted">Join a Team</div>
                     <div className="text-2xl font-display md:text-4xl">
                       Pick a team to see the live question.
                     </div>
+                    {!isClosed && (
+                      <div className="w-full max-w-2xl rounded-md border border-border bg-panel2 p-4 text-left">
+                        <div className="text-xs uppercase tracking-[0.3em] text-muted">Join a Team</div>
+                        <div className="mt-4 flex flex-col gap-3">
+                          <label className="flex flex-col gap-2">
+                            <span className="text-xs uppercase tracking-[0.25em] text-muted">Select Team</span>
+                            <select
+                              className="h-10 px-3"
+                              value={teamId}
+                              onChange={(event) => setTeamId(event.target.value)}
+                            >
+                              <option value="">Choose team</option>
+                              {data.teams.map((team) => (
+                                <option key={team.id} value={team.id}>
+                                  {team.name}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          <div className="text-center text-xs uppercase tracking-[0.2em] text-muted">Or</div>
+                          <label className="flex flex-col gap-2">
+                            <span className="text-xs uppercase tracking-[0.25em] text-muted">New Team Name</span>
+                            <input
+                              className="h-10 px-3"
+                              value={teamName}
+                              onChange={(event) => setTeamName(event.target.value)}
+                            />
+                          </label>
+                          <PrimaryButton onClick={handleJoin}>Join</PrimaryButton>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ) : isLive ? (
                   displayItem ? (
                     <>
+                      {activeRound?.label && (
+                        <div className="text-xs uppercase tracking-[0.35em] text-muted">
+                          {activeRound.label}
+                        </div>
+                      )}
                       <div className="text-xs uppercase tracking-[0.35em] text-muted">{questionLabel}</div>
                       {displayItem.media_type === 'image' && displayItem.media_key && (
                         <div className="w-full rounded-md border border-border bg-panel p-4">
@@ -411,39 +448,6 @@ export function PlayEventPage() {
                 )}
               </div>
             </div>
-
-            {!teamId && !isClosed && (
-              <div className="mx-auto mt-10 w-full max-w-xl rounded-md border border-border bg-panel2 p-4 text-left">
-                <div className="text-xs uppercase tracking-[0.3em] text-muted">Join a Team</div>
-                <div className="mt-4 flex flex-col gap-3">
-                <label className="flex flex-col gap-2">
-                  <span className="text-xs uppercase tracking-[0.25em] text-muted">Select Team</span>
-                  <select
-                    className="h-10 px-3"
-                    value={teamId}
-                    onChange={(event) => setTeamId(event.target.value)}
-                  >
-                    <option value="">Choose team</option>
-                    {data.teams.map((team) => (
-                      <option key={team.id} value={team.id}>
-                        {team.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <div className="text-center text-xs uppercase tracking-[0.2em] text-muted">Or</div>
-                <label className="flex flex-col gap-2">
-                  <span className="text-xs uppercase tracking-[0.25em] text-muted">New Team Name</span>
-                  <input
-                    className="h-10 px-3"
-                    value={teamName}
-                    onChange={(event) => setTeamName(event.target.value)}
-                  />
-                </label>
-                <PrimaryButton onClick={handleJoin}>Join</PrimaryButton>
-                </div>
-              </div>
-            )}
 
             {!isLive && waitingShowLeaderboard && (
               <div className="mx-auto mt-10 w-full max-w-3xl">
