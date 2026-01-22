@@ -62,7 +62,12 @@ const truncateText = (font: any, text: string, maxWidth: number, size: number) =
   return `${truncated}…`;
 };
 
-const drawPageHeader = (page: any, event: Event, fonts: { regular: any; bold: any }) => {
+const drawPageHeader = (
+  page: any,
+  event: Event,
+  locationName: string,
+  fonts: { regular: any; bold: any }
+) => {
   const titleSize = 14;
   const metaSize = 9;
   const headerTop = PAGE_HEIGHT - PAGE_MARGIN;
@@ -73,13 +78,17 @@ const drawPageHeader = (page: any, event: Event, fonts: { regular: any; bold: an
     size: titleSize,
     font: fonts.bold
   });
-  const startsAt = new Date(event.starts_at).toLocaleString();
-  page.drawText(startsAt, {
-    x: PAGE_MARGIN,
-    y: titleY - metaSize - 4,
-    size: metaSize,
-    font: fonts.regular
-  });
+  const dateLabel = new Date(event.starts_at).toLocaleDateString();
+  const metaParts = [locationName, dateLabel].filter((value) => value && value.trim().length > 0);
+  const metaLine = metaParts.join(' • ');
+  if (metaLine) {
+    page.drawText(metaLine, {
+      x: PAGE_MARGIN,
+      y: titleY - metaSize - 4,
+      size: metaSize,
+      font: fonts.regular
+    });
+  }
 
   const label = 'Team Name:';
   const labelSize = 9;
@@ -144,7 +153,8 @@ const renderRoundBlock = (
     font: fonts.bold
   });
 
-  let contentTop = titleY - 6;
+  const titleGap = 12;
+  let contentTop = titleY - titleGap;
   const numberWidth = fonts.regular.widthOfTextAtSize('00.', numberSize);
   const contentX = cell.x + CELL_PADDING;
   const textStartX = contentX + numberWidth + 6;
@@ -167,7 +177,8 @@ const renderRoundBlock = (
       size: labelSize,
       font: fonts.regular
     });
-    contentTop = labelY - 6;
+    const labelGap = 8;
+    contentTop = labelY - labelGap;
   }
 
   const itemCount = items.length;
@@ -236,7 +247,12 @@ const renderRoundBlock = (
   }
 };
 
-const buildPdf = async (event: Event, rounds: RoundBundle[], mode: 'scoresheet' | 'answersheet') => {
+const buildPdf = async (
+  event: Event,
+  locationName: string,
+  rounds: RoundBundle[],
+  mode: 'scoresheet' | 'answersheet'
+) => {
   const pdfDoc = await PDFDocument.create();
   const fonts = {
     regular: await pdfDoc.embedFont(StandardFonts.Helvetica),
@@ -252,7 +268,7 @@ const buildPdf = async (event: Event, rounds: RoundBundle[], mode: 'scoresheet' 
   for (let index = 0; index < rounds.length; index += 1) {
     if (index % 4 === 0) {
       const page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
-      drawPageHeader(page, event, fonts);
+      drawPageHeader(page, event, locationName, fonts);
       drawGridLines(page);
     }
     const page = pdfDoc.getPages()[pdfDoc.getPages().length - 1];
@@ -543,8 +559,9 @@ export function EventDetailPage() {
         bundles.push({ round: rounds[index], items: response.data });
       }
 
-      const scoresheetBytes = await buildPdf(event, bundles, 'scoresheet');
-      const answersheetBytes = await buildPdf(event, bundles, 'answersheet');
+      const locationName = locations.find((location) => location.id === event.location_id)?.name ?? '';
+      const scoresheetBytes = await buildPdf(event, locationName, bundles, 'scoresheet');
+      const answersheetBytes = await buildPdf(event, locationName, bundles, 'answersheet');
       const baseName = safeFileName(event.title, `event-${event.id.slice(0, 8)}`);
       const scoresheetFile = new File([scoresheetBytes], `${baseName}-scoresheet.pdf`, {
         type: 'application/pdf'
