@@ -69,13 +69,15 @@ async function buildSheetPdf(options: {
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
   const [pageWidth, pageHeight] = PAGE_SIZE;
 
-  const headerSize = 18;
-  const subHeaderSize = 10;
-  const roundHeaderSize = 12;
-  const bodySize = 10;
+  const headerSize = 16;
+  const subHeaderSize = 9;
+  const roundHeaderSize = 11;
+  const bodySize = 9;
   const lineHeight = bodySize + 6;
-  const roundSpacing = 10;
-  const answerLineGap = 8;
+  const roundSpacing = 8;
+  const answerLineGap = 6;
+  const teamLineHeight = 10;
+  const gridGutter = 24;
 
   const makePage = () => {
     const page = doc.addPage(PAGE_SIZE);
@@ -84,11 +86,40 @@ async function buildSheetPdf(options: {
     y -= headerSize + 4;
     page.drawText(options.subtitle, { x: MARGIN, y, size: subHeaderSize, font, color: rgb(0.4, 0.4, 0.4) });
     y -= subHeaderSize + 12;
+    if (options.kind === 'scoresheet') {
+      const label = 'Team Name:';
+      page.drawText(label, { x: MARGIN, y, size: subHeaderSize, font: bold, color: rgb(0.2, 0.2, 0.2) });
+      const labelWidth = bold.widthOfTextAtSize(label, subHeaderSize);
+      const lineStart = MARGIN + labelWidth + 8;
+      const lineEnd = pageWidth - MARGIN;
+      page.drawLine({
+        start: { x: lineStart, y: y - 1 },
+        end: { x: lineEnd, y: y - 1 },
+        thickness: 0.7,
+        color: rgb(0.3, 0.3, 0.3)
+      });
+      y -= teamLineHeight + 6;
+    }
     return { page, y };
   };
 
-  const maxWidth = pageWidth - MARGIN * 2;
-  let { page, y } = makePage();
+  const contentTop = (pageHeight - MARGIN);
+  const headerOffset = headerSize + subHeaderSize + 16 + (options.kind === 'scoresheet' ? teamLineHeight + 6 : 0);
+  const gridTop = contentTop - headerOffset;
+  const gridHeight = gridTop - MARGIN;
+  const cellWidth = (pageWidth - MARGIN * 2 - gridGutter) / 2;
+  const cellHeight = (gridHeight - gridGutter) / 2;
+
+  const getCellOrigin = (index: number) => {
+    const row = Math.floor(index / 2);
+    const col = index % 2;
+    const x = MARGIN + col * (cellWidth + gridGutter);
+    const yTop = gridTop - row * (cellHeight + gridGutter);
+    return { x, yTop };
+  };
+
+  let { page } = makePage();
+  let cellIndex = 0;
 
   for (const round of options.rounds) {
     const roundTitle = `Round ${round.round_number}${round.round_label ? ` — ${round.round_label}` : ''}`;
@@ -97,37 +128,58 @@ async function buildSheetPdf(options: {
     const itemLines: string[][] = [];
 
     for (const item of round.items) {
-      const text = options.kind === 'answersheet' ? formatAnswerText(item) : formatQuestionText(item);
-      const lines = wrapText(text || '________', font, bodySize, maxWidth);
-      itemLines.push(lines);
-      roundHeight += lines.length * lineHeight + answerLineGap;
+      if (options.kind === 'scoresheet') {
+        itemLines.push(['']);
+        roundHeight += lineHeight + answerLineGap;
+      } else {
+        const text = formatAnswerText(item);
+        const lines = wrapText(text || '________', font, bodySize, cellWidth);
+        itemLines.push(lines);
+        roundHeight += lines.length * lineHeight + answerLineGap;
+      }
     }
 
-    if (y - roundHeight < MARGIN) {
-      ({ page, y } = makePage());
+    if (roundHeight > cellHeight && cellIndex % 4 !== 0) {
+      cellIndex = Math.ceil((cellIndex + 1) / 4) * 4;
     }
 
-    page.drawText(roundTitle, { x: MARGIN, y, size: roundHeaderSize, font: bold, color: rgb(0.2, 0.2, 0.2) });
+    if (cellIndex >= 4) {
+      page = makePage().page;
+      cellIndex = 0;
+    }
+
+    const { x, yTop } = getCellOrigin(cellIndex);
+    let y = yTop;
+    page.drawText(roundTitle, { x, y, size: roundHeaderSize, font: bold, color: rgb(0.2, 0.2, 0.2) });
     y -= roundHeaderHeight;
+
+    const numberWidth = 22;
+    const lineLeft = x + numberWidth;
+    const lineRight = x + cellWidth;
 
     round.items.forEach((item, index) => {
       const lines = itemLines[index];
-      for (const line of lines) {
-        page.drawText(line, { x: MARGIN, y, size: bodySize, font, color: rgb(0.1, 0.1, 0.1) });
-        y -= lineHeight;
-      }
       if (options.kind === 'scoresheet') {
+        const numberLabel = `${index + 1}.`;
+        page.drawText(numberLabel, { x, y, size: bodySize, font, color: rgb(0.1, 0.1, 0.1) });
         page.drawLine({
-          start: { x: MARGIN, y: y + 2 },
-          end: { x: MARGIN + maxWidth, y: y + 2 },
+          start: { x: lineLeft, y: y - 1 },
+          end: { x: lineRight, y: y - 1 },
           thickness: 0.5,
-          color: rgb(0.7, 0.7, 0.7)
+          color: rgb(0.6, 0.6, 0.6)
         });
+        y -= lineHeight + answerLineGap;
+        return;
+      }
+
+      for (const line of lines) {
+        page.drawText(line, { x, y, size: bodySize, font, color: rgb(0.1, 0.1, 0.1) });
+        y -= lineHeight;
       }
       y -= answerLineGap;
     });
 
-    y -= roundSpacing;
+    cellIndex += 1;
   }
 
   return doc.save();
