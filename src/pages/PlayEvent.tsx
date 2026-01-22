@@ -305,8 +305,8 @@ export function PlayEventPage() {
         </header>
 
         <main className="flex-1 px-6 pb-10">
-          <div className="mx-auto flex w-full max-w-5xl flex-col">
-            <div className="flex min-h-[55vh] items-center justify-center">
+          <div className="mx-auto flex w-full max-w-6xl flex-col">
+            <div className="flex min-h-[65vh] items-center justify-center">
               <div className="flex w-full flex-col items-center gap-8 text-center">
                 {!teamId ? (
                   <div className="flex flex-col items-center gap-4">
@@ -320,9 +320,9 @@ export function PlayEventPage() {
                     <>
                       <div className="text-xs uppercase tracking-[0.35em] text-muted">{questionLabel}</div>
                       {displayItem.media_type === 'image' && displayItem.media_key && (
-                        <div className="w-full rounded-md border border-border bg-panel p-3">
+                        <div className="w-full rounded-md border border-border bg-panel p-4">
                           <img
-                            className="max-h-[55vh] w-full object-contain"
+                            className="max-h-[60vh] w-full object-contain"
                             src={api.publicMediaUrl(data.event.public_code, displayItem.media_key)}
                             alt="Media"
                             onError={() => {
@@ -335,7 +335,7 @@ export function PlayEventPage() {
                           />
                         </div>
                       )}
-                      <div className="text-3xl font-display leading-tight md:text-6xl">
+                      <div className="text-4xl font-display leading-tight md:text-7xl">
                         {displayItem.prompt}
                       </div>
                       {mediaError && (
@@ -390,18 +390,18 @@ export function PlayEventPage() {
                           </span>
                         </div>
                       )}
-                      {data.live?.reveal_answer && answerText && (
-                        <div className="w-full max-w-3xl border-t border-border pt-4">
-                          <div className="text-xs uppercase tracking-[0.3em] text-muted">Answer</div>
-                          <div className="mt-2 text-xl font-display md:text-2xl">{answerText}</div>
-                        </div>
-                      )}
-                      {data.live?.reveal_fun_fact && displayItem.fun_fact && (
-                        <div className="w-full max-w-3xl border-t border-border pt-4">
-                          <div className="text-xs uppercase tracking-[0.3em] text-muted">Factoid</div>
-                          <div className="mt-2 text-base text-text">{displayItem.fun_fact}</div>
-                        </div>
-                      )}
+                  {data.live?.reveal_answer && answerText && (
+                    <div className="w-full max-w-4xl border-t border-border pt-4">
+                      <div className="text-xs uppercase tracking-[0.3em] text-muted">Answer</div>
+                      <div className="mt-2 text-2xl font-display md:text-3xl">{answerText}</div>
+                    </div>
+                  )}
+                  {data.live?.reveal_fun_fact && displayItem.fun_fact && (
+                    <div className="w-full max-w-4xl border-t border-border pt-4">
+                      <div className="text-xs uppercase tracking-[0.3em] text-muted">Factoid</div>
+                      <div className="mt-2 text-lg text-text">{displayItem.fun_fact}</div>
+                    </div>
+                  )}
                     </>
                   ) : (
                     waitingRoom
