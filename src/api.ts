@@ -98,6 +98,8 @@ export const api = {
   deleteUser: (id: string) => apiFetch<{ ok: true }>(`/api/users/${id}`, { method: 'DELETE' }),
   aiGenerate: (payload: { prompt: string; model?: string; max_output_tokens?: number }) =>
     apiFetch<{ text: string }>('/api/ai/generate', { method: 'POST', body: JSON.stringify(payload) }),
+  aiImageAnswer: (payload: { media_key: string; prompt?: string }) =>
+    apiFetch<{ answer: string }>('/api/ai/image-answer', { method: 'POST', body: JSON.stringify(payload) }),
 
   listLocations: () => apiFetch<Location[]>('/api/locations'),
   createLocation: (payload: Partial<Location>) =>

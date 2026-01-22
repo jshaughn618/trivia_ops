@@ -42,6 +42,8 @@ export function EditionDetailPage() {
   const [metaError, setMetaError] = useState<string | null>(null);
   const [answerLoading, setAnswerLoading] = useState(false);
   const [answerError, setAnswerError] = useState<string | null>(null);
+  const [imageAnswerLoading, setImageAnswerLoading] = useState(false);
+  const [imageAnswerError, setImageAnswerError] = useState<string | null>(null);
   const [factLoading, setFactLoading] = useState(false);
   const [factError, setFactError] = useState<string | null>(null);
   const [infoOpen, setInfoOpen] = useState(true);
@@ -188,6 +190,8 @@ export function EditionDetailPage() {
     setRefineOptions([]);
     setRefineError(null);
     setItemValidationError(null);
+    setImageAnswerError(null);
+    setImageAnswerLoading(false);
     setItemDraft({
       prompt: item.prompt,
       answer: item.answer,
@@ -208,6 +212,8 @@ export function EditionDetailPage() {
     setActiveItemId(null);
     setItemDraft({ ...emptyItem, item_mode: 'text' });
     setItemValidationError(null);
+    setImageAnswerError(null);
+    setImageAnswerLoading(false);
   };
 
   const saveEdit = async (item: EditionItem) => {
@@ -287,6 +293,17 @@ export function EditionDetailPage() {
         media_key: uploadRes.data.key,
         media_filename: file.name || draft.media_filename
       }));
+      if (gameTypeId === 'visual' && !itemDraft.answer.trim()) {
+        setImageAnswerLoading(true);
+        setImageAnswerError(null);
+        const aiRes = await api.aiImageAnswer({ media_key: uploadRes.data.key });
+        setImageAnswerLoading(false);
+        if (aiRes.ok) {
+          setItemDraft((draft) => ({ ...draft, answer: aiRes.data.answer }));
+        } else {
+          setImageAnswerError(aiRes.error.message ?? 'Failed to auto-fill answer.');
+        }
+      }
       load();
     } else {
       setMediaError(uploadRes.error.message);
@@ -333,6 +350,17 @@ export function EditionDetailPage() {
         media_key: uploadRes.data.key,
         media_filename: file.name || draft.media_filename
       }));
+      if (gameTypeId === 'visual' && !itemDraft.answer.trim()) {
+        setImageAnswerLoading(true);
+        setImageAnswerError(null);
+        const aiRes = await api.aiImageAnswer({ media_key: uploadRes.data.key });
+        setImageAnswerLoading(false);
+        if (aiRes.ok) {
+          setItemDraft((draft) => ({ ...draft, answer: aiRes.data.answer }));
+        } else {
+          setImageAnswerError(aiRes.error.message ?? 'Failed to auto-fill answer.');
+        }
+      }
     } else {
       setMediaError(uploadRes.error.message);
     }
@@ -409,6 +437,8 @@ export function EditionDetailPage() {
     setRefineOpen(false);
     setRefineOptions([]);
     setRefineError(null);
+    setImageAnswerError(null);
+    setImageAnswerLoading(false);
     setItemDraft({
       ...emptyItem,
       prompt: visualPrompt,
@@ -1033,6 +1063,12 @@ export function EditionDetailPage() {
                             onChange={(event) => setItemDraft((draft) => ({ ...draft, answer: event.target.value }))}
                           />
                           {answerError && <span className="text-[10px] tracking-[0.2em] text-danger">{answerError}</span>}
+                          {imageAnswerLoading && (
+                            <span className="text-[10px] uppercase tracking-[0.2em] text-muted">Analyzing image…</span>
+                          )}
+                          {imageAnswerError && (
+                            <span className="text-[10px] tracking-[0.2em] text-danger">{imageAnswerError}</span>
+                          )}
                         </label>
                       )}
                       {gameTypeId === 'audio' && (
@@ -1350,6 +1386,12 @@ export function EditionDetailPage() {
                     onChange={(event) => setItemDraft((draft) => ({ ...draft, answer: event.target.value }))}
                   />
                   {answerError && <span className="text-[10px] tracking-[0.2em] text-danger">{answerError}</span>}
+                  {imageAnswerLoading && (
+                    <span className="text-[10px] uppercase tracking-[0.2em] text-muted">Analyzing image…</span>
+                  )}
+                  {imageAnswerError && (
+                    <span className="text-[10px] tracking-[0.2em] text-danger">{imageAnswerError}</span>
+                  )}
                 </label>
               )}
               {gameTypeId === 'audio' && (

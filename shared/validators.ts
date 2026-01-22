@@ -168,6 +168,11 @@ export const aiGenerateSchema = z.object({
   max_output_tokens: z.number().int().min(1).max(2000).optional()
 });
 
+export const imageAnswerSchema = z.object({
+  media_key: z.string().min(1),
+  prompt: z.string().min(1).optional()
+});
+
 export const userCreateSchema = z.object({
   email: emailSchema,
   password: passwordSchema,
