@@ -60,10 +60,10 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
   );
 
   const now = nowIso();
-  const data = parsed.data;
+  const payloadData = parsed.data;
 
   if (existing) {
-    const waitingMessageProvided = data.waiting_message !== undefined;
+    const waitingMessageProvided = payloadData.waiting_message !== undefined;
     await execute(
       env,
       `UPDATE event_live_state
@@ -77,14 +77,14 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
            updated_at = ?
        WHERE event_id = ?`,
       [
-        data.active_round_id ?? null,
-        data.current_item_ordinal ?? null,
-        data.reveal_answer === undefined ? null : data.reveal_answer ? 1 : 0,
-        data.reveal_fun_fact === undefined ? null : data.reveal_fun_fact ? 1 : 0,
+        payloadData.active_round_id ?? null,
+        payloadData.current_item_ordinal ?? null,
+        payloadData.reveal_answer === undefined ? null : payloadData.reveal_answer ? 1 : 0,
+        payloadData.reveal_fun_fact === undefined ? null : payloadData.reveal_fun_fact ? 1 : 0,
         waitingMessageProvided ? 1 : 0,
-        data.waiting_message ?? null,
-        data.waiting_show_leaderboard === undefined ? null : data.waiting_show_leaderboard ? 1 : 0,
-        data.waiting_show_next_round === undefined ? null : data.waiting_show_next_round ? 1 : 0,
+        payloadData.waiting_message ?? null,
+        payloadData.waiting_show_leaderboard === undefined ? null : payloadData.waiting_show_leaderboard ? 1 : 0,
+        payloadData.waiting_show_next_round === undefined ? null : payloadData.waiting_show_next_round ? 1 : 0,
         now,
         params.id
       ]
@@ -100,13 +100,13 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
       [
         id,
         params.id,
-        data.active_round_id ?? null,
-        data.current_item_ordinal ?? null,
-        data.reveal_answer ? 1 : 0,
-        data.reveal_fun_fact ? 1 : 0,
-        data.waiting_message ?? null,
-        data.waiting_show_leaderboard ? 1 : 0,
-        data.waiting_show_next_round === undefined ? 1 : data.waiting_show_next_round ? 1 : 0,
+        payloadData.active_round_id ?? null,
+        payloadData.current_item_ordinal ?? null,
+        payloadData.reveal_answer ? 1 : 0,
+        payloadData.reveal_fun_fact ? 1 : 0,
+        payloadData.waiting_message ?? null,
+        payloadData.waiting_show_leaderboard ? 1 : 0,
+        payloadData.waiting_show_next_round === undefined ? 1 : payloadData.waiting_show_next_round ? 1 : 0,
         now,
         now
       ]

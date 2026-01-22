@@ -19,11 +19,11 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
     return jsonError({ code: 'not_found', message: 'Team not found' }, 404);
   }
 
-  const data = { ...existing, ...parsed.data };
+  const merged = { ...existing, ...parsed.data };
   await execute(
     env,
     `UPDATE teams SET name = ?, table_label = ? WHERE id = ?`,
-    [data.name, data.table_label ?? null, params.teamId]
+    [merged.name, merged.table_label ?? null, params.teamId]
   );
 
   const row = await queryFirst(env, 'SELECT * FROM teams WHERE id = ? AND COALESCE(deleted, 0) = 0', [params.teamId]);

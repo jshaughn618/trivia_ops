@@ -29,14 +29,14 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request, 
 
   const id = crypto.randomUUID();
   const createdAt = nowIso();
-  const data = parsed.data;
+  const payloadData = parsed.data;
 
   await execute(
     env,
     `INSERT INTO teams (id, event_id, name, table_label, created_at)
      VALUES (?, ?, ?, ?, ?)`
     ,
-    [id, params.id, data.name, data.table_label ?? null, createdAt]
+    [id, params.id, payloadData.name, payloadData.table_label ?? null, createdAt]
   );
 
   const rows = await queryAll(env, 'SELECT * FROM teams WHERE id = ? AND COALESCE(deleted, 0) = 0', [id]);

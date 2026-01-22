@@ -32,7 +32,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, data }) 
 
   const id = crypto.randomUUID();
   const createdAt = nowIso();
-  const data = parsed.data;
+  const payloadData = parsed.data;
   const publicCode = await generateEventCode(env);
 
   await execute(
@@ -42,13 +42,13 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, data }) 
     ,
     [
       id,
-      data.title,
-      data.starts_at,
-      data.location_id ?? null,
-      data.host_user_id ?? null,
-      data.status,
-      data.event_type ?? 'Pub Trivia',
-      data.notes ?? null,
+      payloadData.title,
+      payloadData.starts_at,
+      payloadData.location_id ?? null,
+      payloadData.host_user_id ?? null,
+      payloadData.status,
+      payloadData.event_type ?? 'Pub Trivia',
+      payloadData.notes ?? null,
       createdAt,
       publicCode
     ]

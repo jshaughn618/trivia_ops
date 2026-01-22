@@ -30,7 +30,7 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
     return jsonError({ code: 'not_found', message: 'Event not found' }, 404);
   }
 
-  const data = { ...existing, ...parsed.data };
+  const merged = { ...existing, ...parsed.data };
   await execute(
     env,
     `UPDATE events
@@ -47,17 +47,17 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
          answersheet_name = ?
      WHERE id = ?`,
     [
-      data.title,
-      data.starts_at,
-      data.location_id ?? null,
-      data.host_user_id ?? null,
-      data.status,
-      data.event_type ?? 'Pub Trivia',
-      data.notes ?? null,
-      data.scoresheet_key ?? null,
-      data.scoresheet_name ?? null,
-      data.answersheet_key ?? null,
-      data.answersheet_name ?? null,
+      merged.title,
+      merged.starts_at,
+      merged.location_id ?? null,
+      merged.host_user_id ?? null,
+      merged.status,
+      merged.event_type ?? 'Pub Trivia',
+      merged.notes ?? null,
+      merged.scoresheet_key ?? null,
+      merged.scoresheet_name ?? null,
+      merged.answersheet_key ?? null,
+      merged.answersheet_name ?? null,
       params.id
     ]
   );

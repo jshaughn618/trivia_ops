@@ -19,24 +19,24 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
     return jsonError({ code: 'not_found', message: 'Item not found' }, 404);
   }
 
-  const data = { ...existing, ...parsed.data };
+  const merged = { ...existing, ...parsed.data };
   await execute(
     env,
     `UPDATE edition_items
      SET prompt = ?, answer = ?, answer_a = ?, answer_b = ?, answer_a_label = ?, answer_b_label = ?, fun_fact = ?, ordinal = ?, media_type = ?, media_key = ?, media_caption = ?
      WHERE id = ?`,
     [
-      data.prompt,
-      data.answer ?? '',
-      data.answer_a ?? null,
-      data.answer_b ?? null,
-      data.answer_a_label ?? null,
-      data.answer_b_label ?? null,
-      data.fun_fact ?? null,
-      data.ordinal,
-      data.media_type ?? null,
-      data.media_key ?? null,
-      data.media_caption ?? null,
+      merged.prompt,
+      merged.answer ?? '',
+      merged.answer_a ?? null,
+      merged.answer_b ?? null,
+      merged.answer_a_label ?? null,
+      merged.answer_b_label ?? null,
+      merged.fun_fact ?? null,
+      merged.ordinal,
+      merged.media_type ?? null,
+      merged.media_key ?? null,
+      merged.media_caption ?? null,
       params.itemId
     ]
   );

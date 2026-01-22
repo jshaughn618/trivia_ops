@@ -19,11 +19,11 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
     return jsonError({ code: 'not_found', message: 'Round not found' }, 404);
   }
 
-  const data = { ...existing, ...parsed.data };
+  const merged = { ...existing, ...parsed.data };
   await execute(
     env,
     `UPDATE event_rounds SET round_number = ?, label = ?, edition_id = ?, status = ? WHERE id = ?`,
-    [data.round_number, data.label, data.edition_id, data.status, params.roundId]
+    [merged.round_number, merged.label, merged.edition_id, merged.status, params.roundId]
   );
 
   const event = await queryFirst<{ id: string; status: string }>(

@@ -29,20 +29,20 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request, 
 
   const id = crypto.randomUUID();
   const createdAt = nowIso();
-  const data = parsed.data;
+  const payloadData = parsed.data;
 
   await execute(
     env,
     `INSERT INTO event_rounds (id, event_id, round_number, label, edition_id, status, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?)`
     ,
-    [id, params.id, data.round_number, data.label, data.edition_id, data.status, createdAt]
+    [id, params.id, payloadData.round_number, payloadData.label, payloadData.edition_id, payloadData.status, createdAt]
   );
 
   const editionItems = await queryAll<{ id: string; ordinal: number }>(
     env,
     'SELECT id, ordinal FROM edition_items WHERE edition_id = ? AND COALESCE(deleted, 0) = 0 ORDER BY ordinal ASC',
-    [data.edition_id]
+    [payloadData.edition_id]
   );
 
   for (const item of editionItems) {

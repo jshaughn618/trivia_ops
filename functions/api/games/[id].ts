@@ -29,11 +29,11 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
     return jsonError({ code: 'not_found', message: 'Game not found' }, 404);
   }
 
-  const data = { ...existing, ...parsed.data };
+  const merged = { ...existing, ...parsed.data };
   await execute(
     env,
     `UPDATE games SET name = ?, game_type_id = ?, description = ?, default_settings_json = ? WHERE id = ?`,
-    [data.name, data.game_type_id, data.description ?? null, data.default_settings_json ?? null, params.id]
+    [merged.name, merged.game_type_id, merged.description ?? null, merged.default_settings_json ?? null, params.id]
   );
 
   const row = await queryFirst(env, 'SELECT * FROM games WHERE id = ? AND COALESCE(deleted, 0) = 0', [params.id]);

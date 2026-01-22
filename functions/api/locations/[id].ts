@@ -29,11 +29,11 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
     return jsonError({ code: 'not_found', message: 'Location not found' }, 404);
   }
 
-  const data = { ...existing, ...parsed.data };
+  const merged = { ...existing, ...parsed.data };
   await execute(
     env,
     `UPDATE locations SET name = ?, address = ?, city = ?, state = ?, notes = ? WHERE id = ?`,
-    [data.name, data.address ?? null, data.city ?? null, data.state ?? null, data.notes ?? null, params.id]
+    [merged.name, merged.address ?? null, merged.city ?? null, merged.state ?? null, merged.notes ?? null, params.id]
   );
 
   const row = await queryFirst(env, 'SELECT * FROM locations WHERE id = ? AND COALESCE(deleted, 0) = 0', [params.id]);

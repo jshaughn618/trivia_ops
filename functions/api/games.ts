@@ -23,22 +23,22 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, data }) 
 
   const id = crypto.randomUUID();
   const createdAt = nowIso();
-  const data = parsed.data;
+  const payloadData = parsed.data;
 
   const gameType = await queryFirst<{ default_settings_json: string | null }>(
     env,
     'SELECT default_settings_json FROM game_types WHERE id = ? AND COALESCE(deleted, 0) = 0',
-    [data.game_type_id]
+    [payloadData.game_type_id]
   );
 
-  const defaultSettings = data.default_settings_json ?? gameType?.default_settings_json ?? null;
+  const defaultSettings = payloadData.default_settings_json ?? gameType?.default_settings_json ?? null;
 
   await execute(
     env,
     `INSERT INTO games (id, name, game_type_id, description, default_settings_json, created_at)
      VALUES (?, ?, ?, ?, ?, ?)`
     ,
-    [id, data.name, data.game_type_id, data.description ?? null, defaultSettings, createdAt]
+    [id, payloadData.name, payloadData.game_type_id, payloadData.description ?? null, defaultSettings, createdAt]
   );
 
   const rows = await queryAll(env, 'SELECT * FROM games WHERE id = ? AND COALESCE(deleted, 0) = 0', [id]);

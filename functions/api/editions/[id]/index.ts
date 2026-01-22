@@ -29,18 +29,18 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
     return jsonError({ code: 'not_found', message: 'Edition not found' }, 404);
   }
 
-  const data = { ...existing, ...parsed.data };
-  const title = parsed.data.title ?? parsed.data.theme ?? data.title;
+  const merged = { ...existing, ...parsed.data };
+  const title = parsed.data.title ?? parsed.data.theme ?? merged.title;
   await execute(
     env,
     `UPDATE editions SET game_id = ?, title = ?, description = ?, status = ?, tags_csv = ?, theme = ?, updated_at = ? WHERE id = ?`,
     [
-      data.game_id,
+      merged.game_id,
       title,
-      data.description ?? null,
-      data.status,
-      data.tags_csv ?? null,
-      data.theme ?? null,
+      merged.description ?? null,
+      merged.status,
+      merged.tags_csv ?? null,
+      merged.theme ?? null,
       nowIso(),
       params.id
     ]

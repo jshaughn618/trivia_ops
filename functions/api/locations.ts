@@ -23,7 +23,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, data }) 
 
   const id = crypto.randomUUID();
   const createdAt = nowIso();
-  const data = parsed.data;
+  const payloadData = parsed.data;
 
   await execute(
     env,
@@ -32,11 +32,11 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, data }) 
     ,
     [
       id,
-      data.name,
-      data.address ?? null,
-      data.city ?? null,
-      data.state ?? null,
-      data.notes ?? null,
+      payloadData.name,
+      payloadData.address ?? null,
+      payloadData.city ?? null,
+      payloadData.state ?? null,
+      payloadData.notes ?? null,
       createdAt
     ]
   );

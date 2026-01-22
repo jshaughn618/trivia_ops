@@ -27,7 +27,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request, 
 
   const id = crypto.randomUUID();
   const createdAt = nowIso();
-  const data = parsed.data;
+  const payloadData = parsed.data;
 
   await execute(
     env,
@@ -38,17 +38,17 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request, 
     [
       id,
       params.id,
-      data.prompt,
-      data.answer ?? '',
-      data.answer_a ?? null,
-      data.answer_b ?? null,
-      data.answer_a_label ?? null,
-      data.answer_b_label ?? null,
-      data.fun_fact ?? null,
-      data.ordinal,
-      data.media_type ?? null,
-      data.media_key ?? null,
-      data.media_caption ?? null,
+      payloadData.prompt,
+      payloadData.answer ?? '',
+      payloadData.answer_a ?? null,
+      payloadData.answer_b ?? null,
+      payloadData.answer_a_label ?? null,
+      payloadData.answer_b_label ?? null,
+      payloadData.fun_fact ?? null,
+      payloadData.ordinal,
+      payloadData.media_type ?? null,
+      payloadData.media_key ?? null,
+      payloadData.media_caption ?? null,
       createdAt
     ]
   );
