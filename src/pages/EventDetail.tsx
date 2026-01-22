@@ -395,12 +395,12 @@ export function EventDetailPage() {
               ) : (
                 <div className="mt-2 text-xs uppercase tracking-[0.2em] text-muted">No scoresheet uploaded.</div>
               )}
-              <div className="mt-3 flex items-center gap-3">
-                <label className="flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-muted">
+              <div className="mt-3 flex w-full items-center gap-3">
+                <label className="flex w-full items-center gap-2 text-xs uppercase tracking-[0.2em] text-muted">
                   <input
                     type="file"
                     accept="application/pdf"
-                    className="text-xs"
+                    className="w-full max-w-full text-xs"
                     onChange={(event) => {
                       const file = event.target.files?.[0];
                       event.target.value = '';
@@ -439,12 +439,12 @@ export function EventDetailPage() {
               ) : (
                 <div className="mt-2 text-xs uppercase tracking-[0.2em] text-muted">No answer sheet uploaded.</div>
               )}
-              <div className="mt-3 flex items-center gap-3">
-                <label className="flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-muted">
+              <div className="mt-3 flex w-full items-center gap-3">
+                <label className="flex w-full items-center gap-2 text-xs uppercase tracking-[0.2em] text-muted">
                   <input
                     type="file"
                     accept="application/pdf"
-                    className="text-xs"
+                    className="w-full max-w-full text-xs"
                     onChange={(event) => {
                       const file = event.target.files?.[0];
                       event.target.value = '';
