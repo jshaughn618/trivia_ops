@@ -90,6 +90,10 @@ export type Event = {
   public_code?: string | null;
   status: EventStatus;
   notes: string | null;
+  scoresheet_key: string | null;
+  scoresheet_name: string | null;
+  answersheet_key: string | null;
+  answersheet_name: string | null;
   created_at: string;
 };
 

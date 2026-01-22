@@ -34,6 +34,10 @@ export function EventDetailPage() {
   const [qrError, setQrError] = useState<string | null>(null);
   const [roundMenuId, setRoundMenuId] = useState<string | null>(null);
   const [draggedRoundId, setDraggedRoundId] = useState<string | null>(null);
+  const [scoresheetUploading, setScoresheetUploading] = useState(false);
+  const [scoresheetError, setScoresheetError] = useState<string | null>(null);
+  const [answersheetUploading, setAnswersheetUploading] = useState(false);
+  const [answersheetError, setAnswersheetError] = useState<string | null>(null);
 
   const load = async () => {
     if (!eventId) return;
@@ -213,6 +217,43 @@ export function EventDetailPage() {
     setScoreLoading(false);
   };
 
+  const uploadDocument = async (type: 'scoresheet' | 'answersheet', file: File) => {
+    if (!eventId) return;
+    const setUploading = type === 'scoresheet' ? setScoresheetUploading : setAnswersheetUploading;
+    const setError = type === 'scoresheet' ? setScoresheetError : setAnswersheetError;
+    setUploading(true);
+    setError(null);
+
+    if (file.type && file.type !== 'application/pdf') {
+      setError('PDF only.');
+      setUploading(false);
+      return;
+    }
+
+    const res = await api.uploadEventDocument(eventId, type, file);
+    if (res.ok) {
+      setEvent(res.data);
+    } else {
+      setError(res.error.message ?? 'Upload failed.');
+    }
+    setUploading(false);
+  };
+
+  const removeDocument = async (type: 'scoresheet' | 'answersheet') => {
+    if (!eventId) return;
+    const setUploading = type === 'scoresheet' ? setScoresheetUploading : setAnswersheetUploading;
+    const setError = type === 'scoresheet' ? setScoresheetError : setAnswersheetError;
+    setUploading(true);
+    setError(null);
+    const res = await api.deleteEventDocument(eventId, type);
+    if (res.ok) {
+      setEvent(res.data);
+    } else {
+      setError(res.error.message ?? 'Remove failed.');
+    }
+    setUploading(false);
+  };
+
   if (!event) {
     return (
       <AppShell title="Event Detail">
@@ -327,6 +368,98 @@ export function EventDetailPage() {
               <PrimaryButton onClick={updateEvent}>Update Event</PrimaryButton>
               <StampBadge label={event.status.toUpperCase()} variant="verified" />
               <DangerButton onClick={deleteEvent}>Delete Event</DangerButton>
+            </div>
+          </div>
+        </Panel>
+
+        <Panel title="Event Documents">
+          <div className="flex flex-col gap-4">
+            <div className="border-2 border-border bg-panel2 p-3">
+              <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">Scoresheet (PDF)</div>
+              {event.scoresheet_key ? (
+                <div className="mt-2 flex flex-wrap items-center gap-3">
+                  <a
+                    href={api.mediaUrl(event.scoresheet_key)}
+                    className="text-xs uppercase tracking-[0.2em] text-accent-ink"
+                    download={event.scoresheet_name ?? 'scoresheet.pdf'}
+                  >
+                    Download {event.scoresheet_name ?? 'scoresheet.pdf'}
+                  </a>
+                  <DangerButton
+                    onClick={() => removeDocument('scoresheet')}
+                    disabled={scoresheetUploading}
+                  >
+                    Remove
+                  </DangerButton>
+                </div>
+              ) : (
+                <div className="mt-2 text-xs uppercase tracking-[0.2em] text-muted">No scoresheet uploaded.</div>
+              )}
+              <div className="mt-3 flex items-center gap-3">
+                <label className="flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-muted">
+                  <input
+                    type="file"
+                    accept="application/pdf"
+                    className="text-xs"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      event.target.value = '';
+                      if (file) uploadDocument('scoresheet', file);
+                    }}
+                    disabled={scoresheetUploading}
+                  />
+                </label>
+                {scoresheetUploading && (
+                  <div className="text-xs uppercase tracking-[0.2em] text-muted">Uploading…</div>
+                )}
+              </div>
+              {scoresheetError && (
+                <div className="mt-2 text-xs uppercase tracking-[0.2em] text-danger">{scoresheetError}</div>
+              )}
+            </div>
+
+            <div className="border-2 border-border bg-panel2 p-3">
+              <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">Answer Sheet (PDF)</div>
+              {event.answersheet_key ? (
+                <div className="mt-2 flex flex-wrap items-center gap-3">
+                  <a
+                    href={api.mediaUrl(event.answersheet_key)}
+                    className="text-xs uppercase tracking-[0.2em] text-accent-ink"
+                    download={event.answersheet_name ?? 'answersheet.pdf'}
+                  >
+                    Download {event.answersheet_name ?? 'answersheet.pdf'}
+                  </a>
+                  <DangerButton
+                    onClick={() => removeDocument('answersheet')}
+                    disabled={answersheetUploading}
+                  >
+                    Remove
+                  </DangerButton>
+                </div>
+              ) : (
+                <div className="mt-2 text-xs uppercase tracking-[0.2em] text-muted">No answer sheet uploaded.</div>
+              )}
+              <div className="mt-3 flex items-center gap-3">
+                <label className="flex items-center gap-2 text-xs uppercase tracking-[0.2em] text-muted">
+                  <input
+                    type="file"
+                    accept="application/pdf"
+                    className="text-xs"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      event.target.value = '';
+                      if (file) uploadDocument('answersheet', file);
+                    }}
+                    disabled={answersheetUploading}
+                  />
+                </label>
+                {answersheetUploading && (
+                  <div className="text-xs uppercase tracking-[0.2em] text-muted">Uploading…</div>
+                )}
+              </div>
+              {answersheetError && (
+                <div className="mt-2 text-xs uppercase tracking-[0.2em] text-danger">{answersheetError}</div>
+              )}
             </div>
           </div>
         </Panel>

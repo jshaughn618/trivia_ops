@@ -51,6 +51,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params, data, requ
           return 'audio/wav';
         case 'ogg':
           return 'audio/ogg';
+        case 'pdf':
+          return 'application/pdf';
         case 'png':
           return 'image/png';
         case 'jpg':

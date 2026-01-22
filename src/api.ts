@@ -153,6 +153,38 @@ export const api = {
   updateEvent: (id: string, payload: Partial<Event>) =>
     apiFetch<Event>(`/api/events/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
   deleteEvent: (id: string) => apiFetch<{ ok: true }>(`/api/events/${id}`, { method: 'DELETE' }),
+  uploadEventDocument: async (eventId: string, type: 'scoresheet' | 'answersheet', file: File) => {
+    const requestId = createRequestId();
+    const start = performance.now();
+    const res = await fetch(`/api/events/${eventId}/documents?type=${type}`, {
+      method: 'POST',
+      body: await file.arrayBuffer(),
+      credentials: 'include',
+      headers: {
+        'x-request-id': requestId,
+        'x-doc-type': type,
+        'x-doc-filename': file.name || `${type}.pdf`,
+        'Content-Type': file.type || 'application/pdf'
+      }
+    });
+    const text = await res.text();
+    let json: unknown = null;
+    if (text) {
+      try {
+        json = JSON.parse(text);
+      } catch {
+        logWarn('event_document_upload_non_json', { requestId, status: res.status, body_snippet: text.slice(0, 200) });
+      }
+    }
+    const durationMs = Math.round(performance.now() - start);
+    logInfo('event_document_upload_end', { requestId, status: res.status, ok: res.ok, durationMs });
+    if (!res.ok) {
+      logError('event_document_upload_failed', { requestId, status: res.status, body_snippet: text.slice(0, 200) });
+    }
+    return json as ApiEnvelope<Event>;
+  },
+  deleteEventDocument: (eventId: string, type: 'scoresheet' | 'answersheet') =>
+    apiFetch<Event>(`/api/events/${eventId}/documents?type=${type}`, { method: 'DELETE' }),
 
   listEventRounds: (eventId: string) => apiFetch<EventRound[]>(`/api/events/${eventId}/rounds`),
   createEventRound: (eventId: string, payload: Partial<EventRound>) =>

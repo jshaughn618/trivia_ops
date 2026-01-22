@@ -27,7 +27,18 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request })
   const data = { ...existing, ...parsed.data };
   await execute(
     env,
-    `UPDATE events SET title = ?, starts_at = ?, location_id = ?, host_user_id = ?, status = ?, notes = ? WHERE id = ?`,
+    `UPDATE events
+     SET title = ?,
+         starts_at = ?,
+         location_id = ?,
+         host_user_id = ?,
+         status = ?,
+         notes = ?,
+         scoresheet_key = ?,
+         scoresheet_name = ?,
+         answersheet_key = ?,
+         answersheet_name = ?
+     WHERE id = ?`,
     [
       data.title,
       data.starts_at,
@@ -35,6 +46,10 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request })
       data.host_user_id ?? null,
       data.status,
       data.notes ?? null,
+      data.scoresheet_key ?? null,
+      data.scoresheet_name ?? null,
+      data.answersheet_key ?? null,
+      data.answersheet_name ?? null,
       params.id
     ]
   );

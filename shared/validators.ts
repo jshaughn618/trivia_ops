@@ -111,7 +111,11 @@ export const eventUpdateSchema = z.object({
   location_id: idSchema.nullable().optional(),
   host_user_id: idSchema.nullable().optional(),
   status: eventStatusSchema.optional(),
-  notes: z.string().nullable().optional()
+  notes: z.string().nullable().optional(),
+  scoresheet_key: z.string().nullable().optional(),
+  scoresheet_name: z.string().nullable().optional(),
+  answersheet_key: z.string().nullable().optional(),
+  answersheet_name: z.string().nullable().optional()
 });
 
 export const eventRoundCreateSchema = z.object({
