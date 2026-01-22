@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api';
 import { Panel } from '../components/Panel';
@@ -70,6 +70,7 @@ export function PlayEventPage() {
   const [mediaError, setMediaError] = useState<string | null>(null);
   const [visualIndex, setVisualIndex] = useState(0);
   const { theme, toggleTheme } = useTheme();
+  const menuRef = useRef<HTMLDivElement | null>(null);
   const normalizedCode = useMemo(() => (code ?? '').trim().toUpperCase(), [code]);
 
   const load = async () => {
@@ -125,6 +126,18 @@ export function PlayEventPage() {
   useEffect(() => {
     setVisualIndex(0);
   }, [data?.live?.active_round_id, data?.visual_items?.length]);
+
+  useEffect(() => {
+    if (!teamMenuOpen) return;
+    const handleClick = (event: MouseEvent) => {
+      const target = event.target as Node | null;
+      if (menuRef.current && target && !menuRef.current.contains(target)) {
+        setTeamMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [teamMenuOpen]);
 
   const handleJoin = async () => {
     if (!data) return;
@@ -254,18 +267,17 @@ export function PlayEventPage() {
         <header className="px-6 py-4">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <div className="text-[10px] uppercase tracking-[0.3em] text-muted">Event</div>
               <div className="text-lg font-display tracking-tight md:text-2xl">{data.event.title}</div>
+              <div className="mt-1 text-xs text-muted">Event Code: {data.event.public_code}</div>
               <div className="mt-1 text-xs text-muted">
-                {data.event.public_code} • {data.event.location_name ?? 'Location TBD'} •{' '}
-                {new Date(data.event.starts_at).toLocaleString()}
+                {data.event.location_name ?? 'Location TBD'} • {new Date(data.event.starts_at).toLocaleString()}
               </div>
             </div>
             <div className="flex items-center gap-3 text-right">
               {teamId && teamNameLabel && (
                 <div className="flex items-center gap-3">
                   <div className="text-sm font-medium">{teamNameLabel}</div>
-                  <div className="relative">
+                  <div className="relative" ref={menuRef}>
                     <button
                       type="button"
                       aria-label="Team menu"
