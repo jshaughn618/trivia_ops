@@ -106,6 +106,7 @@ export type EventRound = {
   event_id: Id;
   round_number: number;
   label: string;
+  scoresheet_title: string | null;
   edition_id: Id;
   status: EventRoundStatus;
   created_at: string;

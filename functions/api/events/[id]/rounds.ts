@@ -31,12 +31,22 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request, 
   const createdAt = nowIso();
   const payloadData = parsed.data;
 
+  const scoresheetTitle = payloadData.scoresheet_title ?? payloadData.label;
   await execute(
     env,
-    `INSERT INTO event_rounds (id, event_id, round_number, label, edition_id, status, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO event_rounds (id, event_id, round_number, label, scoresheet_title, edition_id, status, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
     ,
-    [id, params.id, payloadData.round_number, payloadData.label, payloadData.edition_id, payloadData.status, createdAt]
+    [
+      id,
+      params.id,
+      payloadData.round_number,
+      payloadData.label,
+      scoresheetTitle,
+      payloadData.edition_id,
+      payloadData.status,
+      createdAt
+    ]
   );
 
   const editionItems = await queryAll<{ id: string; ordinal: number }>(

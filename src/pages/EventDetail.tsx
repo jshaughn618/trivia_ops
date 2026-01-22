@@ -29,7 +29,10 @@ const safeFileName = (value: string, fallback: string) => {
     .replace(/-+$/, '') || fallback;
 };
 
-const roundTitle = (round: EventRound) => `Round ${round.round_number} - ${round.label}`;
+const roundTitle = (round: EventRound) => {
+  const title = round.scoresheet_title?.trim() || round.label;
+  return title ? `Round ${round.round_number} ${title}` : `Round ${round.round_number}`;
+};
 
 const answerLabel = (items: EditionItem[], key: 'a' | 'b') => {
   if (key === 'a') {
@@ -316,6 +319,7 @@ export function EventDetailPage() {
   const [qrError, setQrError] = useState<string | null>(null);
   const [roundMenuId, setRoundMenuId] = useState<string | null>(null);
   const [draggedRoundId, setDraggedRoundId] = useState<string | null>(null);
+  const [scoresheetTitles, setScoresheetTitles] = useState<Record<string, string>>({});
   const [scoresheetUploading, setScoresheetUploading] = useState(false);
   const [scoresheetError, setScoresheetError] = useState<string | null>(null);
   const [answersheetUploading, setAnswersheetUploading] = useState(false);
@@ -360,6 +364,18 @@ export function EventDetailPage() {
       loadScores(rounds[0].id);
     }
   }, [rounds, scoreRoundId]);
+
+  useEffect(() => {
+    setScoresheetTitles((prev) => {
+      const next = { ...prev };
+      rounds.forEach((round) => {
+        if (next[round.id] === undefined) {
+          next[round.id] = round.scoresheet_title ?? round.label;
+        }
+      });
+      return next;
+    });
+  }, [rounds]);
 
   const publicUrl = useMemo(() => {
     if (!event?.public_code) return '';
@@ -446,12 +462,23 @@ export function EventDetailPage() {
     await api.createEventRound(eventId, {
       round_number: roundNumber,
       label,
+      scoresheet_title: label,
       edition_id: roundEditionId,
       status: 'planned'
     });
     setRoundGameId('');
     setRoundEditionId('');
     load();
+  };
+
+  const saveScoresheetTitle = async (round: EventRound) => {
+    const rawTitle = scoresheetTitles[round.id];
+    const nextTitle = rawTitle?.trim() || round.label;
+    const res = await api.updateEventRound(round.id, { scoresheet_title: nextTitle });
+    if (res.ok) {
+      setRounds((prev) => prev.map((item) => (item.id === round.id ? res.data : item)));
+      setScoresheetTitles((prev) => ({ ...prev, [round.id]: res.data.scoresheet_title ?? res.data.label }));
+    }
   };
 
   const createTeam = async () => {
@@ -879,6 +906,19 @@ export function EventDetailPage() {
                     </div>
                   </div>
                   <div className="mt-1 text-[10px] uppercase tracking-[0.2em] text-muted">{display.detail}</div>
+                  <label className="mt-3 flex flex-col gap-2 text-[10px] font-display uppercase tracking-[0.25em] text-muted">
+                    Scoresheet Title
+                    <div className="flex flex-wrap items-center gap-2">
+                      <input
+                        className="h-9 flex-1 px-2 text-xs"
+                        value={scoresheetTitles[round.id] ?? ''}
+                        onChange={(event) =>
+                          setScoresheetTitles((prev) => ({ ...prev, [round.id]: event.target.value }))
+                        }
+                      />
+                      <SecondaryButton onClick={() => saveScoresheetTitle(round)}>Save Title</SecondaryButton>
+                    </div>
+                  </label>
                 </div>
               );
             })}
