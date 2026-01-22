@@ -155,8 +155,6 @@ export const api = {
   updateEvent: (id: string, payload: Partial<Event>) =>
     apiFetch<Event>(`/api/events/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
   deleteEvent: (id: string) => apiFetch<{ ok: true }>(`/api/events/${id}`, { method: 'DELETE' }),
-  generateScoresheets: (eventId: string) =>
-    apiFetch<Event>(`/api/events/${eventId}/scoresheets`, { method: 'POST' }),
   uploadEventDocument: async (eventId: string, type: 'scoresheet' | 'answersheet', file: File) => {
     const requestId = createRequestId();
     const start = performance.now();

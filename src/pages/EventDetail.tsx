@@ -1,12 +1,277 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import QRCode from 'qrcode';
+import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { api } from '../api';
 import { AppShell } from '../components/AppShell';
 import { Panel } from '../components/Panel';
 import { PrimaryButton, SecondaryButton, DangerButton, ButtonLink } from '../components/Buttons';
 import { StampBadge } from '../components/StampBadge';
-import type { Event, EventRound, GameEdition, Game, Team, Location, User } from '../types';
+import type { Event, EventRound, GameEdition, Game, Team, Location, User, EditionItem } from '../types';
+
+const PAGE_WIDTH = 612;
+const PAGE_HEIGHT = 792;
+const PAGE_MARGIN = 36;
+const HEADER_HEIGHT = 60;
+const CELL_PADDING = 12;
+
+type RoundBundle = {
+  round: EventRound;
+  items: EditionItem[];
+};
+
+const safeFileName = (value: string, fallback: string) => {
+  const trimmed = value.trim().toLowerCase();
+  if (!trimmed) return fallback;
+  return trimmed
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+/, '')
+    .replace(/-+$/, '') || fallback;
+};
+
+const roundTitle = (round: EventRound) => `Round ${round.round_number} - ${round.label}`;
+
+const answerLabel = (items: EditionItem[], key: 'a' | 'b') => {
+  if (key === 'a') {
+    return items.find((item) => item.answer_a_label)?.answer_a_label ?? 'Answer A';
+  }
+  return items.find((item) => item.answer_b_label)?.answer_b_label ?? 'Answer B';
+};
+
+const formatAnswer = (item: EditionItem) => {
+  const answerA = item.answer_a?.trim();
+  const answerB = item.answer_b?.trim();
+  if (answerA || answerB) {
+    const labelA = item.answer_a_label?.trim() || 'A';
+    const labelB = item.answer_b_label?.trim() || 'B';
+    if (answerA && answerB) {
+      return `${labelA}: ${answerA}  ${labelB}: ${answerB}`;
+    }
+    if (answerA) return `${labelA}: ${answerA}`;
+    if (answerB) return `${labelB}: ${answerB}`;
+  }
+  return item.answer?.trim() || '—';
+};
+
+const truncateText = (font: any, text: string, maxWidth: number, size: number) => {
+  if (font.widthOfTextAtSize(text, size) <= maxWidth) return text;
+  let truncated = text;
+  while (truncated.length > 0 && font.widthOfTextAtSize(`${truncated}…`, size) > maxWidth) {
+    truncated = truncated.slice(0, -1);
+  }
+  return `${truncated}…`;
+};
+
+const drawPageHeader = (page: any, event: Event, fonts: { regular: any; bold: any }) => {
+  const titleSize = 14;
+  const metaSize = 9;
+  const headerTop = PAGE_HEIGHT - PAGE_MARGIN;
+  const titleY = headerTop - titleSize;
+  page.drawText(event.title, {
+    x: PAGE_MARGIN,
+    y: titleY,
+    size: titleSize,
+    font: fonts.bold
+  });
+  const startsAt = new Date(event.starts_at).toLocaleString();
+  page.drawText(startsAt, {
+    x: PAGE_MARGIN,
+    y: titleY - metaSize - 4,
+    size: metaSize,
+    font: fonts.regular
+  });
+
+  const label = 'Team Name:';
+  const labelSize = 9;
+  const labelWidth = fonts.regular.widthOfTextAtSize(label, labelSize);
+  const lineWidth = 200;
+  const lineStartX = PAGE_WIDTH - PAGE_MARGIN - lineWidth;
+  const labelX = lineStartX - labelWidth - 6;
+  page.drawText(label, {
+    x: labelX,
+    y: titleY,
+    size: labelSize,
+    font: fonts.regular
+  });
+  page.drawLine({
+    start: { x: lineStartX, y: titleY - 2 },
+    end: { x: PAGE_WIDTH - PAGE_MARGIN, y: titleY - 2 },
+    thickness: 1,
+    color: rgb(0, 0, 0)
+  });
+};
+
+const drawGridLines = (page: any) => {
+  const gridTop = PAGE_HEIGHT - PAGE_MARGIN - HEADER_HEIGHT;
+  const gridBottom = PAGE_MARGIN;
+  const gridHeight = gridTop - gridBottom;
+  const gridWidth = PAGE_WIDTH - PAGE_MARGIN * 2;
+  const midX = PAGE_MARGIN + gridWidth / 2;
+  const midY = gridBottom + gridHeight / 2;
+  const lineColor = rgb(0.75, 0.75, 0.75);
+
+  page.drawLine({
+    start: { x: midX, y: gridBottom },
+    end: { x: midX, y: gridTop },
+    thickness: 0.6,
+    color: lineColor
+  });
+  page.drawLine({
+    start: { x: PAGE_MARGIN, y: midY },
+    end: { x: PAGE_WIDTH - PAGE_MARGIN, y: midY },
+    thickness: 0.6,
+    color: lineColor
+  });
+};
+
+const renderRoundBlock = (
+  page: any,
+  bundle: RoundBundle,
+  cell: { x: number; y: number; width: number; height: number },
+  fonts: { regular: any; bold: any },
+  mode: 'scoresheet' | 'answersheet'
+) => {
+  const titleSize = 11;
+  const numberSize = 9;
+  const textSize = mode === 'scoresheet' ? 9 : 8.5;
+  const items = bundle.items;
+  const hasParts = items.some((item) => item.answer_a || item.answer_b);
+  const titleY = cell.y + cell.height - CELL_PADDING - titleSize;
+  page.drawText(roundTitle(bundle.round), {
+    x: cell.x + CELL_PADDING,
+    y: titleY,
+    size: titleSize,
+    font: fonts.bold
+  });
+
+  let contentTop = titleY - 6;
+  const numberWidth = fonts.regular.widthOfTextAtSize('00.', numberSize);
+  const contentX = cell.x + CELL_PADDING;
+  const textStartX = contentX + numberWidth + 6;
+  const availableWidth = cell.width - CELL_PADDING * 2 - numberWidth - 6;
+
+  if (hasParts && mode === 'scoresheet') {
+    const labelSize = 8.5;
+    const labelY = contentTop - labelSize;
+    const gap = 12;
+    const colWidth = (availableWidth - gap) / 2;
+    page.drawText(answerLabel(items, 'a'), {
+      x: textStartX,
+      y: labelY,
+      size: labelSize,
+      font: fonts.regular
+    });
+    page.drawText(answerLabel(items, 'b'), {
+      x: textStartX + colWidth + gap,
+      y: labelY,
+      size: labelSize,
+      font: fonts.regular
+    });
+    contentTop = labelY - 6;
+  }
+
+  const itemCount = items.length;
+  const minLineSpacing = mode === 'scoresheet' ? 14 : 12;
+  const availableHeight = contentTop - (cell.y + CELL_PADDING);
+  if (itemCount > 0 && availableHeight / itemCount < minLineSpacing) {
+    throw new Error(`Round ${bundle.round.round_number} has too many items to fit on one page.`);
+  }
+  const lineSpacing = itemCount > 0 ? availableHeight / itemCount : availableHeight;
+  const baseY = contentTop - numberSize;
+
+  if (itemCount === 0) {
+    page.drawText('No items.', {
+      x: contentX,
+      y: baseY,
+      size: textSize,
+      font: fonts.regular
+    });
+    return;
+  }
+
+  for (let index = 0; index < itemCount; index += 1) {
+    const item = items[index];
+    const rowY = baseY - lineSpacing * index;
+    page.drawText(`${index + 1}.`, {
+      x: contentX,
+      y: rowY,
+      size: numberSize,
+      font: fonts.regular
+    });
+    if (mode === 'scoresheet') {
+      if (hasParts) {
+        const gap = 12;
+        const colWidth = (availableWidth - gap) / 2;
+        const lineY = rowY - 2;
+        page.drawLine({
+          start: { x: textStartX, y: lineY },
+          end: { x: textStartX + colWidth, y: lineY },
+          thickness: 0.8,
+          color: rgb(0, 0, 0)
+        });
+        page.drawLine({
+          start: { x: textStartX + colWidth + gap, y: lineY },
+          end: { x: textStartX + colWidth + gap + colWidth, y: lineY },
+          thickness: 0.8,
+          color: rgb(0, 0, 0)
+        });
+      } else {
+        const lineY = rowY - 2;
+        page.drawLine({
+          start: { x: textStartX, y: lineY },
+          end: { x: textStartX + availableWidth, y: lineY },
+          thickness: 0.8,
+          color: rgb(0, 0, 0)
+        });
+      }
+    } else {
+      const answer = truncateText(fonts.regular, formatAnswer(item), availableWidth, textSize);
+      page.drawText(answer, {
+        x: textStartX,
+        y: rowY,
+        size: textSize,
+        font: fonts.regular
+      });
+    }
+  }
+};
+
+const buildPdf = async (event: Event, rounds: RoundBundle[], mode: 'scoresheet' | 'answersheet') => {
+  const pdfDoc = await PDFDocument.create();
+  const fonts = {
+    regular: await pdfDoc.embedFont(StandardFonts.Helvetica),
+    bold: await pdfDoc.embedFont(StandardFonts.HelveticaBold)
+  };
+  const gridTop = PAGE_HEIGHT - PAGE_MARGIN - HEADER_HEIGHT;
+  const gridBottom = PAGE_MARGIN;
+  const gridHeight = gridTop - gridBottom;
+  const gridWidth = PAGE_WIDTH - PAGE_MARGIN * 2;
+  const cellWidth = gridWidth / 2;
+  const cellHeight = gridHeight / 2;
+
+  for (let index = 0; index < rounds.length; index += 1) {
+    if (index % 4 === 0) {
+      const page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
+      drawPageHeader(page, event, fonts);
+      drawGridLines(page);
+    }
+    const page = pdfDoc.getPages()[pdfDoc.getPages().length - 1];
+    const cellIndex = index % 4;
+    const row = cellIndex < 2 ? 0 : 1;
+    const col = cellIndex % 2;
+    const cellX = PAGE_MARGIN + col * cellWidth;
+    const cellY = row === 0 ? gridBottom + cellHeight : gridBottom;
+    renderRoundBlock(
+      page,
+      rounds[index],
+      { x: cellX, y: cellY, width: cellWidth, height: cellHeight },
+      fonts,
+      mode
+    );
+  }
+
+  return pdfDoc.save();
+};
 
 export function EventDetailPage() {
   const { eventId } = useParams();
@@ -260,16 +525,51 @@ export function EventDetailPage() {
   };
 
   const generateScoresheets = async () => {
-    if (!eventId) return;
+    if (!eventId || !event) return;
+    if (rounds.length === 0) {
+      setScoresheetGenerateError('No rounds available to generate scoresheets.');
+      return;
+    }
     setScoresheetGenerating(true);
     setScoresheetGenerateError(null);
-    const res = await api.generateScoresheets(eventId);
-    if (res.ok) {
-      setEvent(res.data);
-    } else {
-      setScoresheetGenerateError(res.error.message ?? 'Failed to generate scoresheets.');
+    try {
+      const itemResponses = await Promise.all(rounds.map((round) => api.listEventRoundItems(round.id)));
+      const bundles: RoundBundle[] = [];
+      for (let index = 0; index < rounds.length; index += 1) {
+        const response = itemResponses[index];
+        if (!response.ok) {
+          throw new Error(response.error.message ?? `Failed to load items for round ${rounds[index].round_number}.`);
+        }
+        bundles.push({ round: rounds[index], items: response.data });
+      }
+
+      const scoresheetBytes = await buildPdf(event, bundles, 'scoresheet');
+      const answersheetBytes = await buildPdf(event, bundles, 'answersheet');
+      const baseName = safeFileName(event.title, `event-${event.id.slice(0, 8)}`);
+      const scoresheetFile = new File([scoresheetBytes], `${baseName}-scoresheet.pdf`, {
+        type: 'application/pdf'
+      });
+      const answersheetFile = new File([answersheetBytes], `${baseName}-answersheet.pdf`, {
+        type: 'application/pdf'
+      });
+
+      const scoresheetRes = await api.uploadEventDocument(eventId, 'scoresheet', scoresheetFile);
+      if (!scoresheetRes.ok) {
+        throw new Error(scoresheetRes.error.message ?? 'Failed to upload scoresheet.');
+      }
+      setEvent(scoresheetRes.data);
+
+      const answersheetRes = await api.uploadEventDocument(eventId, 'answersheet', answersheetFile);
+      if (!answersheetRes.ok) {
+        throw new Error(answersheetRes.error.message ?? 'Failed to upload answer sheet.');
+      }
+      setEvent(answersheetRes.data);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to generate scoresheets.';
+      setScoresheetGenerateError(message);
+    } finally {
+      setScoresheetGenerating(false);
     }
-    setScoresheetGenerating(false);
   };
 
   if (!event) {
