@@ -23,6 +23,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params, data }) =>
       eri.ordinal AS ordinal,
      ei.media_type,
      ei.media_key,
+     ei.audio_answer_key,
      ei.media_caption,
      ei.created_at
     FROM event_round_items eri

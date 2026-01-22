@@ -14,6 +14,7 @@ export function GameDetailPage() {
   const [gameTypes, setGameTypes] = useState<GameType[]>([]);
   const [name, setName] = useState('');
   const [gameTypeId, setGameTypeId] = useState('');
+  const [subtype, setSubtype] = useState('');
   const [description, setDescription] = useState('');
   const [descLoading, setDescLoading] = useState(false);
   const [descError, setDescError] = useState<string | null>(null);
@@ -31,6 +32,7 @@ export function GameDetailPage() {
         setName(gameRes.data.name);
         setGameTypeId(gameRes.data.game_type_id);
         setDescription(gameRes.data.description ?? '');
+        setSubtype(gameRes.data.subtype ?? '');
       }
       if (editionsRes.ok) setEditions(editionsRes.data);
       if (typesRes.ok) setGameTypes(typesRes.data);
@@ -40,7 +42,12 @@ export function GameDetailPage() {
 
   const handleUpdate = async () => {
     if (!gameId) return;
-    const res = await api.updateGame(gameId, { name, description, game_type_id: gameTypeId });
+    const res = await api.updateGame(gameId, {
+      name,
+      description,
+      game_type_id: gameTypeId,
+      subtype: subtype.trim() || null
+    });
     if (res.ok) setGame(res.data);
   };
 
@@ -77,6 +84,9 @@ export function GameDetailPage() {
     );
   }
 
+  const selectedType = gameTypes.find((type) => type.id === gameTypeId) ?? null;
+  const isMusicType = selectedType?.code === 'music';
+
   return (
     <AppShell title="Game Detail">
       <div className="grid gap-4 lg:grid-cols-[1fr,320px]">
@@ -101,6 +111,12 @@ export function GameDetailPage() {
                 ))}
               </select>
             </label>
+            {isMusicType && (
+              <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+                Music Subtype
+                <input className="h-10 px-3" value={subtype} onChange={(event) => setSubtype(event.target.value)} />
+              </label>
+            )}
             <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
               Description
               <span className="flex items-center justify-end">

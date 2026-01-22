@@ -235,6 +235,11 @@ export function PlayEventPage() {
   const answerText = displayItem?.answer || (displayItem?.answer_a && displayItem?.answer_b
     ? `${displayItem.answer_a_label ? `${displayItem.answer_a_label}: ` : 'A: '}${displayItem.answer_a} / ${displayItem.answer_b_label ? `${displayItem.answer_b_label}: ` : 'B: '}${displayItem.answer_b}`
     : null);
+  const promptText = displayItem?.prompt?.trim()
+    ? displayItem.prompt
+    : displayItem?.media_type === 'audio'
+      ? 'Listen to the clip.'
+      : '';
   const nextRound = (() => {
     const rounds = data?.rounds ?? [];
     const ordered = [...rounds].sort((a, b) => a.round_number - b.round_number);
@@ -418,7 +423,7 @@ export function PlayEventPage() {
                         onTouchStart={handleSwipeStart}
                         onTouchEnd={handleSwipeEnd}
                       >
-                        {displayItem.prompt}
+                        {promptText}
                       </div>
                       {mediaError && (
                         <div className="rounded-md border border-danger bg-panel px-3 py-2 text-xs text-danger-ink">

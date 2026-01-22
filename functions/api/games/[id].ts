@@ -32,8 +32,15 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
   const merged = { ...existing, ...parsed.data };
   await execute(
     env,
-    `UPDATE games SET name = ?, game_type_id = ?, description = ?, default_settings_json = ? WHERE id = ?`,
-    [merged.name, merged.game_type_id, merged.description ?? null, merged.default_settings_json ?? null, params.id]
+    `UPDATE games SET name = ?, game_type_id = ?, description = ?, subtype = ?, default_settings_json = ? WHERE id = ?`,
+    [
+      merged.name,
+      merged.game_type_id,
+      merged.description ?? null,
+      merged.subtype ?? null,
+      merged.default_settings_json ?? null,
+      params.id
+    ]
   );
 
   const row = await queryFirst(env, 'SELECT * FROM games WHERE id = ? AND COALESCE(deleted, 0) = 0', [params.id]);

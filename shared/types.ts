@@ -41,6 +41,7 @@ export type Game = {
   name: string;
   game_type_id: Id;
   description: string | null;
+  subtype: string | null;
   default_settings_json: string | null;
   created_at: string;
 };
@@ -79,6 +80,7 @@ export type EditionItem = {
   media_type: MediaType | null;
   media_key: string | null;
   media_caption: string | null;
+  audio_answer_key: string | null;
   created_at: string;
 };
 

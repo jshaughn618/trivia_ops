@@ -9,6 +9,15 @@ import type { Game, GameType } from '../types';
 function GameTypeIcon({ type }: { type: GameType | null }) {
   const key = `${type?.code ?? ''} ${type?.name ?? ''}`.toLowerCase();
   const common = 'h-5 w-5 text-muted';
+  if (key.includes('music')) {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true" className={common} fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M9 18V5l10-2v13" />
+        <circle cx="7" cy="18" r="3" />
+        <circle cx="19" cy="16" r="3" />
+      </svg>
+    );
+  }
   if (key.includes('audio')) {
     return (
       <svg viewBox="0 0 24 24" aria-hidden="true" className={common} fill="none" stroke="currentColor" strokeWidth="2">
@@ -44,6 +53,7 @@ export function GamesPage() {
   const [gameTypes, setGameTypes] = useState<GameType[]>([]);
   const [name, setName] = useState('');
   const [gameTypeId, setGameTypeId] = useState('');
+  const [subtype, setSubtype] = useState('');
   const [filterTypeId, setFilterTypeId] = useState('');
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
@@ -61,17 +71,25 @@ export function GamesPage() {
   const handleCreate = async () => {
     if (!name.trim() || !gameTypeId) return;
     setLoading(true);
-    const res = await api.createGame({ name, description, game_type_id: gameTypeId });
+    const res = await api.createGame({
+      name,
+      description,
+      game_type_id: gameTypeId,
+      subtype: subtype.trim() || null
+    });
     setLoading(false);
     if (res.ok) {
       setName('');
       setDescription('');
       setGameTypeId('');
+      setSubtype('');
       load();
     }
   };
 
   const typeById = useMemo(() => Object.fromEntries(gameTypes.map((type) => [type.id, type])), [gameTypes]);
+  const selectedType = typeById[gameTypeId] ?? null;
+  const isMusicType = selectedType?.code === 'music';
 
   return (
     <AppShell title="Games">
@@ -112,7 +130,7 @@ export function GamesPage() {
                   <div className="text-sm font-display uppercase tracking-[0.25em]">{game.name}</div>
                 </div>
                 <div className="mt-1 text-xs text-muted uppercase tracking-[0.2em]">
-                  {game.description ?? 'No description'}
+                  {game.subtype ? `${game.subtype} • ${game.description ?? 'No description'}` : game.description ?? 'No description'}
                 </div>
               </Link>
             ))}
@@ -135,6 +153,12 @@ export function GamesPage() {
                 ))}
               </select>
             </label>
+            {isMusicType && (
+              <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+                Music Subtype
+                <input className="h-10 px-3" value={subtype} onChange={(event) => setSubtype(event.target.value)} />
+              </label>
+            )}
             <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
               Description
               <textarea
@@ -152,6 +176,7 @@ export function GamesPage() {
                   setName('');
                   setDescription('');
                   setGameTypeId('');
+                  setSubtype('');
                 }}
               >
                 Clear

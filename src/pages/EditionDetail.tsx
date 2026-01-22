@@ -16,6 +16,7 @@ const emptyItem = {
   fun_fact: '',
   media_key: '',
   media_type: '',
+  audio_answer_key: '',
   media_filename: ''
 };
 
@@ -25,7 +26,7 @@ export function EditionDetailPage() {
   const [edition, setEdition] = useState<GameEdition | null>(null);
   const [items, setItems] = useState<EditionItem[]>([]);
   const [games, setGames] = useState<Game[]>([]);
-  const [itemDraft, setItemDraft] = useState({ ...emptyItem });
+  const [itemDraft, setItemDraft] = useState({ ...emptyItem, item_mode: 'text' as 'text' | 'audio' });
   const [status, setStatus] = useState('draft');
   const [tags, setTags] = useState('');
   const [theme, setTheme] = useState('');
@@ -52,12 +53,16 @@ export function EditionDetailPage() {
   const [bulkLoading, setBulkLoading] = useState(false);
   const [bulkError, setBulkError] = useState<string | null>(null);
   const [bulkResult, setBulkResult] = useState<string | null>(null);
+  const [musicBulkLoading, setMusicBulkLoading] = useState(false);
+  const [musicBulkError, setMusicBulkError] = useState<string | null>(null);
+  const [musicBulkResult, setMusicBulkResult] = useState<string | null>(null);
   const [activeItemId, setActiveItemId] = useState<string | null>(null);
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [itemMenuId, setItemMenuId] = useState<string | null>(null);
   const itemMenuRef = useRef<HTMLDivElement | null>(null);
   const editUploadRef = useRef<HTMLInputElement | null>(null);
   const newUploadRef = useRef<HTMLInputElement | null>(null);
+  const musicUploadRef = useRef<HTMLInputElement | null>(null);
 
   const load = async () => {
     if (!editionId) return;
@@ -134,8 +139,14 @@ export function EditionDetailPage() {
 
   const handleCreateItem = async () => {
     if (!editionId) return;
-    if (!itemDraft.prompt.trim()) {
+    const isMusic = gameTypeId === 'music';
+    const isMusicAudio = isMusic && itemDraft.item_mode === 'audio';
+    if (!isMusicAudio && !itemDraft.prompt.trim()) {
       setItemValidationError('Question is required.');
+      return;
+    }
+    if (isMusicAudio && !itemDraft.media_key) {
+      setItemValidationError('Question audio clip is required.');
       return;
     }
     if (gameTypeId === 'audio') {
@@ -157,12 +168,13 @@ export function EditionDetailPage() {
       answer_a_label: itemDraft.answer_a_label || null,
       answer_b_label: itemDraft.answer_b_label || null,
       fun_fact: itemDraft.fun_fact || null,
-      media_type: itemDraft.media_type || null,
+      media_type: isMusicAudio ? 'audio' : itemDraft.media_type || null,
       media_key: itemDraft.media_key || null,
+      audio_answer_key: itemDraft.audio_answer_key || null,
       ordinal: nextOrdinal
     });
     if (res.ok) {
-      setItemDraft({ ...emptyItem });
+      setItemDraft({ ...emptyItem, item_mode: 'text' });
       setActiveItemId(null);
       setItemValidationError(null);
       load();
@@ -170,6 +182,7 @@ export function EditionDetailPage() {
   };
 
   const startEdit = (item: EditionItem) => {
+    const isAudioItem = item.media_type === 'audio' || Boolean(item.media_key) || Boolean(item.audio_answer_key);
     setActiveItemId(item.id);
     setRefineOpen(false);
     setRefineOptions([]);
@@ -185,19 +198,27 @@ export function EditionDetailPage() {
       fun_fact: item.fun_fact ?? '',
       media_type: item.media_type ?? '',
       media_key: item.media_key ?? '',
-      media_filename: ''
+      audio_answer_key: item.audio_answer_key ?? '',
+      media_filename: '',
+      item_mode: isAudioItem ? 'audio' : 'text'
     });
   };
 
   const cancelEdit = () => {
     setActiveItemId(null);
-    setItemDraft({ ...emptyItem });
+    setItemDraft({ ...emptyItem, item_mode: 'text' });
     setItemValidationError(null);
   };
 
   const saveEdit = async (item: EditionItem) => {
-    if (!itemDraft.prompt.trim()) {
+    const isMusic = gameTypeId === 'music';
+    const isMusicAudio = isMusic && itemDraft.item_mode === 'audio';
+    if (!isMusicAudio && !itemDraft.prompt.trim()) {
       setItemValidationError('Question is required.');
+      return;
+    }
+    if (isMusicAudio && !itemDraft.media_key) {
+      setItemValidationError('Question audio clip is required.');
       return;
     }
     if (gameTypeId === 'audio') {
@@ -219,8 +240,9 @@ export function EditionDetailPage() {
       answer_a_label: itemDraft.answer_a_label || null,
       answer_b_label: itemDraft.answer_b_label || null,
       fun_fact: itemDraft.fun_fact || null,
-      media_type: itemDraft.media_type || null,
-      media_key: itemDraft.media_key || null
+      media_type: isMusicAudio ? 'audio' : itemDraft.media_type || null,
+      media_key: itemDraft.media_key || null,
+      audio_answer_key: itemDraft.audio_answer_key || null
     });
     if (res.ok) {
       cancelEdit();
@@ -244,11 +266,12 @@ export function EditionDetailPage() {
   };
 
   const handleUpload = async (item: EditionItem, file: File) => {
-    if (gameTypeId === 'audio' && file.type !== 'audio/mpeg') {
+    const isAudioGame = gameTypeId === 'audio' || gameTypeId === 'music';
+    if (isAudioGame && file.type !== 'audio/mpeg') {
       setMediaError('Audio rounds require MP3 files.');
       return;
     }
-    const kind = gameTypeId === 'audio' ? 'audio' : file.type.startsWith('audio/') ? 'audio' : 'image';
+    const kind = isAudioGame ? 'audio' : file.type.startsWith('audio/') ? 'audio' : 'image';
     setMediaUploading(true);
     setMediaError(null);
     const uploadRes = await api.uploadMedia(file, kind);
@@ -293,11 +316,12 @@ export function EditionDetailPage() {
   };
 
   const handleDraftUpload = async (file: File) => {
-    if (gameTypeId === 'audio' && file.type !== 'audio/mpeg') {
+    const isAudioGame = gameTypeId === 'audio' || gameTypeId === 'music';
+    if (isAudioGame && file.type !== 'audio/mpeg') {
       setMediaError('Audio rounds require MP3 files.');
       return;
     }
-    const kind = gameTypeId === 'audio' ? 'audio' : file.type.startsWith('audio/') ? 'audio' : 'image';
+    const kind = isAudioGame ? 'audio' : file.type.startsWith('audio/') ? 'audio' : 'image';
     setMediaUploading(true);
     setMediaError(null);
     const uploadRes = await api.uploadMedia(file, kind);
@@ -314,12 +338,83 @@ export function EditionDetailPage() {
     }
   };
 
+  const uploadAudioClip = async (file: File) => {
+    const isMp3 = file.type === 'audio/mpeg' || file.name.toLowerCase().endsWith('.mp3');
+    if (!isMp3) {
+      setMediaError('MP3 files only.');
+      return null;
+    }
+    setMediaUploading(true);
+    setMediaError(null);
+    const uploadRes = await api.uploadMedia(file, 'audio');
+    setMediaUploading(false);
+    if (!uploadRes.ok) {
+      setMediaError(uploadRes.error.message);
+      return null;
+    }
+    return uploadRes.data.key;
+  };
+
+  const handleQuestionAudioUpload = async (item: EditionItem | null, file: File) => {
+    const key = await uploadAudioClip(file);
+    if (!key) return;
+    if (item) {
+      await api.updateEditionItem(item.id, { media_type: 'audio', media_key: key });
+    }
+    setItemDraft((draft) => ({
+      ...draft,
+      media_type: 'audio',
+      media_key: key
+    }));
+    load();
+  };
+
+  const handleAnswerAudioUpload = async (item: EditionItem | null, file: File) => {
+    const key = await uploadAudioClip(file);
+    if (!key) return;
+    if (item) {
+      await api.updateEditionItem(item.id, { audio_answer_key: key });
+    }
+    setItemDraft((draft) => ({
+      ...draft,
+      audio_answer_key: key
+    }));
+    load();
+  };
+
+  const handleDeleteAnswerAudio = async (item?: EditionItem) => {
+    if (!itemDraft.audio_answer_key) return;
+    setMediaUploading(true);
+    setMediaError(null);
+    const res = await api.deleteMedia(itemDraft.audio_answer_key);
+    setMediaUploading(false);
+    if (!res.ok) {
+      setMediaError(res.error.message);
+      return;
+    }
+    if (item) {
+      await api.updateEditionItem(item.id, { audio_answer_key: null });
+    }
+    setItemDraft((draft) => ({
+      ...draft,
+      audio_answer_key: ''
+    }));
+    load();
+  };
+
   const startNewItem = () => {
+    const lastItem = [...items].sort((a, b) => a.ordinal - b.ordinal).at(-1);
+    const visualPrompt = gameTypeId === 'visual' ? lastItem?.prompt?.trim() ?? '' : '';
     setActiveItemId('new');
     setRefineOpen(false);
     setRefineOptions([]);
     setRefineError(null);
-    setItemDraft({ ...emptyItem });
+    setItemDraft({
+      ...emptyItem,
+      prompt: visualPrompt,
+      item_mode: gameTypeId === 'music' ? 'audio' : 'text',
+      media_type: gameTypeId === 'music' ? 'audio' : ''
+    });
     setItemValidationError(null);
   };
 
@@ -510,6 +605,127 @@ export function EditionDetailPage() {
     load();
   };
 
+  const parseMusicFilename = (file: File) => {
+    const name = file.name.replace(/\.[^/.]+$/, '').trim();
+    const match = /^([Aa])?(\d{1,3})\s*[-_ ]?\s*(.*)$/.exec(name);
+    if (!match) return null;
+    const isAnswer = Boolean(match[1]);
+    const ordinal = Number(match[2]);
+    const title = (match[3] ?? '').trim();
+    if (!ordinal) return null;
+    return { isAnswer, ordinal, title };
+  };
+
+  const handleMusicBulkUpload = async (fileList: FileList) => {
+    if (!editionId) return;
+    setMusicBulkLoading(true);
+    setMusicBulkError(null);
+    setMusicBulkResult(null);
+
+    const groups = new Map<number, { question?: File; answer?: File; title?: string }>();
+    const errors: string[] = [];
+    const files = Array.from(fileList);
+
+    for (const file of files) {
+      const parsed = parseMusicFilename(file);
+      if (!parsed) {
+        errors.push(`Unrecognized filename: ${file.name}`);
+        continue;
+      }
+      const isMp3 = file.type === 'audio/mpeg' || file.name.toLowerCase().endsWith('.mp3');
+      if (!isMp3) {
+        errors.push(`Not an MP3: ${file.name}`);
+        continue;
+      }
+      const entry = groups.get(parsed.ordinal) ?? {};
+      if (parsed.isAnswer) {
+        if (entry.answer) {
+          errors.push(`Duplicate answer clip for ${parsed.ordinal}`);
+        } else {
+          entry.answer = file;
+        }
+      } else {
+        if (entry.question) {
+          errors.push(`Duplicate question clip for ${parsed.ordinal}`);
+        } else {
+          entry.question = file;
+        }
+      }
+      if (parsed.title && !entry.title) entry.title = parsed.title;
+      groups.set(parsed.ordinal, entry);
+    }
+
+    if (errors.length > 0) {
+      setMusicBulkError(errors.join(' • '));
+      setMusicBulkLoading(false);
+      return;
+    }
+
+    const itemsByOrdinal = new Map(items.map((item) => [item.ordinal, item]));
+    let created = 0;
+    let updated = 0;
+
+    const sorted = [...groups.entries()].sort((a, b) => a[0] - b[0]);
+    for (const [ordinal, entry] of sorted) {
+      if (!entry.question) {
+        errors.push(`Missing question clip for ${ordinal}`);
+        continue;
+      }
+      if (!entry.title) {
+        errors.push(`Missing title in filename for ${ordinal}`);
+        continue;
+      }
+
+      const uploadQuestion = await api.uploadMedia(entry.question, 'audio');
+      if (!uploadQuestion.ok) {
+        errors.push(`Upload failed for ${entry.question.name}`);
+        continue;
+      }
+      const questionKey = uploadQuestion.data.key;
+
+      let answerKey: string | null = null;
+      if (entry.answer) {
+        const uploadAnswer = await api.uploadMedia(entry.answer, 'audio');
+        if (!uploadAnswer.ok) {
+          errors.push(`Upload failed for ${entry.answer.name}`);
+        } else {
+          answerKey = uploadAnswer.data.key;
+        }
+      }
+
+      const existing = itemsByOrdinal.get(ordinal);
+      if (existing) {
+        const res = await api.updateEditionItem(existing.id, {
+          prompt: existing.prompt ?? '',
+          answer: entry.title,
+          media_type: 'audio',
+          media_key: questionKey,
+          audio_answer_key: answerKey
+        });
+        if (res.ok) updated += 1;
+      } else {
+        const res = await api.createEditionItem(editionId, {
+          prompt: '',
+          answer: entry.title,
+          media_type: 'audio',
+          media_key: questionKey,
+          audio_answer_key: answerKey,
+          ordinal
+        });
+        if (res.ok) created += 1;
+      }
+    }
+
+    if (errors.length > 0) {
+      setMusicBulkError(errors.join(' • '));
+    }
+    if (created || updated) {
+      setMusicBulkResult(`Created ${created} • Updated ${updated}`);
+      load();
+    }
+    setMusicBulkLoading(false);
+  };
+
   if (!edition) {
     return (
       <AppShell title="Edition Detail">
@@ -627,6 +843,42 @@ export function EditionDetailPage() {
               )}
             </div>
           )}
+          {gameTypeId === 'music' && (
+            <div className="mb-4 border-2 border-border bg-panel2 p-3">
+              <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">Music Bulk Upload</div>
+              <div className="mt-2 text-[10px] uppercase tracking-[0.2em] text-muted">
+                Upload MP3s named like “01 - Song Name.mp3” and “A01 - Song Name.mp3”.
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <input
+                  ref={musicUploadRef}
+                  type="file"
+                  accept="audio/mpeg"
+                  multiple
+                  className="hidden"
+                  onChange={(event) => {
+                    const files = event.target.files;
+                    event.target.value = '';
+                    if (files && files.length > 0) handleMusicBulkUpload(files);
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => musicUploadRef.current?.click()}
+                  className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
+                  disabled={musicBulkLoading}
+                >
+                  {musicBulkLoading ? 'Uploading' : 'Upload MP3s'}
+                </button>
+              </div>
+              {musicBulkError && (
+                <div className="mt-2 text-xs uppercase tracking-[0.2em] text-danger">{musicBulkError}</div>
+              )}
+              {musicBulkResult && (
+                <div className="mt-2 text-xs uppercase tracking-[0.2em] text-muted">{musicBulkResult}</div>
+              )}
+            </div>
+          )}
           <div className="flex flex-col gap-3">
             {orderedItems.length === 0 && (
               <div className="text-xs uppercase tracking-[0.2em] text-muted">No items yet.</div>
@@ -689,7 +941,13 @@ export function EditionDetailPage() {
                       )}
                     </div>
                   </div>
-                  <div className="mt-2 text-sm text-text">{item.prompt}</div>
+                  <div className="mt-2 text-sm text-text">
+                    {item.prompt?.trim()
+                      ? item.prompt
+                      : gameTypeId === 'music' && item.media_type === 'audio'
+                        ? `Audio Clip ${item.ordinal}`
+                        : ''}
+                  </div>
                   <div className="mt-1 text-xs uppercase tracking-[0.2em] text-muted">
                     {item.answer || (item.answer_a && item.answer_b
                       ? `${item.answer_a_label ? `${item.answer_a_label}: ` : 'A: '}${item.answer_a} / ${item.answer_b_label ? `${item.answer_b_label}: ` : 'B: '}${item.answer_b}`
@@ -700,6 +958,14 @@ export function EditionDetailPage() {
                       {item.media_key ? `${item.media_type} attached` : 'No media'} • Drag to reorder
                     </div>
                   )}
+                  {gameTypeId === 'music' && (
+                    <div className="mt-2 text-[10px] uppercase tracking-[0.2em] text-muted">
+                      {item.media_key ? 'Question audio attached' : 'No question audio'}
+                      {' • '}
+                      {item.audio_answer_key ? 'Answer audio attached' : 'No answer audio'}
+                      {' • Drag to reorder'}
+                    </div>
+                  )}
                 </div>
                 {activeItemId === item.id && (
                   <div className="border-2 border-border bg-panel p-3">
@@ -707,9 +973,33 @@ export function EditionDetailPage() {
                       Edit Item {index + 1}
                     </div>
                     <div className="mt-3 grid gap-3">
+                      {gameTypeId === 'music' && (
+                        <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+                          Item Type
+                          <select
+                            className="h-10 px-3"
+                            value={itemDraft.item_mode}
+                            onChange={(event) =>
+                              setItemDraft((draft) => {
+                                const mode = event.target.value as 'audio' | 'text';
+                                return {
+                                  ...draft,
+                                  item_mode: mode,
+                                  media_type: mode === 'audio' ? 'audio' : '',
+                                  media_key: mode === 'audio' ? draft.media_key : '',
+                                  audio_answer_key: mode === 'audio' ? draft.audio_answer_key : ''
+                                };
+                              })
+                            }
+                          >
+                            <option value="audio">Audio Clip</option>
+                            <option value="text">Text Question</option>
+                          </select>
+                        </label>
+                      )}
                       <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
                         <span className="flex items-center justify-between">
-                          Question
+                          {gameTypeId === 'music' && itemDraft.item_mode === 'audio' ? 'Question (optional)' : 'Question'}
                           <button
                             type="button"
                             onClick={startRefine}
@@ -861,6 +1151,80 @@ export function EditionDetailPage() {
                           {mediaError && <span className="text-[10px] tracking-[0.2em] text-danger">{mediaError}</span>}
                         </label>
                       )}
+                      {gameTypeId === 'music' && itemDraft.item_mode === 'audio' && (
+                        <div className="grid gap-3">
+                          <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+                            Question Audio
+                            <div className="flex flex-wrap items-center gap-2">
+                              <input
+                                type="file"
+                                accept="audio/mpeg"
+                                className="hidden"
+                                ref={editUploadRef}
+                                onChange={(event) => {
+                                  const file = event.target.files?.[0];
+                                  event.target.value = '';
+                                  if (file) handleQuestionAudioUpload(item, file);
+                                }}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => editUploadRef.current?.click()}
+                                className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
+                              >
+                                {mediaUploading ? 'Uploading' : 'Upload Question MP3'}
+                              </button>
+                              {itemDraft.media_key && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteMedia(item)}
+                                  className="border-2 border-danger px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-danger hover:border-[#9d2a24]"
+                                >
+                                  Remove
+                                </button>
+                              )}
+                            </div>
+                            {itemDraft.media_key && (
+                              <audio className="w-full" controls src={api.mediaUrl(itemDraft.media_key)} />
+                            )}
+                          </label>
+                          <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+                            Answer Audio (Optional)
+                            <div className="flex flex-wrap items-center gap-2">
+                              <input
+                                type="file"
+                                accept="audio/mpeg"
+                                className="hidden"
+                                ref={newUploadRef}
+                                onChange={(event) => {
+                                  const file = event.target.files?.[0];
+                                  event.target.value = '';
+                                  if (file) handleAnswerAudioUpload(item, file);
+                                }}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => newUploadRef.current?.click()}
+                                className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
+                              >
+                                {mediaUploading ? 'Uploading' : 'Upload Answer MP3'}
+                              </button>
+                              {itemDraft.audio_answer_key && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteAnswerAudio(item)}
+                                  className="border-2 border-danger px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-danger hover:border-[#9d2a24]"
+                                >
+                                  Remove
+                                </button>
+                              )}
+                            </div>
+                            {itemDraft.audio_answer_key && (
+                              <audio className="w-full" controls src={api.mediaUrl(itemDraft.audio_answer_key)} />
+                            )}
+                          </label>
+                        </div>
+                      )}
                       {itemValidationError && (
                         <div className="border-2 border-danger bg-panel px-3 py-2 text-xs uppercase tracking-[0.2em] text-danger">
                           {itemValidationError}
@@ -926,9 +1290,33 @@ export function EditionDetailPage() {
             <div className="mt-4 border-2 border-border bg-panel p-3">
               <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">New Item</div>
               <div className="mt-3 grid gap-3">
+                {gameTypeId === 'music' && (
+                  <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+                    Item Type
+                    <select
+                      className="h-10 px-3"
+                      value={itemDraft.item_mode}
+                      onChange={(event) =>
+                        setItemDraft((draft) => {
+                          const mode = event.target.value as 'audio' | 'text';
+                          return {
+                            ...draft,
+                            item_mode: mode,
+                            media_type: mode === 'audio' ? 'audio' : '',
+                            media_key: mode === 'audio' ? draft.media_key : '',
+                            audio_answer_key: mode === 'audio' ? draft.audio_answer_key : ''
+                          };
+                        })
+                      }
+                    >
+                      <option value="audio">Audio Clip</option>
+                      <option value="text">Text Question</option>
+                    </select>
+                  </label>
+                )}
                 <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
                   <span className="flex items-center justify-between">
-                    Question
+                    {gameTypeId === 'music' && itemDraft.item_mode === 'audio' ? 'Question (optional)' : 'Question'}
                   <button
                     type="button"
                     onClick={startRefine}
@@ -1079,6 +1467,80 @@ export function EditionDetailPage() {
                   )}
                   {mediaError && <span className="text-[10px] tracking-[0.2em] text-danger">{mediaError}</span>}
                 </label>
+              )}
+              {gameTypeId === 'music' && itemDraft.item_mode === 'audio' && (
+                <div className="grid gap-3">
+                  <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+                    Question Audio
+                    <div className="flex flex-wrap items-center gap-2">
+                      <input
+                        ref={newUploadRef}
+                        type="file"
+                        accept="audio/mpeg"
+                        className="hidden"
+                        onChange={(event) => {
+                          const file = event.target.files?.[0];
+                          event.target.value = '';
+                          if (file) handleQuestionAudioUpload(null, file);
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => newUploadRef.current?.click()}
+                        className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
+                      >
+                        {mediaUploading ? 'Uploading' : 'Upload Question MP3'}
+                      </button>
+                      {itemDraft.media_key && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteMedia()}
+                          className="border-2 border-danger px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-danger hover:border-[#9d2a24]"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                    {itemDraft.media_key && (
+                      <audio className="w-full" controls src={api.mediaUrl(itemDraft.media_key)} />
+                    )}
+                  </label>
+                  <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+                    Answer Audio (Optional)
+                    <div className="flex flex-wrap items-center gap-2">
+                      <input
+                        ref={editUploadRef}
+                        type="file"
+                        accept="audio/mpeg"
+                        className="hidden"
+                        onChange={(event) => {
+                          const file = event.target.files?.[0];
+                          event.target.value = '';
+                          if (file) handleAnswerAudioUpload(null, file);
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => editUploadRef.current?.click()}
+                        className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
+                      >
+                        {mediaUploading ? 'Uploading' : 'Upload Answer MP3'}
+                      </button>
+                      {itemDraft.audio_answer_key && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteAnswerAudio()}
+                          className="border-2 border-danger px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-danger hover:border-[#9d2a24]"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                    {itemDraft.audio_answer_key && (
+                      <audio className="w-full" controls src={api.mediaUrl(itemDraft.audio_answer_key)} />
+                    )}
+                  </label>
+                </div>
               )}
               {itemValidationError && (
                 <div className="border-2 border-danger bg-panel px-3 py-2 text-xs uppercase tracking-[0.2em] text-danger">

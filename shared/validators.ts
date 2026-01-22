@@ -19,6 +19,7 @@ export const gameCreateSchema = z.object({
   name: z.string().min(1),
   game_type_id: idSchema,
   description: z.string().nullable().optional(),
+  subtype: z.string().nullable().optional(),
   default_settings_json: z.string().nullable().optional()
 });
 
@@ -26,6 +27,7 @@ export const gameUpdateSchema = z.object({
   name: z.string().min(1).optional(),
   game_type_id: idSchema.optional(),
   description: z.string().nullable().optional(),
+  subtype: z.string().nullable().optional(),
   default_settings_json: z.string().nullable().optional()
 });
 
@@ -54,7 +56,7 @@ export const editionUpdateSchema = z.object({
 });
 
 const editionItemBaseSchema = z.object({
-  prompt: z.string().min(1),
+  prompt: z.string(),
   answer: z.string().min(1).optional(),
   answer_a: z.string().min(1).nullable().optional(),
   answer_b: z.string().min(1).nullable().optional(),
@@ -64,10 +66,18 @@ const editionItemBaseSchema = z.object({
   ordinal: z.number().int().min(0),
   media_type: z.enum(['image', 'audio']).nullable().optional(),
   media_key: z.string().nullable().optional(),
+  audio_answer_key: z.string().nullable().optional(),
   media_caption: z.string().nullable().optional()
 });
 
 export const editionItemCreateSchema = editionItemBaseSchema
+  .refine((data) => {
+    if (data.media_type === 'audio') return true;
+    return data.prompt.trim().length > 0;
+  }, {
+    message: 'Question is required',
+    path: ['prompt']
+  })
   .refine((data) => {
     if (data.media_type === 'image') {
       return Boolean(data.answer);
@@ -90,6 +100,7 @@ export const editionItemUpdateSchema = editionItemBaseSchema
       data.ordinal !== undefined ||
       data.media_type !== undefined ||
       data.media_key !== undefined ||
+      data.audio_answer_key !== undefined ||
       data.media_caption !== undefined,
     {
       message: 'No fields provided',

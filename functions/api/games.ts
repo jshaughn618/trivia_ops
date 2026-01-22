@@ -35,10 +35,18 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, data }) 
 
   await execute(
     env,
-    `INSERT INTO games (id, name, game_type_id, description, default_settings_json, created_at)
-     VALUES (?, ?, ?, ?, ?, ?)`
+    `INSERT INTO games (id, name, game_type_id, description, subtype, default_settings_json, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`
     ,
-    [id, payloadData.name, payloadData.game_type_id, payloadData.description ?? null, defaultSettings, createdAt]
+    [
+      id,
+      payloadData.name,
+      payloadData.game_type_id,
+      payloadData.description ?? null,
+      payloadData.subtype ?? null,
+      defaultSettings,
+      createdAt
+    ]
   );
 
   const rows = await queryAll(env, 'SELECT * FROM games WHERE id = ? AND COALESCE(deleted, 0) = 0', [id]);

@@ -92,6 +92,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
     fun_fact: string | null;
     media_type: string | null;
     media_key: string | null;
+    audio_answer_key: string | null;
     ordinal: number;
   }> = [];
 
@@ -113,6 +114,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
         fun_fact: string | null;
         media_type: string | null;
         media_key: string | null;
+        audio_answer_key: string | null;
         ordinal: number;
       }>(
         env,
@@ -127,6 +129,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
           COALESCE(eri.overridden_fun_fact, ei.fun_fact) AS fun_fact,
           ei.media_type,
           ei.media_key,
+          ei.audio_answer_key,
           eri.ordinal
          FROM event_round_items eri
          JOIN edition_items ei ON ei.id = eri.edition_item_id
@@ -156,6 +159,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
        COALESCE(eri.overridden_fun_fact, ei.fun_fact) AS fun_fact,
        ei.media_type,
        ei.media_key,
+       ei.audio_answer_key,
        ei.media_caption
        FROM event_round_items eri
        JOIN edition_items ei ON ei.id = eri.edition_item_id

@@ -137,6 +137,11 @@ export function EventRunPage() {
 
   const activeRound = useMemo(() => rounds.find((round) => round.id === roundId) ?? null, [rounds, roundId]);
   const item = items[index];
+  const questionLabel = item?.prompt?.trim()
+    ? item.prompt
+    : item?.media_type === 'audio'
+      ? 'Listen to the clip.'
+      : item?.prompt ?? '';
 
   useEffect(() => {
     setAudioError(null);
@@ -372,7 +377,7 @@ export function EventRunPage() {
                         ? `Image ${index + 1}`
                         : `Question ${index + 1}`}
                   </div>
-                  <div className="mt-2 text-lg font-display uppercase tracking-[0.2em]">{item.prompt}</div>
+                  <div className="mt-2 text-lg font-display uppercase tracking-[0.2em]">{questionLabel}</div>
                   {item.media_type === 'image' && item.media_key && (
                     <div className="mt-4 border-2 border-border bg-panel p-2">
                       <img
@@ -433,6 +438,11 @@ export function EventRunPage() {
                         {item.answer_b_label ? `${item.answer_b_label}: ` : 'B: '}
                         {item.answer_b || 'N/A'}
                       </div>
+                    </div>
+                  )}
+                  {item.audio_answer_key && (
+                    <div className="mt-3">
+                      <audio className="w-full" controls src={api.mediaUrl(item.audio_answer_key)} />
                     </div>
                   )}
                 </div>

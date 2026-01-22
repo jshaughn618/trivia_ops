@@ -23,7 +23,7 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
   await execute(
     env,
     `UPDATE edition_items
-     SET prompt = ?, answer = ?, answer_a = ?, answer_b = ?, answer_a_label = ?, answer_b_label = ?, fun_fact = ?, ordinal = ?, media_type = ?, media_key = ?, media_caption = ?
+     SET prompt = ?, answer = ?, answer_a = ?, answer_b = ?, answer_a_label = ?, answer_b_label = ?, fun_fact = ?, ordinal = ?, media_type = ?, media_key = ?, audio_answer_key = ?, media_caption = ?
      WHERE id = ?`,
     [
       merged.prompt,
@@ -36,6 +36,7 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
       merged.ordinal,
       merged.media_type ?? null,
       merged.media_key ?? null,
+      merged.audio_answer_key ?? null,
       merged.media_caption ?? null,
       params.itemId
     ]
