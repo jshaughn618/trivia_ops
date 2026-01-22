@@ -646,7 +646,7 @@ export function EditionDetailPage() {
     return { isAnswer, ordinal, title };
   };
 
-  const handleMusicBulkUpload = async (fileList: FileList) => {
+  const handleMusicBulkUpload = async (files: File[]) => {
     if (!editionId) return;
     setMusicBulkLoading(true);
     setMusicBulkError(null);
@@ -654,7 +654,11 @@ export function EditionDetailPage() {
 
     const groups = new Map<number, { question?: File; answer?: File; title?: string }>();
     const errors: string[] = [];
-    const files = Array.from(fileList);
+    if (files.length === 0) {
+      setMusicBulkError('No files selected.');
+      setMusicBulkLoading(false);
+      return;
+    }
 
     for (const file of files) {
       const parsed = parseMusicFilename(file);
@@ -883,13 +887,13 @@ export function EditionDetailPage() {
                 <input
                   ref={musicUploadRef}
                   type="file"
-                  accept="audio/mpeg"
+                  accept="audio/mpeg,audio/mp3"
                   multiple
                   className="hidden"
                   onChange={(event) => {
-                    const files = event.target.files;
-                    event.target.value = '';
-                    if (files && files.length > 0) handleMusicBulkUpload(files);
+                    const selection = Array.from(event.currentTarget.files ?? []);
+                    event.currentTarget.value = '';
+                    if (selection.length > 0) handleMusicBulkUpload(selection);
                   }}
                 />
                 <button
