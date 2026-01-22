@@ -412,10 +412,10 @@ export function PlayEventPage() {
               </div>
             </div>
 
-          {!teamId && !isClosed && (
-            <div className="mx-auto mt-10 w-full max-w-xl rounded-md border border-border bg-panel2 p-4 text-left">
-              <div className="text-xs uppercase tracking-[0.3em] text-muted">Join a Team</div>
-              <div className="mt-4 flex flex-col gap-3">
+            {!teamId && !isClosed && (
+              <div className="mx-auto mt-10 w-full max-w-xl rounded-md border border-border bg-panel2 p-4 text-left">
+                <div className="text-xs uppercase tracking-[0.3em] text-muted">Join a Team</div>
+                <div className="mt-4 flex flex-col gap-3">
                 <label className="flex flex-col gap-2">
                   <span className="text-xs uppercase tracking-[0.25em] text-muted">Select Team</span>
                   <select
@@ -441,14 +441,14 @@ export function PlayEventPage() {
                   />
                 </label>
                 <PrimaryButton onClick={handleJoin}>Join</PrimaryButton>
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {!isLive && waitingShowLeaderboard && (
-            <div className="mx-auto mt-10 w-full max-w-3xl">
-              <div className="flex items-center justify-between gap-3">
-                <div className="text-xs uppercase tracking-[0.35em] text-muted">Leaderboard</div>
+            {!isLive && waitingShowLeaderboard && (
+              <div className="mx-auto mt-10 w-full max-w-3xl">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-xs uppercase tracking-[0.35em] text-muted">Leaderboard</div>
                 <SecondaryButton
                   onClick={() =>
                     navigate(
@@ -481,7 +481,8 @@ export function PlayEventPage() {
                 ))}
               </div>
             </div>
-          )}
+            )}
+          </div>
         </main>
 
         <div className="px-6 pb-6">
