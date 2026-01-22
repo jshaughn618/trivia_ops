@@ -29,9 +29,9 @@ export function App() {
       <Route
         path="/dashboard"
         element={
-          <RequireAuth>
+          <RequireAdmin>
             <DashboardPage />
-          </RequireAuth>
+          </RequireAdmin>
         }
       />
       <Route

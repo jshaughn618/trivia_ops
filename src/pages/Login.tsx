@@ -29,7 +29,7 @@ export function LoginPage() {
     const result = await auth.login(email, password);
     setLoading(false);
     if (result.ok) {
-      navigate('/dashboard');
+      navigate(result.user?.user_type === 'admin' ? '/dashboard' : '/events');
     } else {
       setError(result.message ?? 'Login failed');
     }
