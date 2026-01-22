@@ -1,8 +1,13 @@
 import type { Env } from '../../../types';
 import { jsonOk } from '../../../responses';
 import { queryAll } from '../../../db';
+import { requireHostOrAdmin, requireRoundAccess } from '../../../access';
 
-export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
+export const onRequestGet: PagesFunction<Env> = async ({ env, params, data }) => {
+  const guard = requireHostOrAdmin(data.user ?? null);
+  if (guard) return guard;
+  const access = await requireRoundAccess(env, data.user ?? null, params.roundId as string);
+  if (access.response) return access.response;
   const rows = await queryAll(
     env,
     `SELECT

@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { RequireAuth } from './auth';
+import { RequireAdmin, RequireAuth } from './auth';
 import { LoginPage } from './pages/Login';
 import { DashboardPage } from './pages/Dashboard';
 import { GamesPage } from './pages/Games';
@@ -37,41 +37,41 @@ export function App() {
       <Route
         path="/games"
         element={
-          <RequireAuth>
+          <RequireAdmin>
             <GamesPage />
-          </RequireAuth>
+          </RequireAdmin>
         }
       />
       <Route
         path="/games/:gameId"
         element={
-          <RequireAuth>
+          <RequireAdmin>
             <GameDetailPage />
-          </RequireAuth>
+          </RequireAdmin>
         }
       />
       <Route
         path="/editions"
         element={
-          <RequireAuth>
+          <RequireAdmin>
             <EditionsPage />
-          </RequireAuth>
+          </RequireAdmin>
         }
       />
       <Route
         path="/editions/new"
         element={
-          <RequireAuth>
+          <RequireAdmin>
             <EditionNewPage />
-          </RequireAuth>
+          </RequireAdmin>
         }
       />
       <Route
         path="/editions/:editionId"
         element={
-          <RequireAuth>
+          <RequireAdmin>
             <EditionDetailPage />
-          </RequireAuth>
+          </RequireAdmin>
         }
       />
       <Route
@@ -85,17 +85,17 @@ export function App() {
       <Route
         path="/events/new"
         element={
-          <RequireAuth>
+          <RequireAdmin>
             <EventNewPage />
-          </RequireAuth>
+          </RequireAdmin>
         }
       />
       <Route
         path="/events/:eventId"
         element={
-          <RequireAuth>
+          <RequireAdmin>
             <EventDetailPage />
-          </RequireAuth>
+          </RequireAdmin>
         }
       />
       <Route
@@ -117,33 +117,33 @@ export function App() {
       <Route
         path="/locations"
         element={
-          <RequireAuth>
+          <RequireAdmin>
             <LocationsPage />
-          </RequireAuth>
+          </RequireAdmin>
         }
       />
       <Route
         path="/locations/:locationId"
         element={
-          <RequireAuth>
+          <RequireAdmin>
             <LocationDetailPage />
-          </RequireAuth>
+          </RequireAdmin>
         }
       />
       <Route
         path="/settings"
         element={
-          <RequireAuth>
+          <RequireAdmin>
             <SettingsPage />
-          </RequireAuth>
+          </RequireAdmin>
         }
       />
       <Route
         path="/settings/users"
         element={
-          <RequireAuth>
+          <RequireAdmin>
             <UsersPage />
-          </RequireAuth>
+          </RequireAdmin>
         }
       />
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../api';
+import { useAuth } from '../auth';
 import { AppShell } from '../components/AppShell';
 import { ButtonLink } from '../components/Buttons';
 import { Panel } from '../components/Panel';
@@ -13,10 +14,15 @@ export function DashboardPage() {
   const [events, setEvents] = useState<Event[]>([]);
   const [editions, setEditions] = useState<GameEdition[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const auth = useAuth();
+  const isAdmin = auth.user?.user_type === 'admin';
 
   useEffect(() => {
     const load = async () => {
-      const [eventsRes, editionsRes] = await Promise.all([api.listEvents(), api.listEditions()]);
+      const [eventsRes, editionsRes] = await Promise.all([
+        api.listEvents(),
+        isAdmin ? api.listEditions() : Promise.resolve({ ok: true as const, data: [] as GameEdition[] })
+      ]);
       if (eventsRes.ok) setEvents(eventsRes.data);
       if (!eventsRes.ok) {
         setError(eventsRes.error.message ?? 'Failed to load events.');
@@ -29,7 +35,7 @@ export function DashboardPage() {
       }
     };
     load();
-  }, []);
+  }, [isAdmin]);
 
   const upcoming = useMemo(() => {
     return [...events]
@@ -56,30 +62,38 @@ export function DashboardPage() {
           {error}
         </div>
       )}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className={`grid gap-4 ${isAdmin ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
         <Link to="/events?status=live">
           <StatTile label="Live Events" value={String(liveCount)} helper="On Air" />
         </Link>
         <Link to="/events?status=planned">
           <StatTile label="Planned Events" value={String(plannedCount)} helper="Scheduled" />
         </Link>
-        <Link to="/editions?status=draft">
-          <StatTile label="Draft Editions" value={String(draftCount)} helper="Build Queue" />
-        </Link>
+        {isAdmin && (
+          <Link to="/editions?status=draft">
+            <StatTile label="Draft Editions" value={String(draftCount)} helper="Build Queue" />
+          </Link>
+        )}
       </div>
 
-      <div className="mt-6 grid gap-4 md:grid-cols-3">
+      <div className={`mt-6 grid gap-4 ${isAdmin ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
         <Panel title="Quick Actions">
           <div className="flex flex-col gap-3">
-            <ButtonLink to="/events/new" variant="primary">
-              Create Event
-            </ButtonLink>
-            <ButtonLink to="/editions/new" variant="secondary">
-              Build Edition
-            </ButtonLink>
-            <ButtonLink to="/games" variant="secondary">
-              Games
-            </ButtonLink>
+            {isAdmin && (
+              <ButtonLink to="/events/new" variant="primary">
+                Create Event
+              </ButtonLink>
+            )}
+            {isAdmin && (
+              <ButtonLink to="/editions/new" variant="secondary">
+                Build Edition
+              </ButtonLink>
+            )}
+            {isAdmin && (
+              <ButtonLink to="/games" variant="secondary">
+                Games
+              </ButtonLink>
+            )}
             <ButtonLink to="/events" variant="secondary">
               Run Event
             </ButtonLink>
@@ -103,28 +117,30 @@ export function DashboardPage() {
           </div>
         </Panel>
 
-        <Panel title="Draft Editions">
-          <div className="flex flex-col gap-3">
-            {drafts.length === 0 && (
-              <div className="text-xs uppercase tracking-[0.2em] text-muted">No draft editions.</div>
-            )}
-            {drafts.map((edition) => (
-              <Link
-                key={edition.id}
-                to={`/editions/${edition.id}`}
-                className="border-2 border-border bg-panel2 p-3"
-              >
-                <div className="text-sm font-display uppercase tracking-[0.25em]">
-                  {edition.theme ?? 'Untitled Theme'}
-                </div>
-                <div className="mt-2 flex items-center justify-between text-xs text-muted uppercase tracking-[0.2em]">
-                  <span>Updated {new Date(edition.updated_at).toLocaleDateString()}</span>
-                  <StampBadge label="DRAFT" variant="inspected" />
-                </div>
-              </Link>
-            ))}
-          </div>
-        </Panel>
+        {isAdmin && (
+          <Panel title="Draft Editions">
+            <div className="flex flex-col gap-3">
+              {drafts.length === 0 && (
+                <div className="text-xs uppercase tracking-[0.2em] text-muted">No draft editions.</div>
+              )}
+              {drafts.map((edition) => (
+                <Link
+                  key={edition.id}
+                  to={`/editions/${edition.id}`}
+                  className="border-2 border-border bg-panel2 p-3"
+                >
+                  <div className="text-sm font-display uppercase tracking-[0.25em]">
+                    {edition.theme ?? 'Untitled Theme'}
+                  </div>
+                  <div className="mt-2 flex items-center justify-between text-xs text-muted uppercase tracking-[0.2em]">
+                    <span>Updated {new Date(edition.updated_at).toLocaleDateString()}</span>
+                    <StampBadge label="DRAFT" variant="inspected" />
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </Panel>
+        )}
       </div>
     </AppShell>
   );

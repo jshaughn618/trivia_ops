@@ -4,8 +4,11 @@ import { parseJson } from '../request';
 import { editionCreateSchema } from '../../shared/validators';
 import { execute, nowIso, queryAll } from '../db';
 import { logError } from '../_lib/log';
+import { requireAdmin } from '../access';
 
-export const onRequestGet: PagesFunction<Env> = async ({ env, request }) => {
+export const onRequestGet: PagesFunction<Env> = async ({ env, request, data }) => {
+  const guard = requireAdmin(data.user ?? null);
+  if (guard) return guard;
   const url = new URL(request.url);
   const params: unknown[] = [];
   const where: string[] = ['COALESCE(deleted, 0) = 0'];
@@ -71,7 +74,9 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, request }) => {
   }
 };
 
-export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
+export const onRequestPost: PagesFunction<Env> = async ({ request, env, data }) => {
+  const guard = requireAdmin(data.user ?? null);
+  if (guard) return guard;
   const payload = await parseJson(request);
   const parsed = editionCreateSchema.safeParse(payload);
   if (!parsed.success) {

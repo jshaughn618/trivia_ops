@@ -3,8 +3,11 @@ import { jsonError, jsonOk } from '../../../responses';
 import { parseJson } from '../../../request';
 import { editionUpdateSchema } from '../../../../shared/validators';
 import { execute, nowIso, queryFirst } from '../../../db';
+import { requireAdmin } from '../../../access';
 
-export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
+export const onRequestGet: PagesFunction<Env> = async ({ env, params, data }) => {
+  const guard = requireAdmin(data.user ?? null);
+  if (guard) return guard;
   const row = await queryFirst(env, 'SELECT * FROM editions WHERE id = ? AND COALESCE(deleted, 0) = 0', [params.id]);
   if (!row) {
     return jsonError({ code: 'not_found', message: 'Edition not found' }, 404);
@@ -12,7 +15,9 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
   return jsonOk(row);
 };
 
-export const onRequestPut: PagesFunction<Env> = async ({ env, params, request }) => {
+export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, data }) => {
+  const guard = requireAdmin(data.user ?? null);
+  if (guard) return guard;
   const payload = await parseJson(request);
   const parsed = editionUpdateSchema.safeParse(payload);
   if (!parsed.success) {
@@ -45,7 +50,9 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request })
   return jsonOk(row);
 };
 
-export const onRequestDelete: PagesFunction<Env> = async ({ env, params }) => {
+export const onRequestDelete: PagesFunction<Env> = async ({ env, params, data }) => {
+  const guard = requireAdmin(data.user ?? null);
+  if (guard) return guard;
   const existing = await queryFirst(env, 'SELECT id FROM editions WHERE id = ? AND COALESCE(deleted, 0) = 0', [params.id]);
   if (!existing) {
     return jsonError({ code: 'not_found', message: 'Edition not found' }, 404);

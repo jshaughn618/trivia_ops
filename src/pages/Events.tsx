@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { api } from '../api';
+import { useAuth } from '../auth';
 import { AppShell } from '../components/AppShell';
 import { Panel } from '../components/Panel';
 import { ButtonLink } from '../components/Buttons';
@@ -13,6 +14,8 @@ export function EventsPage() {
   const [filter, setFilter] = useState('');
   const [error, setError] = useState<string | null>(null);
   const location = useLocation();
+  const auth = useAuth();
+  const isAdmin = auth.user?.user_type === 'admin';
 
   const load = async () => {
     const res = await api.listEvents();
@@ -44,13 +47,20 @@ export function EventsPage() {
         </div>
       )}
       <div className="grid gap-4 lg:grid-cols-[1fr,320px]">
-        <Panel title="Event Log" action={<ButtonLink to="/events/new" variant="primary">New Event</ButtonLink>}>
+        <Panel
+          title="Event Log"
+          action={isAdmin ? <ButtonLink to="/events/new" variant="primary">New Event</ButtonLink> : undefined}
+        >
           <div className="flex flex-col gap-3">
             {filtered.length === 0 && (
               <div className="text-xs uppercase tracking-[0.2em] text-muted">No events.</div>
             )}
             {filtered.map((event) => (
-              <Link key={event.id} to={`/events/${event.id}`} className="border-2 border-border bg-panel2 p-3">
+              <Link
+                key={event.id}
+                to={isAdmin ? `/events/${event.id}` : `/events/${event.id}/run`}
+                className="border-2 border-border bg-panel2 p-3"
+              >
                 <div className="text-sm font-display uppercase tracking-[0.25em]">{event.title}</div>
                 <div className="mt-2 flex items-center justify-between text-xs text-muted uppercase tracking-[0.2em]">
                   <span>{new Date(event.starts_at).toLocaleString()}</span>

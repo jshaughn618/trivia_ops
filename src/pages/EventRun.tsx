@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
 import { api } from '../api';
+import { useAuth } from '../auth';
 import { AppShell } from '../components/AppShell';
 import { Panel } from '../components/Panel';
 import { ButtonLink, PrimaryButton, SecondaryButton } from '../components/Buttons';
@@ -38,14 +39,16 @@ export function EventRunPage() {
   const [waitingSaving, setWaitingSaving] = useState(false);
   const [waitingError, setWaitingError] = useState<string | null>(null);
   const preselectRef = useRef(false);
+  const auth = useAuth();
+  const isAdmin = auth.user?.user_type === 'admin';
 
   const load = async () => {
     if (!eventId) return;
     const [eventRes, roundsRes, editionsRes, gamesRes, liveRes] = await Promise.all([
       api.getEvent(eventId),
       api.listEventRounds(eventId),
-      api.listEditions(),
-      api.listGames(),
+      isAdmin ? api.listEditions() : Promise.resolve({ ok: true as const, data: [] as GameEdition[] }),
+      isAdmin ? api.listGames() : Promise.resolve({ ok: true as const, data: [] as Game[] }),
       api.getLiveState(eventId)
     ]);
     if (eventRes.ok) setEvent(eventRes.data);
@@ -90,7 +93,7 @@ export function EventRunPage() {
 
   useEffect(() => {
     load();
-  }, [eventId]);
+  }, [eventId, isAdmin]);
 
   useEffect(() => {
     if (roundId) loadItems(roundId);
@@ -113,6 +116,12 @@ export function EventRunPage() {
   }, [games]);
 
   const roundDisplay = (round: EventRound) => {
+    if (!isAdmin) {
+      return {
+        title: `Round ${round.round_number}`,
+        detail: round.label
+      };
+    }
     const edition = editionById[round.edition_id];
     const game = edition ? gameById[edition.game_id] : null;
     const editionLabel = edition?.theme ?? edition?.title ?? 'Edition';

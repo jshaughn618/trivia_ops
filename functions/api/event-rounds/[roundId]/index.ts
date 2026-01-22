@@ -3,8 +3,11 @@ import { jsonError, jsonOk } from '../../../responses';
 import { parseJson } from '../../../request';
 import { eventRoundUpdateSchema } from '../../../../shared/validators';
 import { execute, nowIso, queryAll, queryFirst } from '../../../db';
+import { requireAdmin } from '../../../access';
 
-export const onRequestPut: PagesFunction<Env> = async ({ env, params, request }) => {
+export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, data }) => {
+  const guard = requireAdmin(data.user ?? null);
+  if (guard) return guard;
   const payload = await parseJson(request);
   const parsed = eventRoundUpdateSchema.safeParse(payload);
   if (!parsed.success) {
@@ -56,7 +59,9 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request })
   return jsonOk(row);
 };
 
-export const onRequestDelete: PagesFunction<Env> = async ({ env, params }) => {
+export const onRequestDelete: PagesFunction<Env> = async ({ env, params, data }) => {
+  const guard = requireAdmin(data.user ?? null);
+  if (guard) return guard;
   const existing = await queryFirst(env, 'SELECT id FROM event_rounds WHERE id = ? AND COALESCE(deleted, 0) = 0', [params.roundId]);
   if (!existing) {
     return jsonError({ code: 'not_found', message: 'Round not found' }, 404);

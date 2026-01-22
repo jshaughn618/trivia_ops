@@ -3,8 +3,11 @@ import { jsonError, jsonOk } from '../../../responses';
 import { parseJson } from '../../../request';
 import { editionItemCreateSchema } from '../../../../shared/validators';
 import { execute, nowIso, queryAll } from '../../../db';
+import { requireAdmin } from '../../../access';
 
-export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
+export const onRequestGet: PagesFunction<Env> = async ({ env, params, data }) => {
+  const guard = requireAdmin(data.user ?? null);
+  if (guard) return guard;
   const rows = await queryAll(
     env,
     'SELECT * FROM edition_items WHERE edition_id = ? AND COALESCE(deleted, 0) = 0 ORDER BY ordinal ASC',
@@ -13,7 +16,9 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
   return jsonOk(rows);
 };
 
-export const onRequestPost: PagesFunction<Env> = async ({ env, params, request }) => {
+export const onRequestPost: PagesFunction<Env> = async ({ env, params, request, data }) => {
+  const guard = requireAdmin(data.user ?? null);
+  if (guard) return guard;
   const payload = await parseJson(request);
   const parsed = editionItemCreateSchema.safeParse(payload);
   if (!parsed.success) {

@@ -75,3 +75,23 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   }
   return <>{children}</>;
 }
+
+export function RequireAdmin({ children }: { children: ReactNode }) {
+  const { user, loading } = useAuth();
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-bg text-text flex items-center justify-center">
+        <div className="border-2 border-border bg-panel px-6 py-4 text-xs font-display uppercase tracking-[0.3em] text-muted">
+          Loading Session
+        </div>
+      </div>
+    );
+  }
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+  if (user.user_type !== 'admin') {
+    return <Navigate to="/events" replace />;
+  }
+  return <>{children}</>;
+}

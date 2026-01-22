@@ -3,8 +3,13 @@ import { jsonError, jsonOk } from '../../../responses';
 import { parseJson } from '../../../request';
 import { roundScoresUpdateSchema } from '../../../../shared/validators';
 import { execute, nowIso, queryAll } from '../../../db';
+import { requireAdmin, requireHostOrAdmin, requireRoundAccess } from '../../../access';
 
-export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
+export const onRequestGet: PagesFunction<Env> = async ({ env, params, data }) => {
+  const guard = requireHostOrAdmin(data.user ?? null);
+  if (guard) return guard;
+  const access = await requireRoundAccess(env, data.user ?? null, params.roundId as string);
+  if (access.response) return access.response;
   const rows = await queryAll<{ team_id: string; score: number }>(
     env,
     `SELECT team_id, score FROM event_round_scores
@@ -14,7 +19,9 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
   return jsonOk(rows);
 };
 
-export const onRequestPut: PagesFunction<Env> = async ({ env, params, request }) => {
+export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, data }) => {
+  const guard = requireAdmin(data.user ?? null);
+  if (guard) return guard;
   const payload = await parseJson(request);
   const parsed = roundScoresUpdateSchema.safeParse(payload);
   if (!parsed.success) {

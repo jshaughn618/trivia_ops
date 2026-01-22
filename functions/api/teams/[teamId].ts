@@ -3,8 +3,11 @@ import { jsonError, jsonOk } from '../../responses';
 import { parseJson } from '../../request';
 import { teamUpdateSchema } from '../../../shared/validators';
 import { execute, nowIso, queryFirst } from '../../db';
+import { requireAdmin } from '../../access';
 
-export const onRequestPut: PagesFunction<Env> = async ({ env, params, request }) => {
+export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, data }) => {
+  const guard = requireAdmin(data.user ?? null);
+  if (guard) return guard;
   const payload = await parseJson(request);
   const parsed = teamUpdateSchema.safeParse(payload);
   if (!parsed.success) {
@@ -27,7 +30,9 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request })
   return jsonOk(row);
 };
 
-export const onRequestDelete: PagesFunction<Env> = async ({ env, params }) => {
+export const onRequestDelete: PagesFunction<Env> = async ({ env, params, data }) => {
+  const guard = requireAdmin(data.user ?? null);
+  if (guard) return guard;
   const existing = await queryFirst(env, 'SELECT id FROM teams WHERE id = ? AND COALESCE(deleted, 0) = 0', [params.teamId]);
   if (!existing) {
     return jsonError({ code: 'not_found', message: 'Team not found' }, 404);

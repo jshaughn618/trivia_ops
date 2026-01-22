@@ -30,9 +30,11 @@ export function HeaderBar() {
             <NavLink to="/dashboard" className={navLinkClass}>
               Dashboard
             </NavLink>
-            <NavLink to="/games" className={navLinkClass}>
-              Games
-            </NavLink>
+            {isAdmin && (
+              <NavLink to="/games" className={navLinkClass}>
+                Games
+              </NavLink>
+            )}
             <NavLink to="/events" className={navLinkClass}>
               Events
             </NavLink>
@@ -56,18 +58,24 @@ export function HeaderBar() {
                   <NavLink to="/dashboard" className={navLinkClass} onClick={() => setOpen(false)}>
                     Dashboard
                   </NavLink>
-                  <NavLink to="/games" className={navLinkClass} onClick={() => setOpen(false)}>
-                    Games
-                  </NavLink>
+                  {isAdmin && (
+                    <NavLink to="/games" className={navLinkClass} onClick={() => setOpen(false)}>
+                      Games
+                    </NavLink>
+                  )}
                   <NavLink to="/events" className={navLinkClass} onClick={() => setOpen(false)}>
                     Events
                   </NavLink>
-                  <NavLink to="/locations" className={navLinkClass} onClick={() => setOpen(false)}>
-                    Locations
-                  </NavLink>
-                  <NavLink to="/settings" className={navLinkClass} onClick={() => setOpen(false)}>
-                    Settings
-                  </NavLink>
+                  {isAdmin && (
+                    <NavLink to="/locations" className={navLinkClass} onClick={() => setOpen(false)}>
+                      Locations
+                    </NavLink>
+                  )}
+                  {isAdmin && (
+                    <NavLink to="/settings" className={navLinkClass} onClick={() => setOpen(false)}>
+                      Settings
+                    </NavLink>
+                  )}
                   {isAdmin && (
                     <NavLink to="/settings/users" className={navLinkClass} onClick={() => setOpen(false)}>
                       User Admin

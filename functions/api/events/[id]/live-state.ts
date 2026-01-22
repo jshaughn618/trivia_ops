@@ -3,8 +3,13 @@ import { jsonError, jsonOk } from '../../../responses';
 import { parseJson } from '../../../request';
 import { liveStateUpdateSchema } from '../../../../shared/validators';
 import { execute, nowIso, queryFirst } from '../../../db';
+import { requireEventAccess, requireHostOrAdmin } from '../../../access';
 
-export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
+export const onRequestGet: PagesFunction<Env> = async ({ env, params, data }) => {
+  const guard = requireHostOrAdmin(data.user ?? null);
+  if (guard) return guard;
+  const access = await requireEventAccess(env, data.user ?? null, params.id as string);
+  if (access.response) return access.response;
   const row = await queryFirst<{
     id: string;
     event_id: string;
@@ -37,7 +42,11 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
   );
 };
 
-export const onRequestPut: PagesFunction<Env> = async ({ env, params, request }) => {
+export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, data }) => {
+  const guard = requireHostOrAdmin(data.user ?? null);
+  if (guard) return guard;
+  const access = await requireEventAccess(env, data.user ?? null, params.id as string);
+  if (access.response) return access.response;
   const payload = await parseJson(request);
   const parsed = liveStateUpdateSchema.safeParse(payload);
   if (!parsed.success) {

@@ -3,6 +3,7 @@ import { jsonError, jsonOk } from '../../../responses';
 import { execute, queryFirst } from '../../../db';
 import { logInfo, logWarn } from '../../../_lib/log';
 import { MAX_PDF_BYTES, sniffPdf } from '../../../documents';
+import { requireAdmin } from '../../../access';
 
 const DOC_TYPES = new Set(['scoresheet', 'answersheet']);
 
@@ -47,6 +48,9 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request, 
   if (!data.user) {
     return jsonError({ code: 'unauthorized', message: 'Authentication required' }, 401);
   }
+
+  const adminGuard = requireAdmin(data.user ?? null);
+  if (adminGuard) return adminGuard;
 
   if (!docType || !DOC_TYPES.has(docType)) {
     return jsonError({ code: 'invalid_request', message: 'Invalid document type' }, 400);
@@ -125,6 +129,9 @@ export const onRequestDelete: PagesFunction<Env> = async ({ env, params, request
   if (!data.user) {
     return jsonError({ code: 'unauthorized', message: 'Authentication required' }, 401);
   }
+
+  const adminGuard = requireAdmin(data.user ?? null);
+  if (adminGuard) return adminGuard;
 
   if (!docType || !DOC_TYPES.has(docType)) {
     return jsonError({ code: 'invalid_request', message: 'Invalid document type' }, 400);
