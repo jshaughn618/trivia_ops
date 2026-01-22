@@ -4,6 +4,7 @@ export type EditionStatus = 'draft' | 'published' | 'archived';
 export type EventStatus = 'planned' | 'live' | 'completed' | 'canceled';
 export type EventRoundStatus = 'planned' | 'live' | 'locked' | 'completed';
 export type MediaType = 'image' | 'audio';
+export type EventType = 'Pub Trivia' | 'Music Trivia';
 
 export type ApiError = {
   code: string;
@@ -89,6 +90,7 @@ export type Event = {
   host_user_id: Id | null;
   public_code?: string | null;
   status: EventStatus;
+  event_type: EventType;
   notes: string | null;
   scoresheet_key: string | null;
   scoresheet_name: string | null;

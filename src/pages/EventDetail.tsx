@@ -19,6 +19,7 @@ export function EventDetailPage() {
   const [locations, setLocations] = useState<Location[]>([]);
   const [hosts, setHosts] = useState<User[]>([]);
   const [status, setStatus] = useState('planned');
+  const [eventType, setEventType] = useState<'Pub Trivia' | 'Music Trivia'>('Pub Trivia');
   const [notes, setNotes] = useState('');
   const [locationId, setLocationId] = useState('');
   const [hostUserId, setHostUserId] = useState('');
@@ -53,6 +54,7 @@ export function EventDetailPage() {
     if (eventRes.ok) {
       setEvent(eventRes.data);
       setStatus(eventRes.data.status);
+      setEventType(eventRes.data.event_type ?? 'Pub Trivia');
       setNotes(eventRes.data.notes ?? '');
       setLocationId(eventRes.data.location_id ?? '');
       setHostUserId(eventRes.data.host_user_id ?? '');
@@ -143,6 +145,7 @@ export function EventDetailPage() {
     if (!eventId) return;
     const res = await api.updateEvent(eventId, {
       status,
+      event_type: eventType,
       notes,
       location_id: locationId || null,
       host_user_id: hostUserId || null
@@ -358,6 +361,17 @@ export function EventDetailPage() {
                 <option value="live">Live</option>
                 <option value="completed">Completed</option>
                 <option value="canceled">Canceled</option>
+              </select>
+            </label>
+            <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+              Event Type
+              <select
+                className="h-10 px-3"
+                value={eventType}
+                onChange={(event) => setEventType(event.target.value as 'Pub Trivia' | 'Music Trivia')}
+              >
+                <option value="Pub Trivia">Pub Trivia</option>
+                <option value="Music Trivia">Music Trivia</option>
               </select>
             </label>
             <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">

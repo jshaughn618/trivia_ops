@@ -11,6 +11,7 @@ export function EventNewPage() {
   const [hosts, setHosts] = useState<User[]>([]);
   const [title, setTitle] = useState('');
   const [startsAt, setStartsAt] = useState('');
+  const [eventType, setEventType] = useState<'Pub Trivia' | 'Music Trivia'>('Pub Trivia');
   const [locationId, setLocationId] = useState('');
   const [hostUserId, setHostUserId] = useState('');
   const [notes, setNotes] = useState('');
@@ -34,6 +35,7 @@ export function EventNewPage() {
       location_id: locationId || null,
       host_user_id: hostUserId,
       status: 'planned',
+      event_type: eventType,
       notes
     });
     if (res.ok) {
@@ -67,6 +69,17 @@ export function EventNewPage() {
                   {location.name}
                 </option>
               ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+            Event Type
+            <select
+              className="h-10 px-3"
+              value={eventType}
+              onChange={(event) => setEventType(event.target.value as 'Pub Trivia' | 'Music Trivia')}
+            >
+              <option value="Pub Trivia">Pub Trivia</option>
+              <option value="Music Trivia">Music Trivia</option>
             </select>
           </label>
           <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">

@@ -32,6 +32,7 @@ export const gameUpdateSchema = z.object({
 const editionStatusSchema = z.enum(['draft', 'published', 'archived']);
 const eventStatusSchema = z.enum(['planned', 'live', 'completed', 'canceled']);
 const eventRoundStatusSchema = z.enum(['planned', 'live', 'locked', 'completed']);
+const eventTypeSchema = z.enum(['Pub Trivia', 'Music Trivia']);
 const userTypeSchema = z.enum(['admin', 'host', 'player']);
 
 export const editionCreateSchema = z.object({
@@ -102,6 +103,7 @@ export const eventCreateSchema = z.object({
   location_id: idSchema.nullable().optional(),
   host_user_id: idSchema.nullable().optional(),
   status: eventStatusSchema.default('planned'),
+  event_type: eventTypeSchema.default('Pub Trivia'),
   notes: z.string().nullable().optional()
 });
 
@@ -111,6 +113,7 @@ export const eventUpdateSchema = z.object({
   location_id: idSchema.nullable().optional(),
   host_user_id: idSchema.nullable().optional(),
   status: eventStatusSchema.optional(),
+  event_type: eventTypeSchema.optional(),
   notes: z.string().nullable().optional(),
   scoresheet_key: z.string().nullable().optional(),
   scoresheet_name: z.string().nullable().optional(),
