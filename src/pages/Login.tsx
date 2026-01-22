@@ -35,7 +35,7 @@ export function LoginPage() {
     }
   };
 
-  const sanitized = (value: string) => value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const sanitized = (value: string) => value.replace(/\D/g, '');
   const codeValue = code.join('');
   const codeReady = code.every((digit) => digit.length === 1);
 
@@ -70,7 +70,7 @@ export function LoginPage() {
         <img src={logo} alt="Trivia Ops" className="h-16 w-auto" />
         <div className="mt-4">
           <div className="text-3xl font-display tracking-tight">Join game</div>
-          <div className="mt-2 text-sm text-muted">Enter the 4-character code from your host</div>
+          <div className="mt-2 text-sm text-muted">Enter the 4-digit code from your host</div>
           <div className="mt-1 text-xs text-muted">&nbsp;</div>
           <div className="mt-3 flex flex-col gap-3">
             <div className="flex justify-center gap-3">
@@ -80,8 +80,9 @@ export function LoginPage() {
                   ref={(el) => {
                     codeRefs.current[index] = el;
                   }}
-                  inputMode="text"
-                  pattern="[A-Za-z0-9]*"
+                  type="tel"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
                   maxLength={1}
                   className="h-16 w-16 border-2 border-strong bg-panel2 text-center text-2xl font-display tracking-[0.2em] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
                   value={value}

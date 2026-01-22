@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type React from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api';
 import { Panel } from '../components/Panel';
@@ -71,6 +72,7 @@ export function PlayEventPage() {
   const [visualIndex, setVisualIndex] = useState(0);
   const { theme, toggleTheme } = useTheme();
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const normalizedCode = useMemo(() => (code ?? '').trim().toUpperCase(), [code]);
 
   const load = async () => {
@@ -138,6 +140,29 @@ export function PlayEventPage() {
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
   }, [teamMenuOpen]);
+
+  const handleSwipeStart = (event: React.TouchEvent) => {
+    if (event.touches.length !== 1) return;
+    const touch = event.touches[0];
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+  };
+
+  const handleSwipeEnd = (event: React.TouchEvent) => {
+    const start = touchStartRef.current;
+    touchStartRef.current = null;
+    if (!start) return;
+    if (!visualMode || visualItems.length <= 1) return;
+    if (event.changedTouches.length === 0) return;
+    const touch = event.changedTouches[0];
+    const dx = touch.clientX - start.x;
+    const dy = touch.clientY - start.y;
+    if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy)) return;
+    if (dx < 0) {
+      setVisualIndex((prev) => Math.min(prev + 1, visualItems.length - 1));
+    } else {
+      setVisualIndex((prev) => Math.max(prev - 1, 0));
+    }
+  };
 
   const handleJoin = async () => {
     if (!data) return;
@@ -369,7 +394,11 @@ export function PlayEventPage() {
                       )}
                       <div className="text-xs uppercase tracking-[0.35em] text-muted">{questionLabel}</div>
                       {displayItem.media_type === 'image' && displayItem.media_key && (
-                        <div className="w-full rounded-md border border-border bg-panel p-4">
+                        <div
+                          className="w-full rounded-md border border-border bg-panel p-4"
+                          onTouchStart={handleSwipeStart}
+                          onTouchEnd={handleSwipeEnd}
+                        >
                           <img
                             className="max-h-[60vh] w-full object-contain"
                             src={api.publicMediaUrl(data.event.public_code, displayItem.media_key)}
@@ -384,7 +413,11 @@ export function PlayEventPage() {
                           />
                         </div>
                       )}
-                      <div className="text-4xl font-display leading-tight md:text-7xl">
+                      <div
+                        className="text-4xl font-display leading-tight md:text-7xl"
+                        onTouchStart={handleSwipeStart}
+                        onTouchEnd={handleSwipeEnd}
+                      >
                         {displayItem.prompt}
                       </div>
                       {mediaError && (
