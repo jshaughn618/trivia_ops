@@ -39,6 +39,8 @@ export function EventDetailPage() {
   const [scoresheetError, setScoresheetError] = useState<string | null>(null);
   const [answersheetUploading, setAnswersheetUploading] = useState(false);
   const [answersheetError, setAnswersheetError] = useState<string | null>(null);
+  const [scoresheetGenerating, setScoresheetGenerating] = useState(false);
+  const [scoresheetGenerateError, setScoresheetGenerateError] = useState<string | null>(null);
 
   const load = async () => {
     if (!eventId) return;
@@ -257,6 +259,19 @@ export function EventDetailPage() {
     setUploading(false);
   };
 
+  const generateScoresheets = async () => {
+    if (!eventId) return;
+    setScoresheetGenerating(true);
+    setScoresheetGenerateError(null);
+    const res = await api.generateScoresheets(eventId);
+    if (res.ok) {
+      setEvent(res.data);
+    } else {
+      setScoresheetGenerateError(res.error.message ?? 'Failed to generate scoresheets.');
+    }
+    setScoresheetGenerating(false);
+  };
+
   if (!event) {
     return (
       <AppShell title="Event Detail">
@@ -388,6 +403,14 @@ export function EventDetailPage() {
 
         <Panel title="Event Documents">
           <div className="flex flex-col gap-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <PrimaryButton onClick={generateScoresheets} disabled={scoresheetGenerating}>
+                {scoresheetGenerating ? 'Generating…' : 'Generate Scoresheets'}
+              </PrimaryButton>
+              {scoresheetGenerateError && (
+                <div className="text-xs uppercase tracking-[0.2em] text-danger">{scoresheetGenerateError}</div>
+              )}
+            </div>
             <div className="border-2 border-border bg-panel2 p-3">
               <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">Scoresheet (PDF)</div>
               {event.scoresheet_key ? (
