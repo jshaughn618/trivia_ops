@@ -1,0 +1,126 @@
+import type { Env } from '../../../../types';
+import { jsonError, jsonOk } from '../../../../responses';
+import { normalizeCode } from '../../../../public';
+import { parseJson } from '../../../../request';
+import { execute, nowIso, queryFirst } from '../../../../db';
+
+export const onRequestPost: PagesFunction<Env> = async ({ env, params, request }) => {
+  const payload = await parseJson(request);
+  const teamId = payload?.team_id;
+  const itemId = payload?.item_id;
+  const choiceIndex = payload?.choice_index;
+
+  if (!teamId || !itemId || typeof choiceIndex !== 'number') {
+    return jsonError({ code: 'validation_error', message: 'team_id, item_id, and choice_index are required.' }, 400);
+  }
+
+  const code = normalizeCode(params.code as string);
+  const event = await queryFirst<{ id: string }>(
+    env,
+    'SELECT id FROM events WHERE public_code = ? AND COALESCE(deleted, 0) = 0',
+    [code]
+  );
+  if (!event) {
+    return jsonError({ code: 'not_found', message: 'Event not found' }, 404);
+  }
+
+  const team = await queryFirst<{ id: string }>(
+    env,
+    'SELECT id FROM teams WHERE id = ? AND event_id = ? AND COALESCE(deleted, 0) = 0',
+    [teamId, event.id]
+  );
+  if (!team) {
+    return jsonError({ code: 'not_found', message: 'Team not found' }, 404);
+  }
+
+  const live = await queryFirst<{
+    active_round_id: string | null;
+    current_item_ordinal: number | null;
+    timer_started_at: string | null;
+    timer_duration_seconds: number | null;
+  }>(
+    env,
+    `SELECT active_round_id, current_item_ordinal, timer_started_at, timer_duration_seconds
+     FROM event_live_state WHERE event_id = ? AND COALESCE(deleted, 0) = 0`,
+    [event.id]
+  );
+
+  if (!live?.active_round_id || !live.current_item_ordinal) {
+    return jsonError({ code: 'not_live', message: 'No active question.' }, 400);
+  }
+
+  if (!live.timer_started_at || !live.timer_duration_seconds) {
+    return jsonError({ code: 'timer_not_started', message: 'Timer has not started.' }, 400);
+  }
+
+  const expiresAt = new Date(live.timer_started_at).getTime() + live.timer_duration_seconds * 1000;
+  if (Number.isNaN(expiresAt) || Date.now() > expiresAt) {
+    return jsonError({ code: 'timer_expired', message: 'Timer expired.' }, 400);
+  }
+
+  const current = await queryFirst<{
+    edition_item_id: string;
+    question_type: string | null;
+    choices_json: string | null;
+  }>(
+    env,
+    `SELECT eri.edition_item_id, ei.question_type, ei.choices_json
+     FROM event_round_items eri
+     JOIN edition_items ei ON ei.id = eri.edition_item_id
+     WHERE eri.event_round_id = ? AND eri.ordinal = ? AND COALESCE(eri.deleted, 0) = 0 AND COALESCE(ei.deleted, 0) = 0`,
+    [live.active_round_id, live.current_item_ordinal]
+  );
+
+  if (!current || current.edition_item_id !== itemId) {
+    return jsonError({ code: 'not_current', message: 'Item is not active.' }, 400);
+  }
+
+  if (current.question_type !== 'multiple_choice') {
+    return jsonError({ code: 'invalid_type', message: 'Item is not multiple choice.' }, 400);
+  }
+
+  let choices: string[] = [];
+  if (current.choices_json) {
+    try {
+      const parsed = JSON.parse(current.choices_json);
+      if (Array.isArray(parsed)) {
+        choices = parsed.filter((choice) => typeof choice === 'string');
+      }
+    } catch {
+      choices = [];
+    }
+  }
+
+  if (choiceIndex < 0 || choiceIndex >= choices.length) {
+    return jsonError({ code: 'invalid_choice', message: 'Choice is out of range.' }, 400);
+  }
+
+  const choiceText = choices[choiceIndex];
+  const now = nowIso();
+  const existing = await queryFirst<{ id: string }>(
+    env,
+    `SELECT id FROM event_item_responses
+     WHERE event_id = ? AND team_id = ? AND edition_item_id = ? AND COALESCE(deleted, 0) = 0`,
+    [event.id, teamId, itemId]
+  );
+
+  if (existing) {
+    await execute(
+      env,
+      `UPDATE event_item_responses
+       SET choice_index = ?, choice_text = ?, submitted_at = ?, updated_at = ?
+       WHERE id = ?`,
+      [choiceIndex, choiceText, now, now, existing.id]
+    );
+  } else {
+    await execute(
+      env,
+      `INSERT INTO event_item_responses
+       (id, event_id, event_round_id, edition_item_id, team_id, choice_index, choice_text, submitted_at, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [crypto.randomUUID(), event.id, live.active_round_id, itemId, teamId, choiceIndex, choiceText, now, now]
+    );
+  }
+
+  return jsonOk({ ok: true, choice_index: choiceIndex, choice_text: choiceText });
+};

@@ -43,7 +43,8 @@ export const editionCreateSchema = z.object({
   description: z.string().nullable().optional(),
   status: editionStatusSchema.default('draft'),
   tags_csv: z.string().nullable().optional(),
-  theme: z.string().nullable().optional()
+  theme: z.string().nullable().optional(),
+  timer_seconds: z.number().int().min(5).max(600).optional()
 });
 
 export const editionUpdateSchema = z.object({
@@ -52,11 +53,14 @@ export const editionUpdateSchema = z.object({
   description: z.string().nullable().optional(),
   status: editionStatusSchema.optional(),
   tags_csv: z.string().nullable().optional(),
-  theme: z.string().nullable().optional()
+  theme: z.string().nullable().optional(),
+  timer_seconds: z.number().int().min(5).max(600).optional()
 });
 
 const editionItemBaseSchema = z.object({
   prompt: z.string(),
+  question_type: z.enum(['text', 'multiple_choice']).optional(),
+  choices_json: z.array(z.string().min(1)).optional(),
   answer: z.string().min(1).optional(),
   answer_a: z.string().min(1).nullable().optional(),
   answer_b: z.string().min(1).nullable().optional(),
@@ -86,6 +90,13 @@ export const editionItemCreateSchema = editionItemBaseSchema
   }, {
     message: 'Provide an answer or both answer_a and answer_b',
     path: ['answer']
+  })
+  .refine((data) => {
+    if (data.question_type !== 'multiple_choice') return true;
+    return Array.isArray(data.choices_json) && data.choices_json.length >= 2 && Boolean(data.answer);
+  }, {
+    message: 'Multiple choice items need at least two choices and a correct answer.',
+    path: ['choices_json']
   });
 
 export const editionItemUpdateSchema = editionItemBaseSchema
@@ -95,6 +106,8 @@ export const editionItemUpdateSchema = editionItemBaseSchema
       data.answer !== undefined ||
       data.answer_a !== undefined ||
       data.answer_b !== undefined ||
+      data.question_type !== undefined ||
+      data.choices_json !== undefined ||
       data.prompt !== undefined ||
       data.fun_fact !== undefined ||
       data.ordinal !== undefined ||
@@ -214,7 +227,9 @@ export const liveStateUpdateSchema = z.object({
   reveal_fun_fact: z.boolean().optional(),
   waiting_message: z.string().optional().nullable(),
   waiting_show_leaderboard: z.boolean().optional(),
-  waiting_show_next_round: z.boolean().optional()
+  waiting_show_next_round: z.boolean().optional(),
+  timer_started_at: z.string().nullable().optional(),
+  timer_duration_seconds: z.number().int().min(5).max(600).nullable().optional()
 });
 
 export type LocationCreate = z.infer<typeof locationCreateSchema>;

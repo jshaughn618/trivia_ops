@@ -25,7 +25,9 @@ export function EventRunPage() {
   const [index, setIndex] = useState(0);
   const [showAnswer, setShowAnswer] = useState(false);
   const [showFact, setShowFact] = useState(false);
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [timerStartedAt, setTimerStartedAt] = useState<string | null>(null);
+  const [timerDurationSeconds, setTimerDurationSeconds] = useState(15);
+  const [timerRemainingSeconds, setTimerRemainingSeconds] = useState<number | null>(null);
   const timerRef = useRef<number | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -62,6 +64,8 @@ export function EventRunPage() {
         setWaitingShowNextRound(
           liveRes.data.waiting_show_next_round === undefined ? true : Boolean(liveRes.data.waiting_show_next_round)
         );
+        setTimerStartedAt(liveRes.data.timer_started_at ?? null);
+        setTimerDurationSeconds(liveRes.data.timer_duration_seconds ?? 15);
       }
     }
     const preselect = query.get('round') ?? '';
@@ -80,12 +84,16 @@ export function EventRunPage() {
       setIndex(0);
       setShowAnswer(false);
       setShowFact(false);
+      setTimerStartedAt(null);
+      setTimerRemainingSeconds(null);
       if (eventId) {
         await api.updateLiveState(eventId, {
           active_round_id: selectedRoundId,
           current_item_ordinal: sorted[0]?.ordinal ?? null,
           reveal_answer: false,
-          reveal_fun_fact: false
+          reveal_fun_fact: false,
+          timer_started_at: null,
+          timer_duration_seconds: null
         });
       }
     }
@@ -142,6 +150,10 @@ export function EventRunPage() {
     : item?.media_type === 'audio'
       ? 'Listen to the clip.'
       : item?.prompt ?? '';
+
+  useEffect(() => {
+    setTimerDurationSeconds(activeRound?.timer_seconds ?? 15);
+  }, [activeRound?.id, activeRound?.timer_seconds]);
 
   useEffect(() => {
     setAudioError(null);
@@ -224,11 +236,22 @@ export function EventRunPage() {
       window.clearInterval(timerRef.current);
       timerRef.current = null;
     }
-    setElapsedSeconds(0);
-    if (activeRound?.status === 'live' && items.length > 0) {
-      timerRef.current = window.setInterval(() => {
-        setElapsedSeconds((prev) => prev + 1);
-      }, 1000);
+    const updateRemaining = () => {
+      if (!timerStartedAt || !timerDurationSeconds) {
+        setTimerRemainingSeconds(null);
+        return;
+      }
+      const startMs = new Date(timerStartedAt).getTime();
+      if (Number.isNaN(startMs)) {
+        setTimerRemainingSeconds(null);
+        return;
+      }
+      const remaining = Math.max(0, Math.ceil((startMs + timerDurationSeconds * 1000 - Date.now()) / 1000));
+      setTimerRemainingSeconds(remaining);
+    };
+    updateRemaining();
+    if (timerStartedAt && timerDurationSeconds) {
+      timerRef.current = window.setInterval(updateRemaining, 1000);
     }
     return () => {
       if (timerRef.current) {
@@ -236,7 +259,7 @@ export function EventRunPage() {
         timerRef.current = null;
       }
     };
-  }, [activeRound?.status, roundId, index, items.length]);
+  }, [timerStartedAt, timerDurationSeconds]);
 
   const nextItem = () => {
     if (index < items.length - 1) {
@@ -244,11 +267,15 @@ export function EventRunPage() {
       setIndex(nextIndex);
       setShowAnswer(false);
       setShowFact(false);
+      setTimerStartedAt(null);
+      setTimerRemainingSeconds(null);
       if (eventId) {
         api.updateLiveState(eventId, {
           current_item_ordinal: items[nextIndex]?.ordinal ?? null,
           reveal_answer: false,
-          reveal_fun_fact: false
+          reveal_fun_fact: false,
+          timer_started_at: null,
+          timer_duration_seconds: null
         });
       }
     }
@@ -260,11 +287,15 @@ export function EventRunPage() {
       setIndex(prevIndex);
       setShowAnswer(false);
       setShowFact(false);
+      setTimerStartedAt(null);
+      setTimerRemainingSeconds(null);
       if (eventId) {
         api.updateLiveState(eventId, {
           current_item_ordinal: items[prevIndex]?.ordinal ?? null,
           reveal_answer: false,
-          reveal_fun_fact: false
+          reveal_fun_fact: false,
+          timer_started_at: null,
+          timer_duration_seconds: null
         });
       }
     }
@@ -294,9 +325,13 @@ export function EventRunPage() {
         active_round_id: roundId || activeRound.id,
         current_item_ordinal: null,
         reveal_answer: false,
-        reveal_fun_fact: false
+        reveal_fun_fact: false,
+        timer_started_at: null,
+        timer_duration_seconds: null
       });
     }
+    setTimerStartedAt(null);
+    setTimerRemainingSeconds(null);
     await load();
     if (keepRoundId) {
       setRoundId(keepRoundId);
@@ -343,10 +378,26 @@ export function EventRunPage() {
   };
 
   const timerLabel = useMemo(() => {
-    const minutes = Math.floor(elapsedSeconds / 60);
-    const seconds = elapsedSeconds % 60;
+    const totalSeconds = timerRemainingSeconds ?? timerDurationSeconds;
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
     return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-  }, [elapsedSeconds]);
+  }, [timerRemainingSeconds, timerDurationSeconds]);
+
+  const timerButtonLabel = timerStartedAt ? 'Restart Timer' : 'Start Timer';
+
+  const startTimer = async () => {
+    if (!eventId || !activeRound) return;
+    const duration = activeRound.timer_seconds ?? timerDurationSeconds ?? 15;
+    const startedAt = new Date().toISOString();
+    setTimerStartedAt(startedAt);
+    setTimerDurationSeconds(duration);
+    setTimerRemainingSeconds(duration);
+    await api.updateLiveState(eventId, {
+      timer_started_at: startedAt,
+      timer_duration_seconds: duration
+    });
+  };
 
   if (!event) {
     return (
@@ -476,6 +527,9 @@ export function EventRunPage() {
                   disabled={!item}
                 >
                   {showFact ? 'Hide Fact' : 'Reveal Fact'}
+                </SecondaryButton>
+                <SecondaryButton onClick={startTimer} disabled={!item}>
+                  {timerButtonLabel}
                 </SecondaryButton>
                 <PrimaryButton onClick={nextItem} disabled={!item} className="py-4 text-sm">
                   Next

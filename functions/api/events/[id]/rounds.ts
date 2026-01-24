@@ -12,7 +12,11 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params, data }) =>
   if (access.response) return access.response;
   const rows = await queryAll(
     env,
-    'SELECT * FROM event_rounds WHERE event_id = ? AND COALESCE(deleted, 0) = 0 ORDER BY round_number ASC',
+    `SELECT er.*, ed.timer_seconds
+     FROM event_rounds er
+     JOIN editions ed ON ed.id = er.edition_id
+     WHERE er.event_id = ? AND COALESCE(er.deleted, 0) = 0
+     ORDER BY er.round_number ASC`,
     [params.id]
   );
   return jsonOk(rows);
@@ -65,6 +69,13 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request, 
     );
   }
 
-  const rows = await queryAll(env, 'SELECT * FROM event_rounds WHERE id = ? AND COALESCE(deleted, 0) = 0', [id]);
+  const rows = await queryAll(
+    env,
+    `SELECT er.*, ed.timer_seconds
+     FROM event_rounds er
+     JOIN editions ed ON ed.id = er.edition_id
+     WHERE er.id = ? AND COALESCE(er.deleted, 0) = 0`,
+    [id]
+  );
   return jsonOk(rows[0]);
 };

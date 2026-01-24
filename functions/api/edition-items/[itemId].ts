@@ -20,12 +20,18 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
   }
 
   const merged = { ...existing, ...parsed.data };
+  const questionType = merged.question_type ?? 'text';
+  const choicesJson = parsed.data.choices_json
+    ? JSON.stringify(parsed.data.choices_json)
+    : merged.choices_json ?? null;
   await execute(
     env,
     `UPDATE edition_items
-     SET prompt = ?, answer = ?, answer_a = ?, answer_b = ?, answer_a_label = ?, answer_b_label = ?, fun_fact = ?, ordinal = ?, media_type = ?, media_key = ?, audio_answer_key = ?, media_caption = ?
+     SET question_type = ?, choices_json = ?, prompt = ?, answer = ?, answer_a = ?, answer_b = ?, answer_a_label = ?, answer_b_label = ?, fun_fact = ?, ordinal = ?, media_type = ?, media_key = ?, audio_answer_key = ?, media_caption = ?
      WHERE id = ?`,
     [
+      questionType,
+      choicesJson,
       merged.prompt,
       merged.answer ?? '',
       merged.answer_a ?? null,

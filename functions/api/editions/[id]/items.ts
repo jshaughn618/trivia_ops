@@ -29,15 +29,19 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request, 
   const createdAt = nowIso();
   const payloadData = parsed.data;
 
+  const questionType = payloadData.question_type ?? 'text';
+  const choicesJson = payloadData.choices_json ? JSON.stringify(payloadData.choices_json) : null;
   await execute(
     env,
     `INSERT INTO edition_items
-     (id, edition_id, prompt, answer, answer_a, answer_b, answer_a_label, answer_b_label, fun_fact, ordinal, media_type, media_key, audio_answer_key, media_caption, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+     (id, edition_id, question_type, choices_json, prompt, answer, answer_a, answer_b, answer_a_label, answer_b_label, fun_fact, ordinal, media_type, media_key, audio_answer_key, media_caption, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ,
     [
       id,
       params.id,
+      questionType,
+      choicesJson,
       payloadData.prompt,
       payloadData.answer ?? '',
       payloadData.answer_a ?? null,

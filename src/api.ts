@@ -229,6 +229,11 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(payload)
     }),
+  publicSubmitChoice: (code: string, payload: { team_id: string; item_id: string; choice_index: number }) =>
+    apiFetch<{ ok: true; choice_index: number; choice_text: string }>(`/api/public/event/${code}/responses`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    }),
 
   uploadMedia: async (file: File, kind: 'image' | 'audio') => {
     const requestId = createRequestId();

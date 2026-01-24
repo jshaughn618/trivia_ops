@@ -70,11 +70,13 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
     waiting_message: string | null;
     waiting_show_leaderboard: number;
     waiting_show_next_round: number;
+    timer_started_at: string | null;
+    timer_duration_seconds: number | null;
     updated_at: string;
   }>(
     env,
     `SELECT id, event_id, active_round_id, current_item_ordinal, reveal_answer, reveal_fun_fact,
-            waiting_message, waiting_show_leaderboard, waiting_show_next_round, updated_at
+            waiting_message, waiting_show_leaderboard, waiting_show_next_round, timer_started_at, timer_duration_seconds, updated_at
      FROM event_live_state WHERE event_id = ? AND COALESCE(deleted, 0) = 0`,
     [event.id]
   );
@@ -105,6 +107,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
     if (roundStatus?.status === 'live') {
       const roundItems = await queryAll<{
         id: string;
+        question_type: string | null;
+        choices_json: string | null;
         prompt: string;
         answer: string;
         answer_a: string | null;
@@ -120,6 +124,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
         env,
         `SELECT
           ei.id,
+          ei.question_type,
+          ei.choices_json,
           COALESCE(eri.overridden_prompt, ei.prompt) AS prompt,
           COALESCE(eri.overridden_answer, ei.answer) AS answer,
           ei.answer_a,
@@ -150,6 +156,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
       `SELECT
         ei.id,
         ei.edition_id,
+        ei.question_type,
+        ei.choices_json,
         COALESCE(eri.overridden_prompt, ei.prompt) AS prompt,
         COALESCE(eri.overridden_answer, ei.answer) AS answer,
         ei.answer_a,
@@ -182,7 +190,9 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
           reveal_fun_fact: Boolean(live.reveal_fun_fact),
           waiting_message: live.waiting_message ?? null,
           waiting_show_leaderboard: Boolean(live.waiting_show_leaderboard),
-          waiting_show_next_round: Boolean(live.waiting_show_next_round)
+          waiting_show_next_round: Boolean(live.waiting_show_next_round),
+          timer_started_at: live.timer_started_at ?? null,
+          timer_duration_seconds: live.timer_duration_seconds ?? null
         }
       : null,
     current_item: currentItem,

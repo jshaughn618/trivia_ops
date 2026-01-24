@@ -62,6 +62,7 @@ export type GameEdition = {
   status: EditionStatus;
   tags_csv: string | null;
   theme: string | null;
+  timer_seconds: number;
   created_at: string;
   updated_at: string;
 };
@@ -69,6 +70,8 @@ export type GameEdition = {
 export type EditionItem = {
   id: Id;
   edition_id: Id;
+  question_type: 'text' | 'multiple_choice';
+  choices_json: string | null;
   prompt: string;
   answer: string;
   answer_a: string | null;
@@ -107,6 +110,7 @@ export type EventRound = {
   round_number: number;
   label: string;
   scoresheet_title: string | null;
+  timer_seconds: number | null;
   edition_id: Id;
   status: EventRoundStatus;
   created_at: string;
@@ -132,6 +136,8 @@ export type EventLiveState = {
   waiting_message: string | null;
   waiting_show_leaderboard: boolean;
   waiting_show_next_round: boolean;
+  timer_started_at: string | null;
+  timer_duration_seconds: number | null;
   updated_at: string;
 };
 

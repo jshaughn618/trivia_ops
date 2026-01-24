@@ -7,6 +7,9 @@ import { PrimaryButton, SecondaryButton, DangerButton } from '../components/Butt
 import type { EditionItem, Game, GameEdition } from '../types';
 
 const emptyItem = {
+  question_type: 'text' as 'text' | 'multiple_choice',
+  choices: ['', '', '', ''] as string[],
+  correct_choice_index: 0,
   prompt: '',
   answer: '',
   answer_a: '',
@@ -20,6 +23,21 @@ const emptyItem = {
   media_filename: ''
 };
 
+const choiceLabels = ['A', 'B', 'C', 'D'];
+
+const parseChoices = (choicesJson: string | null) => {
+  if (!choicesJson) return ['', '', '', ''];
+  try {
+    const parsed = JSON.parse(choicesJson);
+    if (!Array.isArray(parsed)) return ['', '', '', ''];
+    const choices = parsed.filter((choice) => typeof choice === 'string').slice(0, 4);
+    while (choices.length < 4) choices.push('');
+    return choices;
+  } catch {
+    return ['', '', '', ''];
+  }
+};
+
 export function EditionDetailPage() {
   const { editionId } = useParams();
   const navigate = useNavigate();
@@ -31,6 +49,7 @@ export function EditionDetailPage() {
   const [tags, setTags] = useState('');
   const [theme, setTheme] = useState('');
   const [description, setDescription] = useState('');
+  const [timerSeconds, setTimerSeconds] = useState(15);
   const [gameTypeId, setGameTypeId] = useState('');
   const [gameId, setGameId] = useState('');
   const [refineOpen, setRefineOpen] = useState(false);
@@ -80,6 +99,7 @@ export function EditionDetailPage() {
       setTags(editionRes.data.tags_csv ?? '');
       setTheme(editionRes.data.theme ?? '');
       setDescription(editionRes.data.description ?? '');
+      setTimerSeconds(editionRes.data.timer_seconds ?? 15);
       setGameId(editionRes.data.game_id);
       const gameRes = await api.getGame(editionRes.data.game_id);
       if (gameRes.ok) setGameTypeId(gameRes.data.game_type_id);
@@ -121,6 +141,18 @@ export function EditionDetailPage() {
     return games.filter((game) => game.game_type_id === gameTypeId);
   }, [games, gameTypeId]);
 
+  const normalizeChoices = (choices: string[]) => {
+    const trimmed = choices.map((choice) => choice.trim());
+    let lastFilled = trimmed.length - 1;
+    while (lastFilled >= 0 && !trimmed[lastFilled]) lastFilled -= 1;
+    const normalized = trimmed.slice(0, lastFilled + 1);
+    const hasGap = normalized.some((choice, index) => {
+      if (choice) return false;
+      return normalized.slice(index + 1).some((later) => Boolean(later));
+    });
+    return { normalized, hasGap };
+  };
+
   const handleEditionUpdate = async () => {
     if (!editionId || !gameId) return;
     const res = await api.updateEdition(editionId, {
@@ -129,7 +161,8 @@ export function EditionDetailPage() {
       tags_csv: tags,
       theme,
       description,
-      game_id: gameId
+      game_id: gameId,
+      timer_seconds: timerSeconds
     });
     if (res.ok) setEdition(res.data);
   };
@@ -144,6 +177,7 @@ export function EditionDetailPage() {
     if (!editionId) return;
     const isMusic = gameTypeId === 'music';
     const isMusicAudio = isMusic && itemDraft.item_mode === 'audio';
+    const isMultipleChoice = itemDraft.question_type === 'multiple_choice' && gameTypeId !== 'audio';
     if (!isMusicAudio && !itemDraft.prompt.trim()) {
       setItemValidationError('Question is required.');
       return;
@@ -157,13 +191,34 @@ export function EditionDetailPage() {
         setItemValidationError('Answer A and Answer B are required for audio items.');
         return;
       }
-    } else if (!itemDraft.answer.trim()) {
+    } else if (!isMultipleChoice && !itemDraft.answer.trim()) {
       setItemValidationError('Answer is required.');
       return;
     }
+    let choicesJson: string[] | null = null;
+    let answerValue = gameTypeId === 'audio' ? undefined : itemDraft.answer.trim();
+    if (isMultipleChoice) {
+      const { normalized, hasGap } = normalizeChoices(itemDraft.choices);
+      if (hasGap) {
+        setItemValidationError('Fill multiple choice options in order without gaps.');
+        return;
+      }
+      if (normalized.length < 2) {
+        setItemValidationError('Multiple choice needs at least two options.');
+        return;
+      }
+      const correctChoice = normalized[itemDraft.correct_choice_index];
+      if (!correctChoice) {
+        setItemValidationError('Select a correct choice.');
+        return;
+      }
+      choicesJson = normalized;
+      answerValue = correctChoice;
+    }
     setItemValidationError(null);
-    const answerValue = gameTypeId === 'audio' ? undefined : itemDraft.answer.trim();
     const res = await api.createEditionItem(editionId, {
+      question_type: isMultipleChoice ? 'multiple_choice' : 'text',
+      choices_json: choicesJson ?? undefined,
       prompt: itemDraft.prompt,
       answer: answerValue,
       answer_a: itemDraft.answer_a || null,
@@ -186,6 +241,11 @@ export function EditionDetailPage() {
 
   const startEdit = (item: EditionItem) => {
     const isAudioItem = item.media_type === 'audio' || Boolean(item.media_key) || Boolean(item.audio_answer_key);
+    const questionType = item.question_type ?? 'text';
+    const choices = parseChoices(item.choices_json ?? null);
+    const correctIndex = questionType === 'multiple_choice' && item.answer
+      ? Math.max(0, choices.findIndex((choice) => choice.trim() === item.answer?.trim()))
+      : 0;
     setActiveItemId(item.id);
     setRefineOpen(false);
     setRefineOptions([]);
@@ -194,6 +254,9 @@ export function EditionDetailPage() {
     setImageAnswerError(null);
     setImageAnswerLoading(false);
     setItemDraft({
+      question_type: questionType,
+      choices,
+      correct_choice_index: correctIndex,
       prompt: item.prompt,
       answer: item.answer,
       answer_a: item.answer_a ?? '',
@@ -220,6 +283,7 @@ export function EditionDetailPage() {
   const saveEdit = async (item: EditionItem) => {
     const isMusic = gameTypeId === 'music';
     const isMusicAudio = isMusic && itemDraft.item_mode === 'audio';
+    const isMultipleChoice = itemDraft.question_type === 'multiple_choice' && gameTypeId !== 'audio';
     if (!isMusicAudio && !itemDraft.prompt.trim()) {
       setItemValidationError('Question is required.');
       return;
@@ -233,13 +297,34 @@ export function EditionDetailPage() {
         setItemValidationError('Answer A and Answer B are required for audio items.');
         return;
       }
-    } else if (!itemDraft.answer.trim()) {
+    } else if (!isMultipleChoice && !itemDraft.answer.trim()) {
       setItemValidationError('Answer is required.');
       return;
     }
+    let choicesJson: string[] | null = null;
+    let answerValue = gameTypeId === 'audio' ? undefined : itemDraft.answer.trim();
+    if (isMultipleChoice) {
+      const { normalized, hasGap } = normalizeChoices(itemDraft.choices);
+      if (hasGap) {
+        setItemValidationError('Fill multiple choice options in order without gaps.');
+        return;
+      }
+      if (normalized.length < 2) {
+        setItemValidationError('Multiple choice needs at least two options.');
+        return;
+      }
+      const correctChoice = normalized[itemDraft.correct_choice_index];
+      if (!correctChoice) {
+        setItemValidationError('Select a correct choice.');
+        return;
+      }
+      choicesJson = normalized;
+      answerValue = correctChoice;
+    }
     setItemValidationError(null);
-    const answerValue = gameTypeId === 'audio' ? undefined : itemDraft.answer.trim();
     const res = await api.updateEditionItem(item.id, {
+      question_type: isMultipleChoice ? 'multiple_choice' : 'text',
+      choices_json: isMultipleChoice ? choicesJson ?? [] : [],
       prompt: itemDraft.prompt,
       answer: answerValue,
       answer_a: itemDraft.answer_a || null,
@@ -820,6 +905,17 @@ export function EditionDetailPage() {
               </select>
             </label>
             <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+              Timer Seconds
+              <input
+                type="number"
+                min={5}
+                max={600}
+                className="h-10 px-3"
+                value={timerSeconds}
+                onChange={(event) => setTimerSeconds(Number(event.target.value))}
+              />
+            </label>
+            <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
               <span className="flex items-center justify-between">
                 Tags
                 <button
@@ -1045,6 +1141,24 @@ export function EditionDetailPage() {
                           </select>
                         </label>
                       )}
+                      {gameTypeId !== 'audio' && (
+                        <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+                          Question Type
+                          <select
+                            className="h-10 px-3"
+                            value={itemDraft.question_type}
+                            onChange={(event) =>
+                              setItemDraft((draft) => ({
+                                ...draft,
+                                question_type: event.target.value as 'text' | 'multiple_choice'
+                              }))
+                            }
+                          >
+                            <option value="text">Text</option>
+                            <option value="multiple_choice">Multiple Choice</option>
+                          </select>
+                        </label>
+                      )}
                       <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
                         <span className="flex items-center justify-between">
                           {gameTypeId === 'music' && itemDraft.item_mode === 'audio' ? 'Question (optional)' : 'Question'}
@@ -1062,7 +1176,7 @@ export function EditionDetailPage() {
                           onChange={(event) => setItemDraft((draft) => ({ ...draft, prompt: event.target.value }))}
                         />
                       </label>
-                      {gameTypeId !== 'audio' && (
+                      {gameTypeId !== 'audio' && itemDraft.question_type !== 'multiple_choice' && (
                         <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
                           <span className="flex items-center justify-between">
                             Answer
@@ -1088,6 +1202,51 @@ export function EditionDetailPage() {
                             <span className="text-[10px] tracking-[0.2em] text-danger">{imageAnswerError}</span>
                           )}
                         </label>
+                      )}
+                      {gameTypeId !== 'audio' && itemDraft.question_type === 'multiple_choice' && (
+                        <div className="grid gap-3 border-2 border-border bg-panel2 p-3">
+                          <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">
+                            Multiple Choice
+                          </div>
+                          {choiceLabels.map((label, idx) => (
+                            <label
+                              key={label}
+                              className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted"
+                            >
+                              Option {label}
+                              <input
+                                className="h-10 px-3"
+                                value={itemDraft.choices[idx] ?? ''}
+                                onChange={(event) =>
+                                  setItemDraft((draft) => {
+                                    const next = [...draft.choices];
+                                    next[idx] = event.target.value;
+                                    return { ...draft, choices: next };
+                                  })
+                                }
+                              />
+                            </label>
+                          ))}
+                          <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+                            Correct Choice
+                            <select
+                              className="h-10 px-3"
+                              value={itemDraft.correct_choice_index}
+                              onChange={(event) =>
+                                setItemDraft((draft) => ({
+                                  ...draft,
+                                  correct_choice_index: Number(event.target.value)
+                                }))
+                              }
+                            >
+                              {choiceLabels.map((label, idx) => (
+                                <option key={label} value={idx}>
+                                  {label}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        </div>
                       )}
                       {gameTypeId === 'audio' && (
                         <>
@@ -1368,6 +1527,24 @@ export function EditionDetailPage() {
                     </select>
                   </label>
                 )}
+                {gameTypeId !== 'audio' && (
+                  <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+                    Question Type
+                    <select
+                      className="h-10 px-3"
+                      value={itemDraft.question_type}
+                      onChange={(event) =>
+                        setItemDraft((draft) => ({
+                          ...draft,
+                          question_type: event.target.value as 'text' | 'multiple_choice'
+                        }))
+                      }
+                    >
+                      <option value="text">Text</option>
+                      <option value="multiple_choice">Multiple Choice</option>
+                    </select>
+                  </label>
+                )}
                 <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
                   <span className="flex items-center justify-between">
                     {gameTypeId === 'music' && itemDraft.item_mode === 'audio' ? 'Question (optional)' : 'Question'}
@@ -1385,7 +1562,7 @@ export function EditionDetailPage() {
                   onChange={(event) => setItemDraft((draft) => ({ ...draft, prompt: event.target.value }))}
                 />
               </label>
-              {gameTypeId !== 'audio' && (
+              {gameTypeId !== 'audio' && itemDraft.question_type !== 'multiple_choice' && (
                 <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
                   <span className="flex items-center justify-between">
                     Answer
@@ -1411,6 +1588,51 @@ export function EditionDetailPage() {
                     <span className="text-[10px] tracking-[0.2em] text-danger">{imageAnswerError}</span>
                   )}
                 </label>
+              )}
+              {gameTypeId !== 'audio' && itemDraft.question_type === 'multiple_choice' && (
+                <div className="grid gap-3 border-2 border-border bg-panel2 p-3">
+                  <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">
+                    Multiple Choice
+                  </div>
+                  {choiceLabels.map((label, idx) => (
+                    <label
+                      key={label}
+                      className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted"
+                    >
+                      Option {label}
+                      <input
+                        className="h-10 px-3"
+                        value={itemDraft.choices[idx] ?? ''}
+                        onChange={(event) =>
+                          setItemDraft((draft) => {
+                            const next = [...draft.choices];
+                            next[idx] = event.target.value;
+                            return { ...draft, choices: next };
+                          })
+                        }
+                      />
+                    </label>
+                  ))}
+                  <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+                    Correct Choice
+                    <select
+                      className="h-10 px-3"
+                      value={itemDraft.correct_choice_index}
+                      onChange={(event) =>
+                        setItemDraft((draft) => ({
+                          ...draft,
+                          correct_choice_index: Number(event.target.value)
+                        }))
+                      }
+                    >
+                      {choiceLabels.map((label, idx) => (
+                        <option key={label} value={idx}>
+                          {label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
               )}
               {gameTypeId === 'audio' && (
                 <>

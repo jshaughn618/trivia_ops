@@ -9,6 +9,19 @@ import { useTheme } from '../lib/theme';
 
 const POLL_MS = 1500;
 
+const parseChoices = (choicesJson?: string | null) => {
+  if (!choicesJson) return [];
+  try {
+    const parsed = JSON.parse(choicesJson);
+    if (Array.isArray(parsed)) {
+      return parsed.filter((choice) => typeof choice === 'string' && choice.trim().length > 0);
+    }
+  } catch {
+    return [];
+  }
+  return [];
+};
+
 type PublicEventResponse = {
   event: {
     id: string;
@@ -29,10 +42,14 @@ type PublicEventResponse = {
     waiting_message: string | null;
     waiting_show_leaderboard: boolean;
     waiting_show_next_round: boolean;
+    timer_started_at: string | null;
+    timer_duration_seconds: number | null;
   } | null;
   visual_round?: boolean;
   visual_items?: {
     id: string;
+    question_type?: 'text' | 'multiple_choice';
+    choices_json?: string | null;
     prompt: string;
     answer: string;
     answer_a: string | null;
@@ -45,6 +62,9 @@ type PublicEventResponse = {
     ordinal: number;
   }[];
   current_item: {
+    id?: string;
+    question_type?: 'text' | 'multiple_choice';
+    choices_json?: string | null;
     prompt: string;
     answer: string;
     answer_a: string | null;
@@ -70,9 +90,15 @@ export function PlayEventPage() {
   const [teamMenuOpen, setTeamMenuOpen] = useState(false);
   const [mediaError, setMediaError] = useState<string | null>(null);
   const [visualIndex, setVisualIndex] = useState(0);
+  const [selectedChoiceIndex, setSelectedChoiceIndex] = useState<number | null>(null);
+  const [submittedChoiceIndex, setSubmittedChoiceIndex] = useState<number | null>(null);
+  const [submitStatus, setSubmitStatus] = useState<'idle' | 'submitting' | 'submitted' | 'error'>('idle');
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [timerRemainingSeconds, setTimerRemainingSeconds] = useState<number | null>(null);
   const { theme, toggleTheme } = useTheme();
   const menuRef = useRef<HTMLDivElement | null>(null);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const countdownRef = useRef<number | null>(null);
   const normalizedCode = useMemo(() => (code ?? '').trim().toUpperCase(), [code]);
 
   const load = async () => {
@@ -130,6 +156,13 @@ export function PlayEventPage() {
   }, [data?.live?.active_round_id, data?.visual_items?.length]);
 
   useEffect(() => {
+    setSelectedChoiceIndex(null);
+    setSubmittedChoiceIndex(null);
+    setSubmitStatus('idle');
+    setSubmitError(null);
+  }, [data?.live?.active_round_id, data?.live?.current_item_ordinal, data?.current_item?.id]);
+
+  useEffect(() => {
     if (!teamMenuOpen) return;
     const handleClick = (event: MouseEvent) => {
       const target = event.target as Node | null;
@@ -140,6 +173,43 @@ export function PlayEventPage() {
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
   }, [teamMenuOpen]);
+
+  useEffect(() => {
+    if (countdownRef.current) {
+      window.clearInterval(countdownRef.current);
+      countdownRef.current = null;
+    }
+    const updateTimer = () => {
+      const startedAt = data?.live?.timer_started_at;
+      const duration = data?.live?.timer_duration_seconds;
+      if (!startedAt || !duration) {
+        setTimerRemainingSeconds(null);
+        return;
+      }
+      const startMs = new Date(startedAt).getTime();
+      if (Number.isNaN(startMs)) {
+        setTimerRemainingSeconds(null);
+        return;
+      }
+      const remaining = Math.max(0, Math.ceil((startMs + duration * 1000 - Date.now()) / 1000));
+      setTimerRemainingSeconds(remaining);
+    };
+    updateTimer();
+    if (data?.live?.timer_started_at && data?.live?.timer_duration_seconds) {
+      countdownRef.current = window.setInterval(updateTimer, 1000);
+    }
+    return () => {
+      if (countdownRef.current) {
+        window.clearInterval(countdownRef.current);
+        countdownRef.current = null;
+      }
+    };
+  }, [
+    data?.live?.timer_started_at,
+    data?.live?.timer_duration_seconds,
+    data?.live?.current_item_ordinal,
+    data?.live?.active_round_id
+  ]);
 
   const handleSwipeStart = (event: React.TouchEvent) => {
     if (event.touches.length !== 1) return;
@@ -186,6 +256,29 @@ export function PlayEventPage() {
     setTeamNameLabel(null);
     setTeamName('');
     setTeamMenuOpen(false);
+  };
+
+  const handleSubmitChoice = async () => {
+    if (!data?.event?.public_code || !teamId || !displayItem?.id) return;
+    if (selectedChoiceIndex === null) {
+      setSubmitError('Select an option first.');
+      setSubmitStatus('error');
+      return;
+    }
+    setSubmitStatus('submitting');
+    setSubmitError(null);
+    const res = await api.publicSubmitChoice(data.event.public_code, {
+      team_id: teamId,
+      item_id: displayItem.id,
+      choice_index: selectedChoiceIndex
+    });
+    if (res.ok) {
+      setSubmittedChoiceIndex(selectedChoiceIndex);
+      setSubmitStatus('submitted');
+    } else {
+      setSubmitStatus('error');
+      setSubmitError(res.error.message ?? 'Failed to submit choice.');
+    }
   };
 
   if (!normalizedCode) {
@@ -240,6 +333,17 @@ export function PlayEventPage() {
     : displayItem?.media_type === 'audio'
       ? 'Listen to the clip.'
       : '';
+  const choiceOptions =
+    displayItem?.question_type === 'multiple_choice' ? parseChoices(displayItem.choices_json) : [];
+  const timerDurationSeconds = data.live?.timer_duration_seconds ?? 15;
+  const timerActive = Boolean(data.live?.timer_started_at && data.live?.timer_duration_seconds);
+  const timerExpired = timerRemainingSeconds !== null && timerRemainingSeconds <= 0;
+  const timerLabel = (() => {
+    const totalSeconds = timerRemainingSeconds ?? timerDurationSeconds;
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  })();
   const nextRound = (() => {
     const rounds = data?.rounds ?? [];
     const ordered = [...rounds].sort((a, b) => a.round_number - b.round_number);
@@ -451,6 +555,73 @@ export function PlayEventPage() {
                           <div>
                             <div className="text-xs uppercase tracking-[0.3em] text-muted">Audio Clue</div>
                             <div className="text-sm text-muted">Listen for the clip.</div>
+                          </div>
+                        </div>
+                      )}
+                      {displayItem.question_type === 'multiple_choice' && choiceOptions.length > 0 && (
+                        <div className="w-full max-w-3xl">
+                          <div className="mb-3 flex items-center justify-between text-xs uppercase tracking-[0.3em] text-muted">
+                            <span>Multiple Choice</span>
+                            <span>{timerActive ? `Timer ${timerLabel}` : `Timer ${timerDurationSeconds}s`}</span>
+                          </div>
+                          <div className="grid gap-3">
+                            {choiceOptions.map((choice, idx) => {
+                              const selected = selectedChoiceIndex === idx;
+                              const submitted = submittedChoiceIndex === idx;
+                              return (
+                                <button
+                                  key={`${choice}-${idx}`}
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedChoiceIndex(idx);
+                                    setSubmitStatus('idle');
+                                    setSubmitError(null);
+                                  }}
+                                  disabled={!timerActive || timerExpired || submitStatus === 'submitting'}
+                                  className={`w-full rounded-md border px-4 py-3 text-left text-sm transition ${
+                                    submitted
+                                      ? 'border-accent-ink bg-panel text-text'
+                                      : selected
+                                        ? 'border-accent-ink bg-panel2 text-text'
+                                        : 'border-border bg-panel2 text-text'
+                                  }`}
+                                >
+                                  <span className="mr-2 text-xs uppercase tracking-[0.3em] text-muted">
+                                    {String.fromCharCode(65 + idx)}
+                                  </span>
+                                  {choice}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          <div className="mt-4 flex flex-wrap items-center gap-3">
+                            <PrimaryButton
+                              onClick={handleSubmitChoice}
+                              disabled={
+                                !timerActive ||
+                                timerExpired ||
+                                submitStatus === 'submitting' ||
+                                selectedChoiceIndex === null
+                              }
+                            >
+                              {submitStatus === 'submitting' ? 'Submitting…' : 'Submit Answer'}
+                            </PrimaryButton>
+                            {!timerActive && (
+                              <div className="text-xs uppercase tracking-[0.2em] text-muted">
+                                Waiting for timer to start.
+                              </div>
+                            )}
+                            {timerExpired && (
+                              <div className="text-xs uppercase tracking-[0.2em] text-danger">Time's up.</div>
+                            )}
+                            {submitStatus === 'submitted' && !timerExpired && (
+                              <div className="text-xs uppercase tracking-[0.2em] text-muted">
+                                Answer submitted.
+                              </div>
+                            )}
+                            {submitError && (
+                              <div className="text-xs uppercase tracking-[0.2em] text-danger">{submitError}</div>
+                            )}
                           </div>
                         </div>
                       )}
