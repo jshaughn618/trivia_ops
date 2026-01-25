@@ -215,23 +215,6 @@ export function PlayEventPage() {
     data?.live?.active_round_id
   ]);
 
-  useEffect(() => {
-    if (!timerExpired) return;
-    if (submittedChoiceIndex !== null) return;
-    if (submitStatus === 'submitting') return;
-    if (selectedChoiceIndex === null) return;
-    if (!displayItem?.id || !data?.event?.public_code || !teamId) return;
-    handleSubmitChoice();
-  }, [
-    timerExpired,
-    selectedChoiceIndex,
-    submittedChoiceIndex,
-    submitStatus,
-    displayItem?.id,
-    data?.event?.public_code,
-    teamId
-  ]);
-
   const handleSwipeStart = (event: React.TouchEvent) => {
     if (event.touches.length !== 1) return;
     const touch = event.touches[0];
@@ -369,6 +352,23 @@ export function PlayEventPage() {
     const seconds = totalSeconds % 60;
     return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
   })();
+
+  useEffect(() => {
+    if (!timerExpired) return;
+    if (submittedChoiceIndex !== null) return;
+    if (submitStatus === 'submitting') return;
+    if (selectedChoiceIndex === null) return;
+    if (!displayItem?.id || !data?.event?.public_code || !teamId) return;
+    handleSubmitChoice();
+  }, [
+    timerExpired,
+    selectedChoiceIndex,
+    submittedChoiceIndex,
+    submitStatus,
+    displayItem?.id,
+    data?.event?.public_code,
+    teamId
+  ]);
   const nextRound = (() => {
     const rounds = data?.rounds ?? [];
     const ordered = [...rounds].sort((a, b) => a.round_number - b.round_number);
