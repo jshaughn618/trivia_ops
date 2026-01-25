@@ -75,6 +75,10 @@ type PublicEventResponse = {
     media_type: string | null;
     media_key: string | null;
   } | null;
+  response_counts?: {
+    total: number;
+    counts: number[];
+  } | null;
 };
 
 export function PlayEventPage() {
@@ -335,6 +339,10 @@ export function PlayEventPage() {
       : '';
   const choiceOptions =
     displayItem?.question_type === 'multiple_choice' ? parseChoices(displayItem.choices_json) : [];
+  const responseCounts = data.response_counts ?? null;
+  const maxResponseCount = responseCounts?.counts
+    ? Math.max(1, ...responseCounts.counts)
+    : 1;
   const timerDurationSeconds = data.live?.timer_duration_seconds ?? 15;
   const timerActive = Boolean(data.live?.timer_started_at && data.live?.timer_duration_seconds);
   const timerExpired = timerRemainingSeconds !== null && timerRemainingSeconds <= 0;
@@ -623,6 +631,36 @@ export function PlayEventPage() {
                               <div className="text-xs uppercase tracking-[0.2em] text-danger">{submitError}</div>
                             )}
                           </div>
+                          {timerExpired && responseCounts && choiceOptions.length > 0 && (
+                            <div className="mt-6 border-t border-border pt-4">
+                              <div className="text-xs uppercase tracking-[0.3em] text-muted">
+                                Team Answers
+                              </div>
+                              <div className="mt-3 grid gap-2">
+                                {choiceOptions.map((choice, idx) => {
+                                  const count = responseCounts.counts[idx] ?? 0;
+                                  const width = Math.round((count / maxResponseCount) * 100);
+                                  return (
+                                    <div key={`${choice}-${idx}`} className="flex items-center gap-3">
+                                      <div className="w-6 text-xs uppercase tracking-[0.3em] text-muted">
+                                        {String.fromCharCode(65 + idx)}
+                                      </div>
+                                      <div className="flex-1 rounded-md border border-border bg-panel2 p-1">
+                                        <div
+                                          className="h-3 rounded-sm bg-accent-ink"
+                                          style={{ width: `${width}%` }}
+                                        />
+                                      </div>
+                                      <div className="w-8 text-right text-xs text-muted">{count}</div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                              <div className="mt-2 text-xs uppercase tracking-[0.2em] text-muted">
+                                Total responses: {responseCounts.total}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
                       {visualMode && (

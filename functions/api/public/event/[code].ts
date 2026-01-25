@@ -85,6 +85,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
   let visualRound = false;
   let visualItems: Array<{
     id: string;
+    question_type: string | null;
+    choices_json: string | null;
     prompt: string;
     answer: string;
     answer_a: string | null;
@@ -97,6 +99,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
     audio_answer_key: string | null;
     ordinal: number;
   }> = [];
+  let responseCounts: { total: number; counts: number[] } | null = null;
 
   if (live?.active_round_id) {
     const roundStatus = await queryFirst<{ status: string }>(
@@ -177,6 +180,36 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
     );
   }
 
+  if (currentItem?.question_type === 'multiple_choice' && currentItem.choices_json && live?.active_round_id) {
+    let choices: string[] = [];
+    try {
+      const parsed = JSON.parse(currentItem.choices_json);
+      if (Array.isArray(parsed)) {
+        choices = parsed.filter((choice) => typeof choice === 'string' && choice.trim().length > 0);
+      }
+    } catch {
+      choices = [];
+    }
+    if (choices.length > 0) {
+      const countsRows = await queryAll<{ choice_index: number; total: number }>(
+        env,
+        `SELECT choice_index, COUNT(*) AS total
+         FROM event_item_responses
+         WHERE event_id = ?
+           AND event_round_id = ?
+           AND edition_item_id = ?
+           AND COALESCE(deleted, 0) = 0
+         GROUP BY choice_index`,
+        [event.id, live.active_round_id, currentItem.id]
+      );
+      const counts = choices.map((_, idx) => {
+        const row = countsRows.find((entry) => entry.choice_index === idx);
+        return row ? row.total : 0;
+      });
+      responseCounts = { total: counts.reduce((sum, value) => sum + value, 0), counts };
+    }
+  }
+
   return jsonOk({
     event,
     rounds,
@@ -197,6 +230,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
       : null,
     current_item: currentItem,
     visual_round: visualRound,
-    visual_items: visualItems
+    visual_items: visualItems,
+    response_counts: responseCounts
   });
 };
