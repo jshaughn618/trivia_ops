@@ -180,7 +180,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
     );
   }
 
-  if (currentItem?.question_type === 'multiple_choice' && currentItem.choices_json && live?.active_round_id) {
+  if (currentItem?.choices_json && live?.active_round_id) {
     let choices: string[] = [];
     try {
       const parsed = JSON.parse(currentItem.choices_json);
