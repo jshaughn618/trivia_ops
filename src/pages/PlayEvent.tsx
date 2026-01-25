@@ -215,6 +215,23 @@ export function PlayEventPage() {
     data?.live?.active_round_id
   ]);
 
+  useEffect(() => {
+    if (!timerExpired) return;
+    if (submittedChoiceIndex !== null) return;
+    if (submitStatus === 'submitting') return;
+    if (selectedChoiceIndex === null) return;
+    if (!displayItem?.id || !data?.event?.public_code || !teamId) return;
+    handleSubmitChoice();
+  }, [
+    timerExpired,
+    selectedChoiceIndex,
+    submittedChoiceIndex,
+    submitStatus,
+    displayItem?.id,
+    data?.event?.public_code,
+    teamId
+  ]);
+
   const handleSwipeStart = (event: React.TouchEvent) => {
     if (event.touches.length !== 1) return;
     const touch = event.touches[0];
