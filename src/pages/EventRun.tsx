@@ -40,6 +40,8 @@ export function EventRunPage() {
   const [waitingShowNextRound, setWaitingShowNextRound] = useState(true);
   const [waitingSaving, setWaitingSaving] = useState(false);
   const [waitingError, setWaitingError] = useState<string | null>(null);
+  const [clearResponsesStatus, setClearResponsesStatus] = useState<'idle' | 'clearing' | 'done' | 'error'>('idle');
+  const [clearResponsesMessage, setClearResponsesMessage] = useState<string | null>(null);
   const preselectRef = useRef(false);
   const auth = useAuth();
   const isAdmin = auth.user?.user_type === 'admin';
@@ -386,6 +388,22 @@ export function EventRunPage() {
 
   const timerButtonLabel = timerStartedAt ? 'Restart Timer' : 'Start Timer';
 
+  const clearRoundResponses = async () => {
+    if (!activeRound) return;
+    const confirmed = window.confirm('Clear all multiple-choice responses for this round?');
+    if (!confirmed) return;
+    setClearResponsesStatus('clearing');
+    setClearResponsesMessage(null);
+    const res = await api.clearRoundResponses(activeRound.id);
+    if (res.ok) {
+      setClearResponsesStatus('done');
+      setClearResponsesMessage('Responses cleared.');
+    } else {
+      setClearResponsesStatus('error');
+      setClearResponsesMessage(res.error.message ?? 'Failed to clear responses.');
+    }
+  };
+
   const startTimer = async () => {
     if (!eventId || !activeRound) return;
     const duration = activeRound.timer_seconds ?? timerDurationSeconds ?? 15;
@@ -531,6 +549,9 @@ export function EventRunPage() {
                 <SecondaryButton onClick={startTimer} disabled={!item}>
                   {timerButtonLabel}
                 </SecondaryButton>
+                <SecondaryButton onClick={clearRoundResponses} disabled={!activeRound || clearResponsesStatus === 'clearing'}>
+                  {clearResponsesStatus === 'clearing' ? 'Clearing…' : 'Clear Responses'}
+                </SecondaryButton>
                 <PrimaryButton onClick={nextItem} disabled={!item} className="py-4 text-sm">
                   Next
                 </PrimaryButton>
@@ -558,6 +579,15 @@ export function EventRunPage() {
               <div className="text-xs uppercase tracking-[0.2em] text-muted">
                 Item {items.length === 0 ? 0 : index + 1} / {items.length}
               </div>
+              {clearResponsesMessage && (
+                <div
+                  className={`text-xs uppercase tracking-[0.2em] ${
+                    clearResponsesStatus === 'error' ? 'text-danger' : 'text-muted'
+                  }`}
+                >
+                  {clearResponsesMessage}
+                </div>
+              )}
             </div>
           ) : (
             <div className="text-xs uppercase tracking-[0.2em] text-muted">Select a round to begin.</div>

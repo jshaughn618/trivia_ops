@@ -205,6 +205,8 @@ export const api = {
     apiFetch<{ inserted: number }>(`/api/event-rounds/${roundId}/sync`, { method: 'POST' }),
   listEventRoundItems: (roundId: string) =>
     apiFetch<EditionItem[]>(`/api/event-rounds/${roundId}/items`),
+  clearRoundResponses: (roundId: string) =>
+    apiFetch<{ ok: true }>(`/api/event-rounds/${roundId}/clear-responses`, { method: 'POST' }),
   getLiveState: (eventId: string) => apiFetch<EventLiveState | null>(`/api/events/${eventId}/live-state`),
   updateLiveState: (eventId: string, payload: Partial<EventLiveState>) =>
     apiFetch<EventLiveState>(`/api/events/${eventId}/live-state`, {
