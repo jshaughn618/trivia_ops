@@ -85,14 +85,6 @@ export function EventLeaderboardPage() {
       .sort((a, b) => b.total - a.total || a.team.name.localeCompare(b.team.name));
   }, [teams, scores, orderedRounds]);
 
-  if (!eventId) {
-    return (
-      <AppShell title="Leaderboard">
-        <div className="text-xs uppercase tracking-[0.2em] text-muted">Missing event.</div>
-      </AppShell>
-    );
-  }
-
   const backTarget = useMemo(() => {
     const params = new URLSearchParams(location.search);
     const from = params.get('from');
@@ -100,8 +92,19 @@ export function EventLeaderboardPage() {
     if (from === 'participant' && code) {
       return { label: 'Back to Event', href: `/play/${code}` };
     }
-    return { label: 'Back to Event', href: `/events/${eventId}` };
+    if (eventId) {
+      return { label: 'Back to Event', href: `/events/${eventId}` };
+    }
+    return { label: 'Back', href: '/events' };
   }, [location.search, event?.public_code, eventId]);
+
+  if (!eventId) {
+    return (
+      <AppShell title="Leaderboard">
+        <div className="text-xs uppercase tracking-[0.2em] text-muted">Missing event.</div>
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell title="Leaderboard">
