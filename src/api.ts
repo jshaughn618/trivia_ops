@@ -201,6 +201,8 @@ export const api = {
     }),
   deleteEventRound: (roundId: string) =>
     apiFetch<{ ok: true }>(`/api/event-rounds/${roundId}`, { method: 'DELETE' }),
+  syncEventRoundItems: (roundId: string) =>
+    apiFetch<{ inserted: number }>(`/api/event-rounds/${roundId}/sync`, { method: 'POST' }),
   listEventRoundItems: (roundId: string) =>
     apiFetch<EditionItem[]>(`/api/event-rounds/${roundId}/items`),
   getLiveState: (eventId: string) => apiFetch<EventLiveState | null>(`/api/events/${eventId}/live-state`),

@@ -320,6 +320,9 @@ export function EventDetailPage() {
   const [roundMenuId, setRoundMenuId] = useState<string | null>(null);
   const [draggedRoundId, setDraggedRoundId] = useState<string | null>(null);
   const [scoresheetTitles, setScoresheetTitles] = useState<Record<string, string>>({});
+  const [roundSyncingId, setRoundSyncingId] = useState<string | null>(null);
+  const [roundSyncMessage, setRoundSyncMessage] = useState<Record<string, string>>({});
+  const [roundSyncError, setRoundSyncError] = useState<Record<string, string>>({});
   const [scoresheetUploading, setScoresheetUploading] = useState(false);
   const [scoresheetError, setScoresheetError] = useState<string | null>(null);
   const [answersheetUploading, setAnswersheetUploading] = useState(false);
@@ -479,6 +482,23 @@ export function EventDetailPage() {
       setRounds((prev) => prev.map((item) => (item.id === round.id ? res.data : item)));
       setScoresheetTitles((prev) => ({ ...prev, [round.id]: res.data.scoresheet_title ?? res.data.label }));
     }
+  };
+
+  const syncRoundItems = async (round: EventRound) => {
+    setRoundSyncingId(round.id);
+    setRoundSyncError((prev) => ({ ...prev, [round.id]: '' }));
+    setRoundSyncMessage((prev) => ({ ...prev, [round.id]: '' }));
+    const res = await api.syncEventRoundItems(round.id);
+    if (res.ok) {
+      const count = res.data.inserted ?? 0;
+      setRoundSyncMessage((prev) => ({
+        ...prev,
+        [round.id]: count > 0 ? `Added ${count} new item${count === 1 ? '' : 's'}.` : 'No new items.'
+      }));
+    } else {
+      setRoundSyncError((prev) => ({ ...prev, [round.id]: res.error.message ?? 'Sync failed.' }));
+    }
+    setRoundSyncingId(null);
   };
 
   const createTeam = async () => {
@@ -893,6 +913,17 @@ export function EventDetailPage() {
                               type="button"
                               onClick={() => {
                                 setRoundMenuId(null);
+                                syncRoundItems(round);
+                              }}
+                              className="mb-2 w-full rounded-md border border-border bg-panel2 px-3 py-2 text-xs font-medium text-text"
+                              disabled={roundSyncingId === round.id}
+                            >
+                              {roundSyncingId === round.id ? 'Syncing…' : 'Sync Items'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setRoundMenuId(null);
                                 deleteRound(round.id);
                               }}
                               className="w-full rounded-md border border-danger bg-panel2 px-3 py-2 text-xs font-medium text-danger-ink"
@@ -906,6 +937,16 @@ export function EventDetailPage() {
                     </div>
                   </div>
                   <div className="mt-1 text-[10px] uppercase tracking-[0.2em] text-muted">{display.detail}</div>
+                  {roundSyncMessage[round.id] && (
+                    <div className="mt-1 text-[10px] uppercase tracking-[0.2em] text-accent-ink">
+                      {roundSyncMessage[round.id]}
+                    </div>
+                  )}
+                  {roundSyncError[round.id] && (
+                    <div className="mt-1 text-[10px] uppercase tracking-[0.2em] text-danger">
+                      {roundSyncError[round.id]}
+                    </div>
+                  )}
                   <label className="mt-3 flex flex-col gap-2 text-[10px] font-display uppercase tracking-[0.25em] text-muted">
                     Scoresheet Title
                     <div className="flex flex-wrap items-center gap-2">
