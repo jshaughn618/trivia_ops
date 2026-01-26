@@ -828,16 +828,7 @@ export function PlayEventPage() {
         )}
         {!isLive && waitingShowLeaderboard && (
           <div className="w-full max-w-2xl space-y-3 text-left">
-            <div className="flex items-center justify-between gap-3">
-              <div className="text-xs uppercase tracking-[0.35em] text-muted">Leaderboard</div>
-              <SecondaryButton
-                onClick={() =>
-                  navigate(`/play/${data.event.public_code}/leaderboard${teamId ? `?team_id=${teamId}` : ''}`)
-                }
-              >
-                View full leaderboard
-              </SecondaryButton>
-            </div>
+            <div className="text-xs uppercase tracking-[0.35em] text-muted">Leaderboard</div>
             {data.leaderboard.length === 0 && <div className="text-sm text-muted">No scores yet.</div>}
             <div className="divide-y divide-border rounded-2xl bg-panel/40">
               {data.leaderboard.map((entry, index) => (

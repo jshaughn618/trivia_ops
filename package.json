@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "release:patch": "npm version patch && git push --follow-tags",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
