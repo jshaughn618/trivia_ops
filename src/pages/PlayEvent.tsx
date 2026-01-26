@@ -192,6 +192,10 @@ export function PlayEventPage() {
       window.clearInterval(countdownRef.current);
       countdownRef.current = null;
     }
+    if (data?.visual_round) {
+      setTimerRemainingSeconds(null);
+      return () => {};
+    }
     const updateTimer = () => {
       const startedAt = data?.live?.timer_started_at;
       const duration = data?.live?.timer_duration_seconds;
@@ -221,7 +225,8 @@ export function PlayEventPage() {
     data?.live?.timer_started_at,
     data?.live?.timer_duration_seconds,
     data?.live?.current_item_ordinal,
-    data?.live?.active_round_id
+    data?.live?.active_round_id,
+    data?.visual_round
   ]);
 
   useEffect(() => {
@@ -239,7 +244,8 @@ export function PlayEventPage() {
   const visualItems = data?.visual_items ?? [];
   const visualMode = Boolean(isLive && data?.visual_round && visualItems.length > 0);
   const displayItem = visualMode ? visualItems[visualIndex] : data?.current_item ?? null;
-  const timerExpired = timerRemainingSeconds !== null && timerRemainingSeconds <= 0;
+  const suppressItemTimer = Boolean(data?.visual_round);
+  const timerExpired = !suppressItemTimer && timerRemainingSeconds !== null && timerRemainingSeconds <= 0;
   const responseCounts = data?.response_counts ?? null;
 
   useEffect(() => {
@@ -427,7 +433,8 @@ export function PlayEventPage() {
     ? Math.max(1, ...responseCounts.counts)
     : 1;
   const timerDurationSeconds = data.live?.timer_duration_seconds ?? activeRound?.timer_seconds ?? 15;
-  const timerActive = Boolean(data.live?.timer_started_at && data.live?.timer_duration_seconds);
+  const timerActive = !suppressItemTimer && Boolean(data.live?.timer_started_at && data.live?.timer_duration_seconds);
+  const timerBlocked = !suppressItemTimer && (!timerActive || timerExpired);
   const timerLabel = (() => {
     const totalSeconds = timerRemainingSeconds ?? timerDurationSeconds;
     const minutes = Math.floor(totalSeconds / 60);
@@ -652,7 +659,9 @@ export function PlayEventPage() {
                         <div className="w-full max-w-3xl">
                           <div className="mb-3 flex items-center justify-between text-xs uppercase tracking-[0.3em] text-muted">
                             <span>Multiple Choice</span>
-                            <span>{timerActive ? `Timer ${timerLabel}` : `Timer ${timerDurationSeconds}s`}</span>
+                            {!suppressItemTimer && (
+                              <span>{timerActive ? `Timer ${timerLabel}` : `Timer ${timerDurationSeconds}s`}</span>
+                            )}
                           </div>
                           <div className="grid gap-3">
                             {choiceOptions.map((choice, idx) => {
@@ -667,7 +676,7 @@ export function PlayEventPage() {
                                     setSubmitStatus('idle');
                                     setSubmitError(null);
                                   }}
-                                  disabled={!timerActive || timerExpired || submitStatus === 'submitting'}
+                                  disabled={timerBlocked || submitStatus === 'submitting'}
                                   className={`w-full rounded-md border px-4 py-3 text-left text-sm transition ${
                                     submitted
                                       ? 'border-accent-ink bg-panel text-text'
@@ -688,15 +697,14 @@ export function PlayEventPage() {
                             <PrimaryButton
                               onClick={handleSubmitChoice}
                               disabled={
-                                !timerActive ||
-                                timerExpired ||
+                                timerBlocked ||
                                 submitStatus === 'submitting' ||
                                 selectedChoiceIndex === null
                               }
                             >
                               {submitStatus === 'submitting' ? 'Submitting…' : 'Submit Answer'}
                             </PrimaryButton>
-                            {!timerActive && (
+                            {!suppressItemTimer && !timerActive && (
                               <div className="text-xs uppercase tracking-[0.2em] text-muted">
                                 Waiting for timer to start.
                               </div>

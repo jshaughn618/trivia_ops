@@ -156,6 +156,7 @@ export function EventRunPage() {
 
   const activeRound = useMemo(() => rounds.find((round) => round.id === roundId) ?? null, [rounds, roundId]);
   const item = items[index];
+  const isImageItem = item?.media_type === 'image';
   const questionLabel = item?.prompt?.trim()
     ? item.prompt
     : item?.media_type === 'audio'
@@ -469,6 +470,7 @@ export function EventRunPage() {
 
   const startTimer = async () => {
     if (!eventId || !activeRound) return;
+    if (isImageItem) return;
     const duration = activeRound.timer_seconds ?? timerDurationSeconds ?? 15;
     const startedAt = new Date().toISOString();
     if (item?.question_type === 'multiple_choice') {
@@ -551,9 +553,11 @@ export function EventRunPage() {
                       )}
                     </div>
                   )}
-                  <div className="absolute bottom-3 right-3 border-2 border-border bg-panel px-2 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted">
-                    {timerLabel}
-                  </div>
+                  {!isImageItem && (
+                    <div className="absolute bottom-3 right-3 border-2 border-border bg-panel px-2 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted">
+                      {timerLabel}
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="text-xs uppercase tracking-[0.2em] text-muted">No items in this round.</div>
@@ -602,9 +606,11 @@ export function EventRunPage() {
                     Standby
                   </PrimaryButton>
                 )}
-                <SecondaryButton onClick={startTimer} disabled={!item}>
-                  {timerButtonLabel}
-                </SecondaryButton>
+                {!isImageItem && (
+                  <SecondaryButton onClick={startTimer} disabled={!item}>
+                    {timerButtonLabel}
+                  </SecondaryButton>
+                )}
                 <SecondaryButton onClick={clearRoundResponses} disabled={!activeRound || clearResponsesStatus === 'clearing'}>
                   {clearResponsesStatus === 'clearing' ? 'Clearing…' : 'Clear Responses'}
                 </SecondaryButton>
