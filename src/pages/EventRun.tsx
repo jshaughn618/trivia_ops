@@ -608,9 +608,6 @@ export function EventRunPage() {
                 <SecondaryButton onClick={clearRoundResponses} disabled={!activeRound || clearResponsesStatus === 'clearing'}>
                   {clearResponsesStatus === 'clearing' ? 'Clearing…' : 'Clear Responses'}
                 </SecondaryButton>
-                <SecondaryButton onClick={toggleFullLeaderboard} disabled={!eventId}>
-                  {showFullLeaderboard ? 'Hide Full Leaderboard' : 'Show Full Leaderboard'}
-                </SecondaryButton>
                 <SecondaryButton
                   onClick={() => {
                     const next = !showAnswer;
@@ -718,6 +715,12 @@ export function EventRunPage() {
           </Panel>
           <Panel title="Waiting Room">
             <div className="flex flex-col gap-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-xs uppercase tracking-[0.2em] text-muted">Leaderboard</div>
+                <SecondaryButton onClick={toggleFullLeaderboard} disabled={!eventId}>
+                  {showFullLeaderboard ? 'Hide Full Leaderboard' : 'Show Full Leaderboard'}
+                </SecondaryButton>
+              </div>
               <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
                 Message
                 <textarea
