@@ -12,7 +12,7 @@ import { AccordionSection } from '../components/AccordionSection';
 import { IconButton } from '../components/IconButton';
 import { logError } from '../lib/log';
 import { useAuth } from '../auth';
-import type { Event, EventRound, GameEdition, Game, Team, Location, User, EditionItem } from '../types';
+import type { Event, EventRound, GameEdition, Game, GameType, Team, Location, User, EditionItem } from '../types';
 
 const PAGE_WIDTH = 612;
 const PAGE_HEIGHT = 792;
@@ -306,6 +306,7 @@ export function EventDetailPage() {
   const [rounds, setRounds] = useState<EventRound[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
   const [games, setGames] = useState<Game[]>([]);
+  const [gameTypes, setGameTypes] = useState<GameType[]>([]);
   const [editions, setEditions] = useState<GameEdition[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [hosts, setHosts] = useState<User[]>([]);
@@ -350,14 +351,15 @@ export function EventDetailPage() {
 
   const load = async () => {
     if (!eventId) return;
-    const [eventRes, roundsRes, teamsRes, editionsRes, locationsRes, gamesRes, hostsRes] = await Promise.all([
+    const [eventRes, roundsRes, teamsRes, editionsRes, locationsRes, gamesRes, hostsRes, gameTypesRes] = await Promise.all([
       api.getEvent(eventId),
       api.listEventRounds(eventId),
       api.listTeams(eventId),
       api.listEditions(),
       api.listLocations(),
       api.listGames(),
-      api.listHosts()
+      api.listHosts(),
+      api.listGameTypes()
     ]);
     if (eventRes.ok) {
       setEvent(eventRes.data);
@@ -373,6 +375,7 @@ export function EventDetailPage() {
     if (locationsRes.ok) setLocations(locationsRes.data);
     if (gamesRes.ok) setGames(gamesRes.data);
     if (hostsRes.ok) setHosts(hostsRes.data);
+    if (gameTypesRes.ok) setGameTypes(gameTypesRes.data);
   };
 
   useEffect(() => {
@@ -483,6 +486,15 @@ export function EventDetailPage() {
   const gameById = useMemo(() => {
     return Object.fromEntries(games.map((game) => [game.id, game]));
   }, [games]);
+
+  const gameTypeById = useMemo(() => {
+    return Object.fromEntries(gameTypes.map((type) => [type.id, type]));
+  }, [gameTypes]);
+
+  const gamesForEvent = useMemo(() => {
+    if (eventType !== 'Music Trivia') return games;
+    return games.filter((game) => gameTypeById[game.game_type_id]?.code === 'music');
+  }, [eventType, games, gameTypeById]);
 
   const roundEditions = useMemo(() => {
     if (!roundGameId) return [];
@@ -868,7 +880,7 @@ export function EventDetailPage() {
               }}
             >
               <option value="">Select game</option>
-              {games.map((game) => (
+              {gamesForEvent.map((game) => (
                 <option key={game.id} value={game.id}>
                   {game.name}
                 </option>
