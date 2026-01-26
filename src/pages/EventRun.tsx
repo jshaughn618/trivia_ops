@@ -311,6 +311,13 @@ export function EventRunPage() {
       await Promise.all(otherLive.map((round) => api.updateEventRound(round.id, { status: 'planned' })));
     }
     await api.updateEventRound(activeRound.id, { status: 'live' });
+    if (eventId) {
+      const currentOrdinal = items[index]?.ordinal ?? items[0]?.ordinal ?? null;
+      await api.updateLiveState(eventId, {
+        active_round_id: activeRound.id,
+        current_item_ordinal: currentOrdinal
+      });
+    }
     await load();
     if (keepRoundId) {
       setRoundId(keepRoundId);
