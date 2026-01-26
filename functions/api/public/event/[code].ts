@@ -196,11 +196,10 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
         `SELECT choice_index, COUNT(*) AS total
          FROM event_item_responses
          WHERE event_id = ?
-           AND event_round_id = ?
            AND edition_item_id = ?
            AND COALESCE(deleted, 0) = 0
          GROUP BY choice_index`,
-        [event.id, live.active_round_id, currentItem.id]
+        [event.id, currentItem.id]
       );
       const counts = choices.map((_, idx) => {
         const row = countsRows.find((entry) => Number(entry.choice_index) === idx);
