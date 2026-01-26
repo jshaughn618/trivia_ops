@@ -104,7 +104,8 @@ export function EventRunPage() {
           reveal_answer: false,
           reveal_fun_fact: false,
           timer_started_at: null,
-          timer_duration_seconds: null
+          timer_duration_seconds: null,
+          show_full_leaderboard: false
         });
       }
     }
@@ -287,7 +288,8 @@ export function EventRunPage() {
           reveal_answer: false,
           reveal_fun_fact: false,
           timer_started_at: null,
-          timer_duration_seconds: null
+          timer_duration_seconds: null,
+          show_full_leaderboard: false
         });
       }
     }
@@ -307,7 +309,8 @@ export function EventRunPage() {
           reveal_answer: false,
           reveal_fun_fact: false,
           timer_started_at: null,
-          timer_duration_seconds: null
+          timer_duration_seconds: null,
+          show_full_leaderboard: false
         });
       }
     }
@@ -325,7 +328,8 @@ export function EventRunPage() {
       const currentOrdinal = items[index]?.ordinal ?? items[0]?.ordinal ?? null;
       await api.updateLiveState(eventId, {
         active_round_id: activeRound.id,
-        current_item_ordinal: currentOrdinal
+        current_item_ordinal: currentOrdinal,
+        show_full_leaderboard: false
       });
     }
     await load();
@@ -346,7 +350,8 @@ export function EventRunPage() {
         reveal_answer: false,
         reveal_fun_fact: false,
         timer_started_at: null,
-        timer_duration_seconds: null
+        timer_duration_seconds: null,
+        show_full_leaderboard: false
       });
     }
     setTimerStartedAt(null);
@@ -387,7 +392,8 @@ export function EventRunPage() {
     const res = await api.updateLiveState(eventId, {
       waiting_message: waitingMessage.trim() ? waitingMessage.trim() : null,
       waiting_show_leaderboard: waitingShowLeaderboard,
-      waiting_show_next_round: waitingShowNextRound
+      waiting_show_next_round: waitingShowNextRound,
+      show_full_leaderboard: false
     });
     if (!res.ok) {
       setWaitingError(res.error.message ?? 'Failed to update waiting room.');

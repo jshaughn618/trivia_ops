@@ -713,7 +713,13 @@ export function PlayEventPage() {
                       </span>
                     )}
                   </div>
-                  <ChoiceList>
+                  <ChoiceList
+                    className={
+                      choiceOptions.length === 4
+                        ? 'landscape:grid landscape:grid-flow-col landscape:grid-rows-2 landscape:gap-3'
+                        : ''
+                    }
+                  >
                     {choiceOptions.map((choice, idx) => {
                       const selected = selectedChoiceIndex === idx;
                       const submitted = submittedChoiceIndex === idx;
