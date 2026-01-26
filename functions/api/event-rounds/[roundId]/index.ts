@@ -5,6 +5,9 @@ import { eventRoundUpdateSchema } from '../../../../shared/validators';
 import { execute, nowIso, queryAll, queryFirst } from '../../../db';
 import { requireAdmin } from '../../../access';
 
+const normalizeAnswer = (value: string | null | undefined) =>
+  (value ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+
 export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, data }) => {
   const guard = requireAdmin(data.user ?? null);
   if (guard) return guard;
@@ -29,6 +32,94 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
     `UPDATE event_rounds SET round_number = ?, label = ?, scoresheet_title = ?, edition_id = ?, status = ? WHERE id = ?`,
     [merged.round_number, merged.label, merged.scoresheet_title, merged.edition_id, merged.status, params.roundId]
   );
+
+  const isCompleting = (existing.status !== 'completed' && existing.status !== 'locked') &&
+    (merged.status === 'completed' || merged.status === 'locked');
+  if (isCompleting) {
+    const roundItems = await queryAll<{
+      edition_item_id: string;
+      question_type: string | null;
+      answer: string | null;
+    }>(
+      env,
+      `SELECT eri.edition_item_id,
+              ei.question_type,
+              COALESCE(eri.overridden_answer, ei.answer) AS answer
+       FROM event_round_items eri
+       JOIN edition_items ei ON ei.id = eri.edition_item_id
+       WHERE eri.event_round_id = ? AND COALESCE(eri.deleted, 0) = 0 AND COALESCE(ei.deleted, 0) = 0`,
+      [params.roundId]
+    );
+
+    const mcItems = roundItems.filter((item) => item.question_type === 'multiple_choice');
+    if (mcItems.length > 0) {
+      const teams = await queryAll<{ id: string }>(
+        env,
+        'SELECT id FROM teams WHERE event_id = ? AND COALESCE(deleted, 0) = 0',
+        [existing.event_id]
+      );
+
+      const responses = await queryAll<{
+        team_id: string;
+        edition_item_id: string;
+        choice_text: string | null;
+      }>(
+        env,
+        `SELECT team_id, edition_item_id, choice_text
+         FROM event_item_responses
+         WHERE event_id = ?
+           AND event_round_id = ?
+           AND COALESCE(deleted, 0) = 0`,
+        [existing.event_id, params.roundId]
+      );
+
+      const responsesByTeam = new Map<string, Map<string, string>>();
+      for (const response of responses) {
+        if (!response.team_id || !response.edition_item_id) continue;
+        const teamMap = responsesByTeam.get(response.team_id) ?? new Map<string, string>();
+        teamMap.set(response.edition_item_id, response.choice_text ?? '');
+        responsesByTeam.set(response.team_id, teamMap);
+      }
+
+      const now = nowIso();
+      for (const team of teams) {
+        const teamResponses = responsesByTeam.get(team.id) ?? new Map<string, string>();
+        let score = 0;
+        for (const item of mcItems) {
+          const answer = normalizeAnswer(item.answer);
+          const response = normalizeAnswer(teamResponses.get(item.edition_item_id));
+          if (answer && response && answer === response) {
+            score += 1;
+          }
+        }
+
+        const existingScore = await queryFirst<{ id: string; deleted: number }>(
+          env,
+          `SELECT id, deleted FROM event_round_scores
+           WHERE event_round_id = ? AND team_id = ?`,
+          [params.roundId, team.id]
+        );
+
+        if (existingScore) {
+          await execute(
+            env,
+            `UPDATE event_round_scores
+             SET score = ?, updated_at = ?, deleted = 0, deleted_at = NULL, deleted_by = NULL
+             WHERE id = ?`,
+            [score, now, existingScore.id]
+          );
+        } else {
+          await execute(
+            env,
+            `INSERT INTO event_round_scores
+             (id, event_round_id, team_id, score, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?)`,
+            [crypto.randomUUID(), params.roundId, team.id, score, now, now]
+          );
+        }
+      }
+    }
+  }
 
   const event = await queryFirst<{ id: string; status: string }>(
     env,
