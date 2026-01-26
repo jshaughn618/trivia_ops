@@ -526,6 +526,25 @@ export function EventRunPage() {
                 <SecondaryButton onClick={prevItem} disabled={index === 0}>
                   Back
                 </SecondaryButton>
+                {activeRound?.status !== 'live' && (
+                  <SecondaryButton onClick={setLive} disabled={!activeRound}>
+                    Display
+                  </SecondaryButton>
+                )}
+                {activeRound?.status === 'live' && (
+                  <SecondaryButton onClick={setPlanned} disabled={!activeRound}>
+                    Standby
+                  </SecondaryButton>
+                )}
+                <SecondaryButton onClick={startTimer} disabled={!item}>
+                  {timerButtonLabel}
+                </SecondaryButton>
+                <SecondaryButton onClick={clearRoundResponses} disabled={!activeRound || clearResponsesStatus === 'clearing'}>
+                  {clearResponsesStatus === 'clearing' ? 'Clearing…' : 'Clear Responses'}
+                </SecondaryButton>
+                <PrimaryButton onClick={nextItem} disabled={!item} className="py-4 text-sm">
+                  Next
+                </PrimaryButton>
                 <PrimaryButton
                   onClick={() => {
                     const next = !showAnswer;
@@ -546,28 +565,9 @@ export function EventRunPage() {
                 >
                   {showFact ? 'Hide Fact' : 'Reveal Fact'}
                 </SecondaryButton>
-                <SecondaryButton onClick={startTimer} disabled={!item}>
-                  {timerButtonLabel}
-                </SecondaryButton>
-                <SecondaryButton onClick={clearRoundResponses} disabled={!activeRound || clearResponsesStatus === 'clearing'}>
-                  {clearResponsesStatus === 'clearing' ? 'Clearing…' : 'Clear Responses'}
-                </SecondaryButton>
-                <PrimaryButton onClick={nextItem} disabled={!item} className="py-4 text-sm">
-                  Next
-                </PrimaryButton>
                 {(activeRound?.status === 'completed' || activeRound?.status === 'locked') && (
                   <SecondaryButton onClick={reopenRound} disabled={!activeRound} className="py-4 text-sm">
                     Reopen Round
-                  </SecondaryButton>
-                )}
-                {activeRound?.status !== 'live' && (
-                  <SecondaryButton onClick={setLive} disabled={!activeRound}>
-                    Go Live
-                  </SecondaryButton>
-                )}
-                {activeRound?.status === 'live' && (
-                  <SecondaryButton onClick={setPlanned} disabled={!activeRound}>
-                    Go Offline
                   </SecondaryButton>
                 )}
                 {activeRound?.status !== 'completed' && activeRound?.status !== 'locked' && item && index === items.length - 1 && (
