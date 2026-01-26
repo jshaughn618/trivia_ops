@@ -18,7 +18,12 @@ type PublicLeaderboardResponse = {
   leaderboard: { team_id: string; name: string; total: number }[];
   rounds?: { id: string; round_number: number; label: string; status: string }[];
   round_scores?: { event_round_id: string; team_id: string; score: number }[];
+  live?: {
+    show_full_leaderboard: boolean;
+  } | null;
 };
+
+const POLL_MS = 1500;
 
 export function PlayLeaderboardPage() {
   const { code } = useParams();
@@ -38,19 +43,30 @@ export function PlayLeaderboardPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let cancelled = false;
     const load = async () => {
       if (!normalizedCode) return;
       const res = await api.publicEvent(normalizedCode);
+      if (cancelled) return;
       if (res.ok) {
-        setData(res.data as PublicLeaderboardResponse);
+        const next = res.data as PublicLeaderboardResponse;
+        setData(next);
         setError(null);
+        if (next.live && !next.live.show_full_leaderboard) {
+          navigate(`/play/${normalizedCode}${storedTeamId ? `?team_id=${storedTeamId}` : ''}`);
+        }
       } else {
         setError(res.error.message);
       }
       setLoading(false);
     };
     load();
-  }, [normalizedCode]);
+    const timer = window.setInterval(load, POLL_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [normalizedCode, navigate, storedTeamId]);
 
   if (!normalizedCode) {
     return (
