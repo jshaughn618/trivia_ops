@@ -19,16 +19,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refresh = async () => {
     setLoading(true);
-    const res = await api.me();
-    if (res.ok) {
-      setUser(res.data);
-    } else {
+    try {
+      const res = await api.me();
+      if (res.ok) {
+        setUser(res.data);
+      } else {
+        setUser(null);
+      }
+    } catch {
       setUser(null);
     }
     setLoading(false);
   };
 
   useEffect(() => {
+    const path = typeof window !== 'undefined' ? window.location.pathname : '';
+    if (path.startsWith('/play')) {
+      setLoading(false);
+      setUser(null);
+      return;
+    }
     refresh();
   }, []);
 
