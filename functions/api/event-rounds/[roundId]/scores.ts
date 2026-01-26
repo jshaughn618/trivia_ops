@@ -3,7 +3,7 @@ import { jsonError, jsonOk } from '../../../responses';
 import { parseJson } from '../../../request';
 import { roundScoresUpdateSchema } from '../../../../shared/validators';
 import { execute, nowIso, queryAll } from '../../../db';
-import { requireAdmin, requireHostOrAdmin, requireRoundAccess } from '../../../access';
+import { requireHostOrAdmin, requireRoundAccess } from '../../../access';
 
 export const onRequestGet: PagesFunction<Env> = async ({ env, params, data }) => {
   const guard = requireHostOrAdmin(data.user ?? null);
@@ -20,8 +20,10 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params, data }) =>
 };
 
 export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, data }) => {
-  const guard = requireAdmin(data.user ?? null);
+  const guard = requireHostOrAdmin(data.user ?? null);
   if (guard) return guard;
+  const access = await requireRoundAccess(env, data.user ?? null, params.roundId as string);
+  if (access.response) return access.response;
   const payload = await parseJson(request);
   const parsed = roundScoresUpdateSchema.safeParse(payload);
   if (!parsed.success) {

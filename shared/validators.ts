@@ -213,7 +213,7 @@ export const publicJoinSchema = z.object({
 
 export const roundScoreSchema = z.object({
   team_id: idSchema,
-  score: z.number().int()
+  score: z.number()
 });
 
 export const roundScoresUpdateSchema = z.object({

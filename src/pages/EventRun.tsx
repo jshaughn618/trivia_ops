@@ -7,7 +7,7 @@ import { Panel } from '../components/Panel';
 import { ButtonLink, PrimaryButton, SecondaryButton } from '../components/Buttons';
 import { StampBadge } from '../components/StampBadge';
 import { logError, logInfo } from '../lib/log';
-import type { EditionItem, Event, EventRound, Game, GameEdition } from '../types';
+import type { EditionItem, Event, EventRound, Game, GameEdition, Team, EventRoundScore } from '../types';
 
 function useQuery() {
   return new URLSearchParams(useLocation().search);
@@ -42,23 +42,30 @@ export function EventRunPage() {
   const [waitingError, setWaitingError] = useState<string | null>(null);
   const [clearResponsesStatus, setClearResponsesStatus] = useState<'idle' | 'clearing' | 'done' | 'error'>('idle');
   const [clearResponsesMessage, setClearResponsesMessage] = useState<string | null>(null);
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [scoresOpen, setScoresOpen] = useState(false);
+  const [scoresSaving, setScoresSaving] = useState(false);
+  const [scoresError, setScoresError] = useState<string | null>(null);
+  const [scoreDrafts, setScoreDrafts] = useState<Record<string, string>>({});
   const preselectRef = useRef(false);
   const auth = useAuth();
   const isAdmin = auth.user?.user_type === 'admin';
 
   const load = async () => {
     if (!eventId) return;
-    const [eventRes, roundsRes, editionsRes, gamesRes, liveRes] = await Promise.all([
+    const [eventRes, roundsRes, editionsRes, gamesRes, liveRes, teamsRes] = await Promise.all([
       api.getEvent(eventId),
       api.listEventRounds(eventId),
       isAdmin ? api.listEditions() : Promise.resolve({ ok: true as const, data: [] as GameEdition[] }),
       isAdmin ? api.listGames() : Promise.resolve({ ok: true as const, data: [] as Game[] }),
-      api.getLiveState(eventId)
+      api.getLiveState(eventId),
+      api.listTeams(eventId)
     ]);
     if (eventRes.ok) setEvent(eventRes.data);
     if (roundsRes.ok) setRounds(roundsRes.data);
     if (editionsRes.ok) setEditions(editionsRes.data);
     if (gamesRes.ok) setGames(gamesRes.data);
+    if (teamsRes.ok) setTeams(teamsRes.data);
     if (liveRes.ok) {
       if (liveRes.data) {
         setWaitingMessage(liveRes.data.waiting_message ?? '');
@@ -411,6 +418,43 @@ export function EventRunPage() {
     }
   };
 
+  const openScores = async () => {
+    if (!activeRound) return;
+    setScoresOpen(true);
+    setScoresError(null);
+    setScoresSaving(false);
+    const scoresRes = await api.listRoundScores(activeRound.id);
+    const scores = scoresRes.ok ? (scoresRes.data as EventRoundScore[]) : [];
+    const scoresByTeam = new Map(scores.map((row) => [row.team_id, row.score]));
+    const nextDrafts: Record<string, string> = {};
+    teams.forEach((team) => {
+      const value = scoresByTeam.get(team.id);
+      nextDrafts[team.id] = value === undefined || value === null ? '' : String(value);
+    });
+    setScoreDrafts(nextDrafts);
+    if (!scoresRes.ok) {
+      setScoresError(scoresRes.error.message ?? 'Failed to load scores.');
+    }
+  };
+
+  const saveScores = async () => {
+    if (!activeRound) return;
+    setScoresSaving(true);
+    setScoresError(null);
+    const payload = teams.map((team) => {
+      const raw = scoreDrafts[team.id];
+      const parsed = raw === undefined || raw === '' ? 0 : Number.parseFloat(raw);
+      return { team_id: team.id, score: Number.isFinite(parsed) ? parsed : 0 };
+    });
+    const res = await api.updateRoundScores(activeRound.id, payload);
+    if (!res.ok) {
+      setScoresError(res.error.message ?? 'Failed to save scores.');
+    } else {
+      setScoresOpen(false);
+    }
+    setScoresSaving(false);
+  };
+
   const startTimer = async () => {
     if (!eventId || !activeRound) return;
     const duration = activeRound.timer_seconds ?? timerDurationSeconds ?? 15;
@@ -577,6 +621,11 @@ export function EventRunPage() {
                     Reopen Round
                   </SecondaryButton>
                 )}
+                {(activeRound?.status === 'completed' || activeRound?.status === 'locked') && (
+                  <SecondaryButton onClick={openScores} disabled={!activeRound}>
+                    Enter Scores
+                  </SecondaryButton>
+                )}
                 {activeRound?.status !== 'completed' && activeRound?.status !== 'locked' && item && index === items.length - 1 && (
                   <SecondaryButton onClick={setCompleted} disabled={!activeRound}>
                     Mark Completed
@@ -692,6 +741,56 @@ export function EventRunPage() {
           </Panel>
         </div>
       </div>
+      {scoresOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-xl border-2 border-border bg-panel p-6">
+            <div className="flex items-center justify-between">
+              <div className="text-sm font-display uppercase tracking-[0.25em]">Enter Scores</div>
+              <button
+                type="button"
+                onClick={() => setScoresOpen(false)}
+                className="text-xs uppercase tracking-[0.2em] text-muted"
+              >
+                Close
+              </button>
+            </div>
+            <div className="mt-4 flex flex-col gap-3">
+              {teams.length === 0 && (
+                <div className="text-xs uppercase tracking-[0.2em] text-muted">No teams yet.</div>
+              )}
+              {teams.map((team) => (
+                <div key={team.id} className="flex items-center justify-between gap-3 border border-border bg-panel2 px-3 py-2">
+                  <div className="text-sm font-display uppercase tracking-[0.2em]">{team.name}</div>
+                  <input
+                    type="number"
+                    step="0.1"
+                    inputMode="decimal"
+                    className="h-9 w-28 px-2 text-right"
+                    value={scoreDrafts[team.id] ?? ''}
+                    onChange={(event) =>
+                      setScoreDrafts((prev) => ({
+                        ...prev,
+                        [team.id]: event.target.value
+                      }))
+                    }
+                  />
+                </div>
+              ))}
+              {scoresError && (
+                <div className="border border-danger bg-panel2 px-3 py-2 text-xs text-danger-ink">
+                  {scoresError}
+                </div>
+              )}
+            </div>
+            <div className="mt-4 flex items-center justify-end gap-2">
+              <SecondaryButton onClick={() => setScoresOpen(false)}>Cancel</SecondaryButton>
+              <PrimaryButton onClick={saveScores} disabled={scoresSaving || teams.length === 0}>
+                {scoresSaving ? 'Saving…' : 'Save Scores'}
+              </PrimaryButton>
+            </div>
+          </div>
+        </div>
+      )}
     </AppShell>
   );
 }
