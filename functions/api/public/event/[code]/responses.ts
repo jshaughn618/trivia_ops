@@ -98,10 +98,10 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request }
 
   const choiceText = choices[choiceIndex];
   const now = nowIso();
-  const existing = await queryFirst<{ id: string }>(
+  const existing = await queryFirst<{ id: string; deleted: number }>(
     env,
-    `SELECT id FROM event_item_responses
-     WHERE event_id = ? AND team_id = ? AND edition_item_id = ? AND COALESCE(deleted, 0) = 0`,
+    `SELECT id, deleted FROM event_item_responses
+     WHERE event_id = ? AND team_id = ? AND edition_item_id = ?`,
     [event.id, teamId, itemId]
   );
 
@@ -109,7 +109,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request }
     await execute(
       env,
       `UPDATE event_item_responses
-       SET choice_index = ?, choice_text = ?, submitted_at = ?, updated_at = ?
+       SET choice_index = ?, choice_text = ?, submitted_at = ?, updated_at = ?, deleted = 0, deleted_at = NULL, deleted_by = NULL
        WHERE id = ?`,
       [choiceIndex, choiceText, now, now, existing.id]
     );
