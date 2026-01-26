@@ -40,6 +40,7 @@ export function EventRunPage() {
   const [waitingShowNextRound, setWaitingShowNextRound] = useState(true);
   const [waitingSaving, setWaitingSaving] = useState(false);
   const [waitingError, setWaitingError] = useState<string | null>(null);
+  const [showFullLeaderboard, setShowFullLeaderboard] = useState(false);
   const [clearResponsesStatus, setClearResponsesStatus] = useState<'idle' | 'clearing' | 'done' | 'error'>('idle');
   const [clearResponsesMessage, setClearResponsesMessage] = useState<string | null>(null);
   const [teams, setTeams] = useState<Team[]>([]);
@@ -73,6 +74,7 @@ export function EventRunPage() {
         setWaitingShowNextRound(
           liveRes.data.waiting_show_next_round === undefined ? true : Boolean(liveRes.data.waiting_show_next_round)
         );
+        setShowFullLeaderboard(Boolean(liveRes.data.show_full_leaderboard));
         setTimerStartedAt(liveRes.data.timer_started_at ?? null);
         setTimerDurationSeconds(liveRes.data.timer_duration_seconds ?? 15);
       }
@@ -393,6 +395,16 @@ export function EventRunPage() {
     setWaitingSaving(false);
   };
 
+  const toggleFullLeaderboard = async () => {
+    if (!eventId) return;
+    const next = !showFullLeaderboard;
+    setShowFullLeaderboard(next);
+    const res = await api.updateLiveState(eventId, { show_full_leaderboard: next });
+    if (!res.ok) {
+      setShowFullLeaderboard(!next);
+    }
+  };
+
   const timerLabel = useMemo(() => {
     const totalSeconds = timerRemainingSeconds ?? timerDurationSeconds;
     const minutes = Math.floor(totalSeconds / 60);
@@ -595,6 +607,9 @@ export function EventRunPage() {
                 </SecondaryButton>
                 <SecondaryButton onClick={clearRoundResponses} disabled={!activeRound || clearResponsesStatus === 'clearing'}>
                   {clearResponsesStatus === 'clearing' ? 'Clearing…' : 'Clear Responses'}
+                </SecondaryButton>
+                <SecondaryButton onClick={toggleFullLeaderboard} disabled={!eventId}>
+                  {showFullLeaderboard ? 'Hide Full Leaderboard' : 'Show Full Leaderboard'}
                 </SecondaryButton>
                 <SecondaryButton
                   onClick={() => {

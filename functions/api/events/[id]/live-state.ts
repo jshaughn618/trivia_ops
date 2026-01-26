@@ -20,13 +20,14 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params, data }) =>
     waiting_message: string | null;
     waiting_show_leaderboard: number;
     waiting_show_next_round: number;
+    show_full_leaderboard: number;
     timer_started_at: string | null;
     timer_duration_seconds: number | null;
     updated_at: string;
   }>(
     env,
     `SELECT id, event_id, active_round_id, current_item_ordinal, reveal_answer, reveal_fun_fact,
-            waiting_message, waiting_show_leaderboard, waiting_show_next_round, timer_started_at, timer_duration_seconds, updated_at
+            waiting_message, waiting_show_leaderboard, waiting_show_next_round, show_full_leaderboard, timer_started_at, timer_duration_seconds, updated_at
      FROM event_live_state WHERE event_id = ? AND COALESCE(deleted, 0) = 0`,
     [params.id]
   );
@@ -39,6 +40,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params, data }) =>
           waiting_message: row.waiting_message ?? null,
           waiting_show_leaderboard: Boolean(row.waiting_show_leaderboard),
           waiting_show_next_round: Boolean(row.waiting_show_next_round),
+          show_full_leaderboard: Boolean(row.show_full_leaderboard),
           timer_started_at: row.timer_started_at ?? null,
           timer_duration_seconds: row.timer_duration_seconds ?? null
         }
@@ -80,6 +82,7 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
            waiting_message = CASE WHEN ? = 1 THEN ? ELSE waiting_message END,
            waiting_show_leaderboard = COALESCE(?, waiting_show_leaderboard),
            waiting_show_next_round = COALESCE(?, waiting_show_next_round),
+           show_full_leaderboard = COALESCE(?, show_full_leaderboard),
            timer_started_at = CASE WHEN ? = 1 THEN ? ELSE timer_started_at END,
            timer_duration_seconds = CASE WHEN ? = 1 THEN ? ELSE timer_duration_seconds END,
            updated_at = ?
@@ -93,6 +96,7 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
         payloadData.waiting_message ?? null,
         payloadData.waiting_show_leaderboard === undefined ? null : payloadData.waiting_show_leaderboard ? 1 : 0,
         payloadData.waiting_show_next_round === undefined ? null : payloadData.waiting_show_next_round ? 1 : 0,
+        payloadData.show_full_leaderboard === undefined ? null : payloadData.show_full_leaderboard ? 1 : 0,
         timerStartedProvided ? 1 : 0,
         payloadData.timer_started_at ?? null,
         timerDurationProvided ? 1 : 0,
@@ -107,8 +111,8 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
       env,
       `INSERT INTO event_live_state
        (id, event_id, active_round_id, current_item_ordinal, reveal_answer, reveal_fun_fact,
-        waiting_message, waiting_show_leaderboard, waiting_show_next_round, timer_started_at, timer_duration_seconds, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        waiting_message, waiting_show_leaderboard, waiting_show_next_round, show_full_leaderboard, timer_started_at, timer_duration_seconds, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         params.id,
@@ -119,6 +123,7 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
         payloadData.waiting_message ?? null,
         payloadData.waiting_show_leaderboard ? 1 : 0,
         payloadData.waiting_show_next_round === undefined ? 1 : payloadData.waiting_show_next_round ? 1 : 0,
+        payloadData.show_full_leaderboard ? 1 : 0,
         payloadData.timer_started_at ?? null,
         payloadData.timer_duration_seconds ?? null,
         now,
@@ -143,7 +148,7 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
   }>(
     env,
     `SELECT id, event_id, active_round_id, current_item_ordinal, reveal_answer, reveal_fun_fact,
-            waiting_message, waiting_show_leaderboard, waiting_show_next_round, timer_started_at, timer_duration_seconds, updated_at
+            waiting_message, waiting_show_leaderboard, waiting_show_next_round, show_full_leaderboard, timer_started_at, timer_duration_seconds, updated_at
      FROM event_live_state WHERE event_id = ? AND COALESCE(deleted, 0) = 0`,
     [params.id]
   );
@@ -157,6 +162,7 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
           waiting_message: row.waiting_message ?? null,
           waiting_show_leaderboard: Boolean(row.waiting_show_leaderboard),
           waiting_show_next_round: Boolean(row.waiting_show_next_round),
+          show_full_leaderboard: Boolean(row.show_full_leaderboard),
           timer_started_at: row.timer_started_at ?? null,
           timer_duration_seconds: row.timer_duration_seconds ?? null
         }

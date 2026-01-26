@@ -43,6 +43,7 @@ type PublicEventResponse = {
     waiting_message: string | null;
     waiting_show_leaderboard: boolean;
     waiting_show_next_round: boolean;
+    show_full_leaderboard: boolean;
     timer_started_at: string | null;
     timer_duration_seconds: number | null;
   } | null;
@@ -222,6 +223,16 @@ export function PlayEventPage() {
     data?.live?.current_item_ordinal,
     data?.live?.active_round_id
   ]);
+
+  useEffect(() => {
+    if (!data?.live?.show_full_leaderboard) return;
+    if (!data?.event?.public_code) return;
+    const params = new URLSearchParams();
+    if (teamId) params.set('team_id', teamId);
+    params.set('from', 'host');
+    const query = params.toString();
+    navigate(`/play/${data.event.public_code}/leaderboard${query ? `?${query}` : ''}`);
+  }, [data?.live?.show_full_leaderboard, data?.event?.public_code, teamId, navigate]);
 
   const activeRound = data?.rounds.find((round) => round.id === data?.live?.active_round_id) ?? null;
   const isLive = activeRound?.status === 'live';

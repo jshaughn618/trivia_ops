@@ -136,6 +136,7 @@ export type EventLiveState = {
   waiting_message: string | null;
   waiting_show_leaderboard: boolean;
   waiting_show_next_round: boolean;
+  show_full_leaderboard: boolean;
   timer_started_at: string | null;
   timer_duration_seconds: number | null;
   updated_at: string;

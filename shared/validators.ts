@@ -228,6 +228,7 @@ export const liveStateUpdateSchema = z.object({
   waiting_message: z.string().optional().nullable(),
   waiting_show_leaderboard: z.boolean().optional(),
   waiting_show_next_round: z.boolean().optional(),
+  show_full_leaderboard: z.boolean().optional(),
   timer_started_at: z.string().nullable().optional(),
   timer_duration_seconds: z.number().int().min(5).max(600).nullable().optional()
 });
