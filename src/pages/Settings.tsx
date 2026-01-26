@@ -9,6 +9,9 @@ export function SettingsPage() {
   const auth = useAuth();
   const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
+  const version = __APP_VERSION__;
+  const commit = __APP_COMMIT__;
+  const buildDate = __APP_BUILD_DATE__;
 
   const handleLogout = async () => {
     await auth.logout();
@@ -39,6 +42,22 @@ export function SettingsPage() {
             <SecondaryButton onClick={toggleTheme} className="px-3 py-1 text-[10px]">
               Switch to {theme === 'dark' ? 'Light' : 'Dark'}
             </SecondaryButton>
+          </div>
+        </div>
+      </Panel>
+      <Panel title="App Version">
+        <div className="flex flex-col gap-2 text-xs uppercase tracking-[0.2em] text-muted">
+          <div className="flex items-center justify-between border-2 border-border bg-panel2 px-3 py-2">
+            <span>Version</span>
+            <span className="text-text">{version}</span>
+          </div>
+          <div className="flex items-center justify-between border-2 border-border bg-panel2 px-3 py-2">
+            <span>Commit</span>
+            <span className="text-text">{commit}</span>
+          </div>
+          <div className="flex items-center justify-between border-2 border-border bg-panel2 px-3 py-2">
+            <span>Build date</span>
+            <span className="text-text">{new Date(buildDate).toLocaleString()}</span>
           </div>
         </div>
       </Panel>

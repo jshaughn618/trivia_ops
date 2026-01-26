@@ -29,7 +29,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
     env,
     `SELECT er.id,
             er.round_number,
-            CASE WHEN g.show_theme = 0 THEN '' ELSE er.label END AS label,
+            CASE WHEN g.show_theme = 0 THEN g.name ELSE er.label END AS label,
             er.status,
             ed.timer_seconds
      FROM event_rounds er
