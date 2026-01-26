@@ -527,14 +527,14 @@ export function EventRunPage() {
                   Back
                 </SecondaryButton>
                 {activeRound?.status !== 'live' && (
-                  <SecondaryButton onClick={setLive} disabled={!activeRound}>
+                  <PrimaryButton onClick={setLive} disabled={!activeRound}>
                     Display
-                  </SecondaryButton>
+                  </PrimaryButton>
                 )}
                 {activeRound?.status === 'live' && (
-                  <SecondaryButton onClick={setPlanned} disabled={!activeRound}>
+                  <PrimaryButton onClick={setPlanned} disabled={!activeRound}>
                     Standby
-                  </SecondaryButton>
+                  </PrimaryButton>
                 )}
                 <SecondaryButton onClick={startTimer} disabled={!item}>
                   {timerButtonLabel}
@@ -542,10 +542,10 @@ export function EventRunPage() {
                 <SecondaryButton onClick={clearRoundResponses} disabled={!activeRound || clearResponsesStatus === 'clearing'}>
                   {clearResponsesStatus === 'clearing' ? 'Clearing…' : 'Clear Responses'}
                 </SecondaryButton>
-                <PrimaryButton onClick={nextItem} disabled={!item} className="py-4 text-sm">
+                <SecondaryButton onClick={nextItem} disabled={!item} className="py-4 text-sm">
                   Next
-                </PrimaryButton>
-                <PrimaryButton
+                </SecondaryButton>
+                <SecondaryButton
                   onClick={() => {
                     const next = !showAnswer;
                     setShowAnswer(next);
@@ -554,7 +554,7 @@ export function EventRunPage() {
                   disabled={!item}
                 >
                   {showAnswer ? 'Hide Answer' : 'Reveal Answer'}
-                </PrimaryButton>
+                </SecondaryButton>
                 <SecondaryButton
                   onClick={() => {
                     const next = !showFact;

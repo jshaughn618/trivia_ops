@@ -107,6 +107,7 @@ export function PlayEventPage() {
   const lastResponseTotalRef = useRef(0);
   const [responseSync, setResponseSync] = useState<{ expectedTotal: number; expiresAt: number } | null>(null);
   const [graphDelayUntil, setGraphDelayUntil] = useState<number | null>(null);
+  const graphDelayItemRef = useRef<string | null>(null);
   const normalizedCode = useMemo(() => (code ?? '').trim().toUpperCase(), [code]);
 
   const load = async () => {
@@ -170,6 +171,7 @@ export function PlayEventPage() {
     setSubmitError(null);
     setResponseSync(null);
     setGraphDelayUntil(null);
+    graphDelayItemRef.current = null;
   }, [data?.live?.active_round_id, data?.live?.current_item_ordinal, data?.current_item?.id]);
 
   useEffect(() => {
@@ -255,9 +257,11 @@ export function PlayEventPage() {
 
   useEffect(() => {
     if (!timerExpired) return;
-    if (graphDelayUntil) return;
+    if (!displayItem?.id) return;
+    if (graphDelayItemRef.current === displayItem.id) return;
+    graphDelayItemRef.current = displayItem.id;
     setGraphDelayUntil(Date.now() + RESPONSE_GRAPH_DELAY_MS);
-  }, [timerExpired, graphDelayUntil, displayItem?.id]);
+  }, [timerExpired, displayItem?.id]);
 
   useEffect(() => {
     if (!graphDelayUntil) return;
