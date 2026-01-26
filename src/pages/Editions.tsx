@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { AppShell } from '../components/AppShell';
 import { ButtonLink, SecondaryButton } from '../components/Buttons';
@@ -11,6 +11,7 @@ import { logError } from '../lib/log';
 import type { Game, GameEdition, Location } from '../types';
 
 export function EditionsPage() {
+  const navigate = useNavigate();
   const [editions, setEditions] = useState<GameEdition[]>([]);
   const [games, setGames] = useState<Game[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
@@ -80,6 +81,22 @@ export function EditionsPage() {
     return map;
   }, [editions]);
 
+  const visibleGameIds = useMemo(() => {
+    return games
+      .filter((game) => (editionsByGame.get(game.id) ?? []).length > 0)
+      .map((game) => game.id);
+  }, [games, editionsByGame]);
+
+  useEffect(() => {
+    setOpenGames((prev) => {
+      const next: Record<string, boolean> = {};
+      visibleGameIds.forEach((id) => {
+        if (prev[id]) next[id] = true;
+      });
+      return next;
+    });
+  }, [visibleGameIds]);
+
   return (
     <AppShell title="Editions" showTitle={false}>
       <div className="space-y-4">
@@ -100,6 +117,11 @@ export function EditionsPage() {
         )}
         <div className="grid gap-4 lg:grid-cols-[1fr,320px]">
           <Section title="Edition library">
+            {editions.length > 0 && (
+              <div className="mb-2 text-xs uppercase tracking-[0.2em] text-muted">
+                Select a game to view editions.
+              </div>
+            )}
             {editions.length === 0 && (
               <div className="flex flex-col gap-2 text-sm text-muted">
                 <span>No editions match your filters.</span>
@@ -111,6 +133,7 @@ export function EditionsPage() {
                     setTag('');
                     setLocationId('');
                     setSearch('');
+                    setOpenGames({});
                   }}
                   className="text-left text-xs uppercase tracking-[0.2em] text-accent-ink"
                 >
@@ -123,36 +146,58 @@ export function EditionsPage() {
                 {games.map((game) => {
                   const gameEditions = editionsByGame.get(game.id) ?? [];
                   if (gameEditions.length === 0) return null;
-                  const isOpen = openGames[game.id] ?? (gameId ? gameId === game.id : true);
+                  const isOpen = Boolean(openGames[game.id]);
+                  const editionListId = `editions-${game.id}`;
                   return (
                     <div key={game.id} className="py-2">
                       <button
                         type="button"
-                        onClick={() => setOpenGames((prev) => ({ ...prev, [game.id]: !isOpen }))}
-                        className="flex w-full items-center justify-between gap-3 rounded-md bg-panel2/40 px-4 py-3 text-left"
+                        aria-expanded={isOpen}
+                        aria-controls={editionListId}
+                        onClick={() =>
+                          setOpenGames((prev) => ({ ...prev, [game.id]: !isOpen }))
+                        }
+                        className="flex w-full items-center justify-between gap-3 rounded-md px-4 py-3 text-left transition hover:bg-panel2/50"
                       >
-                        <div className="text-sm font-display tracking-[0.15em]">{game.name}</div>
-                        <div className="flex items-center gap-3 text-xs text-muted">
-                          <span>
+                        <div className="flex items-center gap-3">
+                          <span
+                            className={`text-sm text-muted transition-transform ${isOpen ? 'rotate-90' : ''}`}
+                            aria-hidden="true"
+                          >
+                            ▶
+                          </span>
+                          <span className="text-base font-semibold text-accent-ink">{game.name}</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs text-muted">
                             {gameEditions.length} {gameEditions.length === 1 ? 'Edition' : 'Editions'}
                           </span>
-                          <span className="text-base">{isOpen ? '−' : '+'}</span>
+                          <button
+                            type="button"
+                            aria-label={`Add edition to ${game.name}`}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              navigate(`/editions/new?game_id=${game.id}`);
+                            }}
+                            className="flex h-8 w-8 items-center justify-center rounded-md border border-border text-sm text-muted transition hover:border-accent-ink hover:text-accent-ink"
+                          >
+                            +
+                          </button>
                         </div>
                       </button>
                       {isOpen && (
-                        <List className="mt-1">
+                        <List id={editionListId} className="mt-1">
                           {gameEditions.map((edition) => {
                             const primaryTitle = edition.theme ?? edition.title ?? 'Untitled edition';
-                            const secondary =
-                              edition.title && edition.title !== primaryTitle
-                                ? edition.title
-                                : edition.tags_csv
-                                  ? `Tags: ${edition.tags_csv}`
-                                  : '';
+                            const secondary = edition.tags_csv ? `Tags: ${edition.tags_csv}` : '';
                             return (
-                              <ListRow key={edition.id} to={`/editions/${edition.id}`} className="py-3">
+                              <ListRow
+                                key={edition.id}
+                                to={`/editions/${edition.id}`}
+                                className="py-3 pl-8"
+                              >
                                 <div className="flex-1">
-                                  <div className="text-sm font-display tracking-[0.12em]">{primaryTitle}</div>
+                                  <div className="text-sm text-text">{primaryTitle}</div>
                                   {secondary && <div className="mt-1 text-xs text-muted">{secondary}</div>}
                                 </div>
                                 <StatusPill status={edition.status} label={edition.status} />
@@ -227,6 +272,7 @@ export function EditionsPage() {
                     setTag('');
                     setLocationId('');
                     setSearch('');
+                    setOpenGames({});
                   }}
                   className="text-xs uppercase tracking-[0.25em] text-muted hover:text-text"
                 >

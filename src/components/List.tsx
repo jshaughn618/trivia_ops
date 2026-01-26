@@ -1,8 +1,16 @@
 import type { ReactNode, HTMLAttributes } from 'react';
 import { Link } from 'react-router-dom';
 
-export function List({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={`-mx-4 divide-y divide-border sm:-mx-5 ${className ?? ''}`}>{children}</div>;
+export function List({
+  children,
+  className,
+  ...rest
+}: { children: ReactNode; className?: string } & HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div {...rest} className={`-mx-4 divide-y divide-border sm:-mx-5 ${className ?? ''}`}>
+      {children}
+    </div>
+  );
 }
 
 type ListRowProps = {
