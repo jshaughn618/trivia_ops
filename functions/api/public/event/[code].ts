@@ -203,7 +203,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
         [event.id, live.active_round_id, currentItem.id]
       );
       const counts = choices.map((_, idx) => {
-        const row = countsRows.find((entry) => entry.choice_index === idx);
+        const row = countsRows.find((entry) => Number(entry.choice_index) === idx);
         return row ? row.total : 0;
       });
       responseCounts = { total: counts.reduce((sum, value) => sum + value, 0), counts };

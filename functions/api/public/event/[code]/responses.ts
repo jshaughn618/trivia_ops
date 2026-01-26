@@ -54,7 +54,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request }
   }
 
   const expiresAt = new Date(live.timer_started_at).getTime() + live.timer_duration_seconds * 1000;
-  const graceMs = 2000;
+  const graceMs = 10000;
   if (Number.isNaN(expiresAt) || Date.now() > expiresAt + graceMs) {
     return jsonError({ code: 'timer_expired', message: 'Timer expired.' }, 400);
   }
