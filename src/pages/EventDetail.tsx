@@ -11,6 +11,7 @@ import { StatusPill } from '../components/StatusPill';
 import { AccordionSection } from '../components/AccordionSection';
 import { IconButton } from '../components/IconButton';
 import { logError } from '../lib/log';
+import { useAuth } from '../auth';
 import type { Event, EventRound, GameEdition, Game, Team, Location, User, EditionItem } from '../types';
 
 const PAGE_WIDTH = 612;
@@ -299,6 +300,8 @@ const buildPdf = async (
 export function EventDetailPage() {
   const { eventId } = useParams();
   const navigate = useNavigate();
+  const auth = useAuth();
+  const isAdmin = auth.user?.user_type === 'admin';
   const [event, setEvent] = useState<Event | null>(null);
   const [rounds, setRounds] = useState<EventRound[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
@@ -336,6 +339,12 @@ export function EventDetailPage() {
   const [scoresheetGenerateError, setScoresheetGenerateError] = useState<string | null>(null);
   const [showQr, setShowQr] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState('');
+  const [titleSaving, setTitleSaving] = useState(false);
+  const [titleError, setTitleError] = useState<string | null>(null);
+  const [startsAtLocal, setStartsAtLocal] = useState('');
+  const [startsAtError, setStartsAtError] = useState<string | null>(null);
   const scoresheetInputId = useId();
   const answersheetInputId = useId();
 
@@ -378,6 +387,24 @@ export function EventDetailPage() {
   }, [rounds, scoreRoundId]);
 
   useEffect(() => {
+    if (!event) return;
+    if (!editingTitle) {
+      setTitleDraft(event.title);
+    }
+  }, [event, editingTitle]);
+
+  useEffect(() => {
+    if (!event) return;
+    const date = new Date(event.starts_at);
+    if (Number.isNaN(date.getTime())) return;
+    const pad = (value: number) => String(value).padStart(2, '0');
+    const localValue = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(
+      date.getHours()
+    )}:${pad(date.getMinutes())}`;
+    setStartsAtLocal(localValue);
+  }, [event?.starts_at]);
+
+  useEffect(() => {
     setScoresheetTitles((prev) => {
       const next = { ...prev };
       rounds.forEach((round) => {
@@ -409,6 +436,25 @@ export function EventDetailPage() {
     } catch (error) {
       logError('event_code_copy_failed', { error });
     }
+  };
+
+  const saveEventTitle = async () => {
+    if (!eventId) return;
+    const nextTitle = titleDraft.trim();
+    if (!nextTitle) {
+      setTitleError('Title cannot be empty.');
+      return;
+    }
+    setTitleSaving(true);
+    setTitleError(null);
+    const res = await api.updateEvent(eventId, { title: nextTitle });
+    if (res.ok) {
+      setEvent(res.data);
+      setEditingTitle(false);
+    } else {
+      setTitleError(res.error.message ?? 'Failed to update title.');
+    }
+    setTitleSaving(false);
   };
 
   useEffect(() => {
@@ -471,10 +517,17 @@ export function EventDetailPage() {
 
   const updateEvent = async () => {
     if (!eventId) return;
+    const startsAtIso = startsAtLocal ? new Date(startsAtLocal) : null;
+    if (startsAtLocal && (!startsAtIso || Number.isNaN(startsAtIso.getTime()))) {
+      setStartsAtError('Invalid date/time.');
+      return;
+    }
+    setStartsAtError(null);
     const res = await api.updateEvent(eventId, {
       status,
       event_type: eventType,
       notes,
+      starts_at: startsAtIso ? startsAtIso.toISOString() : event?.starts_at,
       location_id: locationId || null,
       host_user_id: hostUserId || null
     });
@@ -1050,8 +1103,21 @@ export function EventDetailPage() {
   );
 
   const settingsContent = (
-    <div className="space-y-3">
+      <div className="space-y-3">
       <div className="grid gap-3">
+        <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+          Start date/time
+          <input
+            type="datetime-local"
+            className="h-10 px-3"
+            value={startsAtLocal}
+            onChange={(event) => {
+              setStartsAtLocal(event.target.value);
+              if (startsAtError) setStartsAtError(null);
+            }}
+          />
+          {startsAtError && <span className="text-xs text-danger-ink">{startsAtError}</span>}
+        </label>
         <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
           Location
           <select className="h-10 px-3" value={locationId} onChange={(event) => setLocationId(event.target.value)}>
@@ -1123,7 +1189,65 @@ export function EventDetailPage() {
         <div className="sticky top-0 z-20 -mx-4 border-b border-border bg-bg/95 px-4 pb-4 pt-3 backdrop-blur sm:static sm:mx-0 sm:border-none sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-0 sm:backdrop-blur-0">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="space-y-2">
-              <h1 className="text-2xl font-display tracking-tight">{event.title}</h1>
+              {!editingTitle && (
+                <div className="flex flex-wrap items-center gap-2">
+                  <h1
+                    className={`text-2xl font-display tracking-tight ${isAdmin ? 'cursor-pointer' : ''}`}
+                    onDoubleClick={() => {
+                      if (!isAdmin) return;
+                      setTitleDraft(event.title);
+                      setTitleError(null);
+                      setEditingTitle(true);
+                    }}
+                  >
+                    {event.title}
+                  </h1>
+                  {isAdmin && (
+                    <span className="text-[11px] uppercase tracking-[0.2em] text-muted">Double-click to edit</span>
+                  )}
+                </div>
+              )}
+              {editingTitle && (
+                <div className="w-full max-w-lg space-y-2">
+                  <label className="sr-only" htmlFor="event-title-input">
+                    Event title
+                  </label>
+                  <input
+                    id="event-title-input"
+                    className="h-10 w-full px-3"
+                    value={titleDraft}
+                    onChange={(event) => setTitleDraft(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault();
+                        saveEventTitle();
+                      }
+                      if (event.key === 'Escape') {
+                        event.preventDefault();
+                        setEditingTitle(false);
+                        setTitleError(null);
+                        setTitleDraft(event.title);
+                      }
+                    }}
+                    autoFocus
+                  />
+                  <div className="flex flex-wrap items-center gap-2">
+                    <SecondaryButton onClick={saveEventTitle} disabled={titleSaving}>
+                      {titleSaving ? 'Saving…' : 'Save title'}
+                    </SecondaryButton>
+                    <SecondaryButton
+                      onClick={() => {
+                        setEditingTitle(false);
+                        setTitleError(null);
+                        setTitleDraft(event.title);
+                      }}
+                    >
+                      Cancel
+                    </SecondaryButton>
+                    {titleError && <span className="text-xs text-danger-ink">{titleError}</span>}
+                  </div>
+                </div>
+              )}
               <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
                 <span>{new Date(event.starts_at).toLocaleString()}</span>
                 {locationName && <span>• {locationName}</span>}
