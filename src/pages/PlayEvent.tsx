@@ -32,7 +32,7 @@ type PublicEventResponse = {
     public_code: string;
     location_name: string | null;
   };
-  rounds: { id: string; round_number: number; label: string; status: string }[];
+  rounds: { id: string; round_number: number; label: string; status: string; timer_seconds?: number | null }[];
   teams: { id: string; name: string }[];
   leaderboard: { team_id: string; name: string; total: number }[];
   live: {
@@ -415,7 +415,7 @@ export function PlayEventPage() {
   const maxResponseCount = responseCounts?.counts
     ? Math.max(1, ...responseCounts.counts)
     : 1;
-  const timerDurationSeconds = data.live?.timer_duration_seconds ?? 15;
+  const timerDurationSeconds = data.live?.timer_duration_seconds ?? activeRound?.timer_seconds ?? 15;
   const timerActive = Boolean(data.live?.timer_started_at && data.live?.timer_duration_seconds);
   const timerLabel = (() => {
     const totalSeconds = timerRemainingSeconds ?? timerDurationSeconds;

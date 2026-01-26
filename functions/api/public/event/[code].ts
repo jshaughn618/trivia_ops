@@ -25,9 +25,13 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
     return jsonError({ code: 'not_found', message: 'Event not found' }, 404);
   }
 
-  const rounds = await queryAll<{ id: string; round_number: number; label: string; status: string }>(
+  const rounds = await queryAll<{ id: string; round_number: number; label: string; status: string; timer_seconds: number | null }>(
     env,
-    'SELECT id, round_number, label, status FROM event_rounds WHERE event_id = ? AND COALESCE(deleted, 0) = 0 ORDER BY round_number ASC',
+    `SELECT er.id, er.round_number, er.label, er.status, ed.timer_seconds
+     FROM event_rounds er
+     JOIN editions ed ON ed.id = er.edition_id
+     WHERE er.event_id = ? AND COALESCE(er.deleted, 0) = 0
+     ORDER BY er.round_number ASC`,
     [event.id]
   );
 
