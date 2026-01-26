@@ -215,6 +215,13 @@ export function PlayEventPage() {
     data?.live?.active_round_id
   ]);
 
+  const activeRound = data?.rounds.find((round) => round.id === data?.live?.active_round_id) ?? null;
+  const isLive = activeRound?.status === 'live';
+  const visualItems = data?.visual_items ?? [];
+  const visualMode = Boolean(isLive && data?.visual_round && visualItems.length > 0);
+  const displayItem = visualMode ? visualItems[visualIndex] : data?.current_item ?? null;
+  const timerExpired = timerRemainingSeconds !== null && timerRemainingSeconds <= 0;
+
   const handleSwipeStart = (event: React.TouchEvent) => {
     if (event.touches.length !== 1) return;
     const touch = event.touches[0];
@@ -285,6 +292,23 @@ export function PlayEventPage() {
     }
   };
 
+  useEffect(() => {
+    if (!timerExpired) return;
+    if (submittedChoiceIndex !== null) return;
+    if (submitStatus === 'submitting') return;
+    if (selectedChoiceIndex === null) return;
+    if (!displayItem?.id || !data?.event?.public_code || !teamId) return;
+    handleSubmitChoice();
+  }, [
+    timerExpired,
+    selectedChoiceIndex,
+    submittedChoiceIndex,
+    submitStatus,
+    displayItem?.id,
+    data?.event?.public_code,
+    teamId
+  ]);
+
   if (!normalizedCode) {
     return (
       <div className="min-h-screen bg-bg text-text flex items-center justify-center">
@@ -316,14 +340,9 @@ export function PlayEventPage() {
   }
 
   const isClosed = data.event.status === 'completed' || data.event.status === 'canceled';
-  const activeRound = data.rounds.find((round) => round.id === data.live?.active_round_id) ?? null;
-  const isLive = activeRound?.status === 'live';
-  const visualItems = data.visual_items ?? [];
-  const visualMode = isLive && data.visual_round && visualItems.length > 0;
   const waitingMessage = data.live?.waiting_message?.trim() ?? '';
   const waitingShowLeaderboard = data.live?.waiting_show_leaderboard ?? false;
   const waitingShowNextRound = data.live?.waiting_show_next_round ?? true;
-  const displayItem = visualMode ? visualItems[visualIndex] : data.current_item;
   const questionLabel = visualMode
     ? `Round ${activeRound?.round_number ?? ''} • Image ${visualIndex + 1} of ${visualItems.length}`.trim()
     : activeRound && data.live?.current_item_ordinal
@@ -345,30 +364,12 @@ export function PlayEventPage() {
     : 1;
   const timerDurationSeconds = data.live?.timer_duration_seconds ?? 15;
   const timerActive = Boolean(data.live?.timer_started_at && data.live?.timer_duration_seconds);
-  const timerExpired = timerRemainingSeconds !== null && timerRemainingSeconds <= 0;
   const timerLabel = (() => {
     const totalSeconds = timerRemainingSeconds ?? timerDurationSeconds;
     const minutes = Math.floor(totalSeconds / 60);
     const seconds = totalSeconds % 60;
     return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
   })();
-
-  useEffect(() => {
-    if (!timerExpired) return;
-    if (submittedChoiceIndex !== null) return;
-    if (submitStatus === 'submitting') return;
-    if (selectedChoiceIndex === null) return;
-    if (!displayItem?.id || !data?.event?.public_code || !teamId) return;
-    handleSubmitChoice();
-  }, [
-    timerExpired,
-    selectedChoiceIndex,
-    submittedChoiceIndex,
-    submitStatus,
-    displayItem?.id,
-    data?.event?.public_code,
-    teamId
-  ]);
   const nextRound = (() => {
     const rounds = data?.rounds ?? [];
     const ordered = [...rounds].sort((a, b) => a.round_number - b.round_number);
