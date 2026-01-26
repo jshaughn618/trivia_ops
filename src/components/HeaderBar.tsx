@@ -20,7 +20,7 @@ export function HeaderBar() {
   const logo = theme === 'light' ? logoLight : logoDark;
 
   return (
-    <header className="border-b border-border bg-panel px-4 py-3">
+    <header className="relative z-50 border-b border-border bg-panel px-4 py-3">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
         <Link to="/dashboard" className="flex items-center">
           <img src={logo} alt="Trivia Ops" className="h-10 w-auto" />
@@ -53,7 +53,7 @@ export function HeaderBar() {
               </span>
             </button>
             {open && (
-              <div className="absolute right-0 mt-3 w-48 rounded-md border border-border bg-panel2 p-2 shadow-sm">
+              <div className="absolute right-0 z-50 mt-3 w-48 rounded-md border border-border bg-panel2 p-2 shadow-sm">
                 <nav className="flex flex-col gap-2">
                   <NavLink to="/dashboard" className={navLinkClass} onClick={() => setOpen(false)}>
                     Dashboard
