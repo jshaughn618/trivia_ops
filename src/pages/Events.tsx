@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { api } from '../api';
 import { useAuth } from '../auth';
 import { AppShell } from '../components/AppShell';
-import { Panel } from '../components/Panel';
 import { ButtonLink } from '../components/Buttons';
-import { StampBadge } from '../components/StampBadge';
+import { PageHeader } from '../components/PageHeader';
+import { Section } from '../components/Section';
+import { List, ListRow } from '../components/List';
+import { StatusPill } from '../components/StatusPill';
 import { logError } from '../lib/log';
 import type { Event } from '../types';
 
@@ -40,39 +42,20 @@ export function EventsPage() {
   }, [events, filter]);
 
   return (
-    <AppShell title="Events">
-      {error && (
-        <div className="mb-4 border border-danger bg-panel2 px-3 py-2 text-xs text-danger-ink">
-          {error}
-        </div>
-      )}
-      <div className="grid gap-4 lg:grid-cols-[1fr,320px]">
-        <Panel
-          title="Event Log"
-          action={isAdmin ? <ButtonLink to="/events/new" variant="primary">New Event</ButtonLink> : undefined}
+    <AppShell title="Events" showTitle={false}>
+      <div className="space-y-4">
+        <PageHeader
+          title="Events"
+          actions={
+            isAdmin ? (
+              <ButtonLink to="/events/new" variant="primary">
+                New event
+              </ButtonLink>
+            ) : undefined
+          }
         >
-          <div className="flex flex-col gap-3">
-            {filtered.length === 0 && (
-              <div className="text-xs uppercase tracking-[0.2em] text-muted">No events.</div>
-            )}
-            {filtered.map((event) => (
-              <Link
-                key={event.id}
-                to={isAdmin ? `/events/${event.id}` : `/events/${event.id}/run`}
-                className="border-2 border-border bg-panel2 p-3"
-              >
-                <div className="text-sm font-display uppercase tracking-[0.25em]">{event.title}</div>
-                <div className="mt-2 flex items-center justify-between text-xs text-muted uppercase tracking-[0.2em]">
-                  <span>{new Date(event.starts_at).toLocaleString()}</span>
-                  <StampBadge label={event.status.toUpperCase()} variant={event.status === 'live' ? 'approved' : 'verified'} />
-                </div>
-              </Link>
-            ))}
-          </div>
-        </Panel>
-        <Panel title="Status Filter">
-          <div className="flex flex-col gap-4">
-            <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <label className="flex w-full flex-col gap-2 text-xs font-display uppercase tracking-[0.2em] text-muted sm:max-w-[220px]">
               Status
               <select className="h-10 px-3" value={filter} onChange={(event) => setFilter(event.target.value)}>
                 <option value="">All</option>
@@ -82,8 +65,38 @@ export function EventsPage() {
                 <option value="canceled">Canceled</option>
               </select>
             </label>
+            {error && (
+              <div className="border border-danger bg-panel2 px-3 py-2 text-xs text-danger-ink">
+                {error}
+              </div>
+            )}
           </div>
-        </Panel>
+        </PageHeader>
+
+        <Section title="Event log">
+          {filtered.length === 0 && (
+            <div className="text-xs uppercase tracking-[0.2em] text-muted">No events.</div>
+          )}
+          {filtered.length > 0 && (
+            <List>
+              {filtered.map((event) => (
+                <ListRow
+                  key={event.id}
+                  to={isAdmin ? `/events/${event.id}` : `/events/${event.id}/run`}
+                  className="py-3 sm:py-4"
+                >
+                  <div className="flex-1">
+                    <div className="text-sm font-display tracking-[0.12em]">{event.title}</div>
+                    <div className="mt-1 text-xs text-muted">{new Date(event.starts_at).toLocaleString()}</div>
+                  </div>
+                  <div className="pt-1">
+                    <StatusPill status={event.status} label={event.status} />
+                  </div>
+                </ListRow>
+              ))}
+            </List>
+          )}
+        </Section>
       </div>
     </AppShell>
   );

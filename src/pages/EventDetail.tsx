@@ -1,12 +1,16 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useId } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import QRCode from 'qrcode';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { api } from '../api';
 import { AppShell } from '../components/AppShell';
-import { Panel } from '../components/Panel';
-import { PrimaryButton, SecondaryButton, DangerButton, ButtonLink } from '../components/Buttons';
-import { StampBadge } from '../components/StampBadge';
+import { PrimaryButton, SecondaryButton, DangerButton, ButtonLink, TextLink } from '../components/Buttons';
+import { Section } from '../components/Section';
+import { List, ListRow } from '../components/List';
+import { StatusPill } from '../components/StatusPill';
+import { AccordionSection } from '../components/AccordionSection';
+import { IconButton } from '../components/IconButton';
+import { logError } from '../lib/log';
 import type { Event, EventRound, GameEdition, Game, Team, Location, User, EditionItem } from '../types';
 
 const PAGE_WIDTH = 612;
@@ -318,6 +322,7 @@ export function EventDetailPage() {
   const [qrLoading, setQrLoading] = useState(false);
   const [qrError, setQrError] = useState<string | null>(null);
   const [roundMenuId, setRoundMenuId] = useState<string | null>(null);
+  const [expandedRoundId, setExpandedRoundId] = useState<string | null>(null);
   const [draggedRoundId, setDraggedRoundId] = useState<string | null>(null);
   const [scoresheetTitles, setScoresheetTitles] = useState<Record<string, string>>({});
   const [roundSyncingId, setRoundSyncingId] = useState<string | null>(null);
@@ -329,6 +334,10 @@ export function EventDetailPage() {
   const [answersheetError, setAnswersheetError] = useState<string | null>(null);
   const [scoresheetGenerating, setScoresheetGenerating] = useState(false);
   const [scoresheetGenerateError, setScoresheetGenerateError] = useState<string | null>(null);
+  const [showQr, setShowQr] = useState(false);
+  const [codeCopied, setCodeCopied] = useState(false);
+  const scoresheetInputId = useId();
+  const answersheetInputId = useId();
 
   const load = async () => {
     if (!eventId) return;
@@ -384,6 +393,23 @@ export function EventDetailPage() {
     if (!event?.public_code) return '';
     return `https://triviaops.com/play/${event.public_code}`;
   }, [event?.public_code]);
+
+  const locationName = useMemo(() => {
+    if (!event?.location_id) return '';
+    return locations.find((location) => location.id === event.location_id)?.name ?? '';
+  }, [event?.location_id, locations]);
+
+  const copyEventCode = async () => {
+    if (!event?.public_code) return;
+    if (!navigator.clipboard) return;
+    try {
+      await navigator.clipboard.writeText(event.public_code);
+      setCodeCopied(true);
+      window.setTimeout(() => setCodeCopied(false), 1600);
+    } catch (error) {
+      logError('event_code_copy_failed', { error });
+    }
+  };
 
   useEffect(() => {
     if (!publicUrl) return;
@@ -644,447 +670,510 @@ export function EventDetailPage() {
     );
   }
 
-  return (
-    <AppShell title="Event Detail">
-      <div className="grid gap-4 lg:grid-cols-[1fr,340px]">
-        <Panel
-          title="Event Status"
-          action={
-            <div className="flex flex-wrap items-center gap-2">
-              <ButtonLink to={`/events/${event.id}/leaderboard`} variant="secondary">
-                Leaderboard
-              </ButtonLink>
-              <ButtonLink to={`/events/${event.id}/run`} variant="primary">
-                Run Event
-              </ButtonLink>
-            </div>
-          }
-        >
-          <div className="grid gap-4">
-            <div className="border-2 border-border bg-panel2 p-3">
-              <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">Title</div>
-              <div className="mt-2 text-sm font-display uppercase tracking-[0.2em]">{event.title}</div>
-            </div>
-            {event.public_code && (
-              <div className="border-2 border-border bg-panel2 p-3">
-                <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">Event Code</div>
-                <div className="mt-2 text-lg font-display uppercase tracking-[0.3em]">{event.public_code}</div>
-                <div className="mt-1 text-[10px] uppercase tracking-[0.2em] text-muted">Share for player view</div>
-              </div>
-            )}
-            {event.public_code && (
-              <div className="border-2 border-border bg-panel2 p-3">
-                <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">QR Code</div>
-                {qrLoading && (
-                  <div className="mt-2 text-xs uppercase tracking-[0.2em] text-muted">Generating…</div>
-                )}
-                {qrError && (
-                  <div className="mt-2 text-xs uppercase tracking-[0.2em] text-danger">{qrError}</div>
-                )}
-                {qrUrl && (
-                  <div className="mt-3 flex flex-col items-start gap-3">
-                    <img src={qrUrl} alt="Event QR Code" className="h-40 w-40 border-2 border-border bg-panel" />
-                    <a
-                      href={qrUrl}
-                      download={`trivia-ops-${event.public_code}.png`}
-                      className="text-xs uppercase tracking-[0.2em] text-accent-ink"
-                    >
-                      Download QR Code
-                    </a>
-                  </div>
-                )}
-              </div>
-            )}
-            <div className="flex items-center justify-between border-2 border-border bg-panel2 p-3 text-xs uppercase tracking-[0.2em] text-muted">
-              <span>Starts</span>
-              <span>{new Date(event.starts_at).toLocaleString()}</span>
-            </div>
-            <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-              Location
-              <select
-                className="h-10 px-3"
-                value={locationId}
-                onChange={(event) => setLocationId(event.target.value)}
-              >
-                <option value="">No location</option>
-                {locations.map((location) => (
-                  <option key={location.id} value={location.id}>
-                    {location.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-              Host
-              <select
-                className="h-10 px-3"
-                value={hostUserId}
-                onChange={(event) => setHostUserId(event.target.value)}
-              >
-                <option value="">Select host</option>
-                {hosts.map((host) => (
-                  <option key={host.id} value={host.id}>
-                    {host.first_name || host.last_name
-                      ? `${host.first_name ?? ''} ${host.last_name ?? ''}`.trim()
-                      : host.username ?? host.email}
-                    {' '}
-                    ({host.user_type})
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-              Status
-              <select className="h-10 px-3" value={status} onChange={(event) => setStatus(event.target.value)}>
-                <option value="planned">Planned</option>
-                <option value="live">Live</option>
-                <option value="completed">Completed</option>
-                <option value="canceled">Canceled</option>
-              </select>
-            </label>
-            <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-              Event Type
-              <select
-                className="h-10 px-3"
-                value={eventType}
-                onChange={(event) => setEventType(event.target.value as 'Pub Trivia' | 'Music Trivia')}
-              >
-                <option value="Pub Trivia">Pub Trivia</option>
-                <option value="Music Trivia">Music Trivia</option>
-              </select>
-            </label>
-            <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-              Notes
-              <textarea className="min-h-[80px] px-3 py-2" value={notes} onChange={(event) => setNotes(event.target.value)} />
-            </label>
-            <div className="flex flex-wrap items-center gap-2">
-              <PrimaryButton onClick={updateEvent}>Update Event</PrimaryButton>
-              <StampBadge label={event.status.toUpperCase()} variant="verified" />
-              <DangerButton onClick={deleteEvent}>Delete Event</DangerButton>
-            </div>
-          </div>
-        </Panel>
+  const fileButtonClass =
+    'inline-flex items-center justify-center gap-2 rounded-md border border-border bg-panel px-3 py-2 text-xs font-medium text-text transition-colors hover:bg-panel2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg disabled:pointer-events-none disabled:opacity-50';
 
-        <Panel title="Event Documents">
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-wrap items-center gap-2">
-              <PrimaryButton onClick={generateScoresheets} disabled={scoresheetGenerating}>
-                {scoresheetGenerating ? 'Generating…' : 'Generate Scoresheets'}
-              </PrimaryButton>
-              {scoresheetGenerateError && (
-                <div className="text-xs uppercase tracking-[0.2em] text-danger">{scoresheetGenerateError}</div>
-              )}
-            </div>
-            <div className="border-2 border-border bg-panel2 p-3">
-              <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">Scoresheet (PDF)</div>
-              {event.scoresheet_key ? (
-                <div className="mt-2 flex flex-wrap items-center gap-3">
-                  <a
-                    href={api.mediaUrl(event.scoresheet_key)}
-                    className="text-xs uppercase tracking-[0.2em] text-accent-ink"
-                    download={event.scoresheet_name ?? 'scoresheet.pdf'}
-                  >
-                    Download {event.scoresheet_name ?? 'scoresheet.pdf'}
-                  </a>
-                  <DangerButton
-                    onClick={() => removeDocument('scoresheet')}
-                    disabled={scoresheetUploading}
-                  >
-                    Remove
-                  </DangerButton>
-                </div>
-              ) : (
-                <div className="mt-2 text-xs uppercase tracking-[0.2em] text-muted">No scoresheet uploaded.</div>
-              )}
-              <div className="mt-3 flex w-full items-center gap-3">
-                <label className="flex w-full items-center gap-2 text-xs uppercase tracking-[0.2em] text-muted">
-                  <input
-                    type="file"
-                    accept="application/pdf"
-                    className="w-full max-w-full text-xs"
-                    onChange={(event) => {
-                      const file = event.target.files?.[0];
-                      event.target.value = '';
-                      if (file) uploadDocument('scoresheet', file);
-                    }}
-                    disabled={scoresheetUploading}
-                  />
-                </label>
-                {scoresheetUploading && (
-                  <div className="text-xs uppercase tracking-[0.2em] text-muted">Uploading…</div>
-                )}
-              </div>
-              {scoresheetError && (
-                <div className="mt-2 text-xs uppercase tracking-[0.2em] text-danger">{scoresheetError}</div>
-              )}
-            </div>
-
-            <div className="border-2 border-border bg-panel2 p-3">
-              <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">Answer Sheet (PDF)</div>
-              {event.answersheet_key ? (
-                <div className="mt-2 flex flex-wrap items-center gap-3">
-                  <a
-                    href={api.mediaUrl(event.answersheet_key)}
-                    className="text-xs uppercase tracking-[0.2em] text-accent-ink"
-                    download={event.answersheet_name ?? 'answersheet.pdf'}
-                  >
-                    Download {event.answersheet_name ?? 'answersheet.pdf'}
-                  </a>
-                  <DangerButton
-                    onClick={() => removeDocument('answersheet')}
-                    disabled={answersheetUploading}
-                  >
-                    Remove
-                  </DangerButton>
-                </div>
-              ) : (
-                <div className="mt-2 text-xs uppercase tracking-[0.2em] text-muted">No answer sheet uploaded.</div>
-              )}
-              <div className="mt-3 flex w-full items-center gap-3">
-                <label className="flex w-full items-center gap-2 text-xs uppercase tracking-[0.2em] text-muted">
-                  <input
-                    type="file"
-                    accept="application/pdf"
-                    className="w-full max-w-full text-xs"
-                    onChange={(event) => {
-                      const file = event.target.files?.[0];
-                      event.target.value = '';
-                      if (file) uploadDocument('answersheet', file);
-                    }}
-                    disabled={answersheetUploading}
-                  />
-                </label>
-                {answersheetUploading && (
-                  <div className="text-xs uppercase tracking-[0.2em] text-muted">Uploading…</div>
-                )}
-              </div>
-              {answersheetError && (
-                <div className="mt-2 text-xs uppercase tracking-[0.2em] text-danger">{answersheetError}</div>
-              )}
-            </div>
-          </div>
-        </Panel>
-
-        <Panel title="Rounds">
-          <div className="flex flex-col gap-3">
-            {rounds.length === 0 && (
-              <div className="text-xs uppercase tracking-[0.2em] text-muted">No rounds yet.</div>
-            )}
-            {rounds.map((round) => {
-              const display = roundDisplay(round);
-              const statusLabel = round.status === 'locked' ? 'COMPLETED' : round.status.toUpperCase();
-              return (
-                <div
-                  key={round.id}
-                  className="border-2 border-border bg-panel2 p-2"
-                  draggable
-                  onDragStart={() => setDraggedRoundId(round.id)}
-                  onDragOver={(event) => event.preventDefault()}
-                  onDrop={() => {
-                    if (draggedRoundId) {
-                      reorderRounds(draggedRoundId, round.id);
-                      setDraggedRoundId(null);
-                    }
-                  }}
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="text-sm font-display uppercase tracking-[0.2em]">{display.title}</div>
-                    <div className="flex items-center gap-2">
-                      <Link
-                        to={`/events/${event.id}/run?round=${round.id}`}
-                        className="text-[10px] uppercase tracking-[0.2em] text-accent-ink"
-                      >
-                        Open Runner
-                      </Link>
-                      <div className="relative">
-                        <button
-                          type="button"
-                          aria-label="Round actions"
-                          aria-haspopup="menu"
-                          aria-expanded={roundMenuId === round.id}
-                          onClick={() => setRoundMenuId((current) => (current === round.id ? null : round.id))}
-                          className="flex h-7 w-7 items-center justify-center border border-border text-text"
-                        >
-                          ⋯
-                        </button>
-                        {roundMenuId === round.id && (
-                          <div className="absolute right-0 mt-2 min-w-[160px] rounded-md border border-border bg-panel p-2 text-left shadow-sm">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setRoundMenuId(null);
-                                syncRoundItems(round);
-                              }}
-                              className="mb-2 w-full rounded-md border border-border bg-panel2 px-3 py-2 text-xs font-medium text-text"
-                              disabled={roundSyncingId === round.id}
-                            >
-                              {roundSyncingId === round.id ? 'Syncing…' : 'Sync Items'}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setRoundMenuId(null);
-                                deleteRound(round.id);
-                              }}
-                              className="w-full rounded-md border border-danger bg-panel2 px-3 py-2 text-xs font-medium text-danger-ink"
-                            >
-                              Delete Round
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                      <StampBadge label={statusLabel} variant="inspected" />
-                    </div>
-                  </div>
-                  <div className="mt-1 text-[10px] uppercase tracking-[0.2em] text-muted">{display.detail}</div>
-                  {roundSyncMessage[round.id] && (
-                    <div className="mt-1 text-[10px] uppercase tracking-[0.2em] text-accent-ink">
-                      {roundSyncMessage[round.id]}
-                    </div>
-                  )}
-                  {roundSyncError[round.id] && (
-                    <div className="mt-1 text-[10px] uppercase tracking-[0.2em] text-danger">
-                      {roundSyncError[round.id]}
-                    </div>
-                  )}
-                  <label className="mt-3 flex flex-col gap-2 text-[10px] font-display uppercase tracking-[0.25em] text-muted">
-                    Scoresheet Title
-                    <div className="flex flex-wrap items-center gap-2">
-                      <input
-                        className="h-9 flex-1 px-2 text-xs"
-                        value={scoresheetTitles[round.id] ?? ''}
-                        onChange={(event) =>
-                          setScoresheetTitles((prev) => ({ ...prev, [round.id]: event.target.value }))
-                        }
-                      />
-                      <SecondaryButton onClick={() => saveScoresheetTitle(round)}>Save Title</SecondaryButton>
-                    </div>
-                  </label>
-                </div>
-              );
-            })}
-          </div>
-          <div className="mt-4 border-t-2 border-border pt-4">
-            <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">Add Round</div>
-            <div className="mt-3 flex flex-col gap-3">
-              <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-                Game
-                <select
-                  className="h-10 px-3"
-                  value={roundGameId}
-                  onChange={(event) => {
-                    setRoundGameId(event.target.value);
-                    setRoundEditionId('');
-                  }}
-                >
-                  <option value="">Select game</option>
-                  {games.map((game) => (
-                    <option key={game.id} value={game.id}>
-                      {game.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-                Edition
-                <select
-                  className="h-10 px-3"
-                  value={roundEditionId}
-                  onChange={(event) => setRoundEditionId(event.target.value)}
-                  disabled={!roundGameId}
-                >
-                  <option value="">{roundGameId ? 'Select edition' : 'Select a game first'}</option>
-                  {roundEditions.map((edition) => (
-                    <option key={edition.id} value={edition.id}>
-                      {edition.theme ?? 'Untitled Theme'}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <div className="text-xs uppercase tracking-[0.2em] text-muted">Round Number: {roundNumber}</div>
-              <PrimaryButton onClick={createRound}>Add Round</PrimaryButton>
-            </div>
-          </div>
-        </Panel>
-
-        <Panel title="Teams">
-          <div className="flex flex-col gap-3">
-            {teams.length === 0 && (
-              <div className="text-xs uppercase tracking-[0.2em] text-muted">No teams yet.</div>
-            )}
-            {teams.map((team) => (
-              <div key={team.id} className="border-2 border-border bg-panel2 p-3">
-                <div className="text-sm font-display uppercase tracking-[0.2em]">{team.name}</div>
-                <div className="mt-1 text-xs uppercase tracking-[0.2em] text-muted">
-                  {team.table_label ?? 'No table label'}
-                </div>
-                <div className="mt-2">
-                  <DangerButton onClick={() => deleteTeam(team.id)}>Remove</DangerButton>
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="mt-4 border-t-2 border-border pt-4">
-            <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">Add Team</div>
-            <div className="mt-3 flex flex-col gap-3">
-              <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-                Name
-                <input className="h-10 px-3" value={teamName} onChange={(event) => setTeamName(event.target.value)} />
-              </label>
-              <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-                Table Label
-                <input className="h-10 px-3" value={teamTable} onChange={(event) => setTeamTable(event.target.value)} />
-              </label>
-              <SecondaryButton onClick={createTeam}>Add Team</SecondaryButton>
-            </div>
-          </div>
-        </Panel>
-
-        <Panel title="Round Scores">
-          <div className="flex flex-col gap-4">
-            <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-              Select Round
-              <select
-                className="h-10 px-3"
-                value={scoreRoundId}
-                onChange={(event) => {
-                  const value = event.target.value;
-                  setScoreRoundId(value);
-                  loadScores(value);
+  const roundsContent = (
+    <div className="space-y-3">
+      {rounds.length === 0 && <div className="text-xs uppercase tracking-[0.2em] text-muted">No rounds yet.</div>}
+      {rounds.length > 0 && (
+        <List>
+          {rounds.map((round) => {
+            const display = roundDisplay(round);
+            const statusLabel = round.status === 'locked' ? 'completed' : round.status;
+            const title = `${display.title} — ${round.scoresheet_title?.trim() || round.label}`;
+            return (
+              <ListRow
+                key={round.id}
+                interactive
+                role="button"
+                tabIndex={0}
+                aria-expanded={expandedRoundId === round.id}
+                className="flex-col items-stretch gap-2"
+                onClick={() =>
+                  setExpandedRoundId((current) => (current === round.id ? null : round.id))
+                }
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    setExpandedRoundId((current) => (current === round.id ? null : round.id));
+                  }
+                }}
+                draggable
+                onDragStart={() => setDraggedRoundId(round.id)}
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={() => {
+                  if (draggedRoundId) {
+                    reorderRounds(draggedRoundId, round.id);
+                    setDraggedRoundId(null);
+                  }
                 }}
               >
-                <option value="">Choose round</option>
-                {rounds.map((round) => (
-                  <option key={round.id} value={round.id}>
-                    {roundDisplay(round).title} — {roundDisplay(round).detail}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {teams.length === 0 && (
-              <div className="text-xs uppercase tracking-[0.2em] text-muted">Add teams to score.</div>
-            )}
-            {teams.map((team) => (
-              <label
-                key={team.id}
-                className="flex items-center justify-between gap-3 border-2 border-border bg-panel2 px-3 py-2 text-xs uppercase tracking-[0.2em] text-muted"
-              >
-                <span>{team.name}</span>
-                <input
-                  type="number"
-                  className="h-9 w-20 px-2 text-right"
-                  value={scoreMap[team.id] ?? 0}
-                  onChange={(event) =>
-                    setScoreMap((prev) => ({ ...prev, [team.id]: Number(event.target.value) }))
-                  }
-                />
-              </label>
-            ))}
-            <PrimaryButton onClick={saveScores} disabled={!scoreRoundId || scoreLoading}>
-              {scoreLoading ? 'Saving' : 'Save Scores'}
-            </PrimaryButton>
+                <div className="flex w-full items-start justify-between gap-3">
+                  <div className="flex-1">
+                    <div className="text-sm font-display tracking-[0.12em]">{title}</div>
+                    <div className="mt-1 text-xs text-muted">{display.detail}</div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Link
+                      to={`/events/${event.id}/run?round=${round.id}`}
+                      className="text-xs font-medium text-accent-ink"
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      Open runner
+                    </Link>
+                    <div className="relative">
+                      <IconButton
+                        label="Round actions"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setRoundMenuId((current) => (current === round.id ? null : round.id));
+                        }}
+                        aria-haspopup="menu"
+                        aria-expanded={roundMenuId === round.id}
+                      >
+                        ⋯
+                      </IconButton>
+                      {roundMenuId === round.id && (
+                        <div className="absolute right-0 z-10 mt-2 min-w-[160px] rounded-md border border-border bg-panel p-2 text-left shadow-sm">
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setRoundMenuId(null);
+                              syncRoundItems(round);
+                            }}
+                            className="mb-2 w-full rounded-md border border-border bg-panel2 px-3 py-2 text-xs font-medium text-text"
+                            disabled={roundSyncingId === round.id}
+                          >
+                            {roundSyncingId === round.id ? 'Syncing…' : 'Sync items'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setRoundMenuId(null);
+                              deleteRound(round.id);
+                            }}
+                            className="w-full rounded-md border border-danger bg-panel2 px-3 py-2 text-xs font-medium text-danger-ink"
+                          >
+                            Delete round
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    <StatusPill status={statusLabel} label={statusLabel} />
+                  </div>
+                </div>
+                {roundSyncMessage[round.id] && (
+                  <div className="text-xs text-accent-ink">{roundSyncMessage[round.id]}</div>
+                )}
+                {roundSyncError[round.id] && (
+                  <div className="text-xs text-danger-ink">{roundSyncError[round.id]}</div>
+                )}
+                {expandedRoundId === round.id && (
+                  <div
+                    className="mt-2 w-full border-t border-border pt-3"
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.2em] text-muted">
+                      Scoresheet title
+                      <div className="flex flex-wrap items-center gap-2">
+                        <input
+                          className="h-9 flex-1 px-2 text-xs"
+                          value={scoresheetTitles[round.id] ?? ''}
+                          onChange={(event) =>
+                            setScoresheetTitles((prev) => ({ ...prev, [round.id]: event.target.value }))
+                          }
+                        />
+                        <SecondaryButton
+                          className="px-3 py-2 text-xs"
+                          onClick={() => saveScoresheetTitle(round)}
+                        >
+                          Save
+                        </SecondaryButton>
+                      </div>
+                    </label>
+                  </div>
+                )}
+              </ListRow>
+            );
+          })}
+        </List>
+      )}
+      <div className="border-t border-border pt-4">
+        <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">Add round</div>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+            Game
+            <select
+              className="h-10 px-3"
+              value={roundGameId}
+              onChange={(event) => {
+                setRoundGameId(event.target.value);
+                setRoundEditionId('');
+              }}
+            >
+              <option value="">Select game</option>
+              {games.map((game) => (
+                <option key={game.id} value={game.id}>
+                  {game.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+            Edition
+            <select
+              className="h-10 px-3"
+              value={roundEditionId}
+              onChange={(event) => setRoundEditionId(event.target.value)}
+              disabled={!roundGameId}
+            >
+              <option value="">{roundGameId ? 'Select edition' : 'Select a game first'}</option>
+              {roundEditions.map((edition) => (
+                <option key={edition.id} value={edition.id}>
+                  {edition.theme ?? 'Untitled Theme'}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted">
+          <span className="uppercase tracking-[0.2em]">Round number</span>
+          <span>{roundNumber}</span>
+        </div>
+        <div className="mt-3">
+          <PrimaryButton onClick={createRound}>Add round</PrimaryButton>
+        </div>
+      </div>
+    </div>
+  );
+
+  const teamsContent = (
+    <div className="space-y-3">
+      {teams.length === 0 && <div className="text-xs uppercase tracking-[0.2em] text-muted">No teams yet.</div>}
+      {teams.length > 0 && (
+        <List>
+          {teams.map((team) => (
+            <ListRow key={team.id} className="items-center">
+              <div>
+                <div className="text-sm font-display tracking-[0.12em]">{team.name}</div>
+                <div className="mt-1 text-xs text-muted">{team.table_label ?? 'No table label'}</div>
+              </div>
+              <DangerButton className="px-3 py-2 text-xs" onClick={() => deleteTeam(team.id)}>
+                Remove
+              </DangerButton>
+            </ListRow>
+          ))}
+        </List>
+      )}
+      <div className="border-t border-border pt-4">
+        <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">Add team</div>
+        <div className="mt-3 grid gap-3 sm:grid-cols-[2fr,1fr,auto] sm:items-end">
+          <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+            Name
+            <input className="h-10 px-3" value={teamName} onChange={(event) => setTeamName(event.target.value)} />
+          </label>
+          <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+            Table label
+            <input className="h-10 px-3" value={teamTable} onChange={(event) => setTeamTable(event.target.value)} />
+          </label>
+          <SecondaryButton className="h-10" onClick={createTeam}>
+            Add team
+          </SecondaryButton>
+        </div>
+      </div>
+    </div>
+  );
+
+  const scoresContent = (
+    <div className="space-y-3">
+      <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+        Select round
+        <select
+          className="h-10 px-3"
+          value={scoreRoundId}
+          onChange={(event) => {
+            const value = event.target.value;
+            setScoreRoundId(value);
+            loadScores(value);
+          }}
+        >
+          <option value="">Choose round</option>
+          {rounds.map((round) => (
+            <option key={round.id} value={round.id}>
+              {roundDisplay(round).title} — {roundDisplay(round).detail}
+            </option>
+          ))}
+        </select>
+      </label>
+      {teams.length === 0 && <div className="text-xs uppercase tracking-[0.2em] text-muted">Add teams to score.</div>}
+      {teams.length > 0 && (
+        <List>
+          {teams.map((team) => (
+            <ListRow key={team.id} className="items-center">
+              <div className="text-sm">{team.name}</div>
+              <input
+                type="number"
+                className="h-9 w-20 px-2 text-right"
+                value={scoreMap[team.id] ?? 0}
+                onChange={(event) =>
+                  setScoreMap((prev) => ({ ...prev, [team.id]: Number(event.target.value) }))
+                }
+              />
+            </ListRow>
+          ))}
+        </List>
+      )}
+      <div className="flex justify-end">
+        <PrimaryButton onClick={saveScores} disabled={!scoreRoundId || scoreLoading}>
+          {scoreLoading ? 'Saving' : 'Save scores'}
+        </PrimaryButton>
+      </div>
+    </div>
+  );
+
+  const documentsContent = (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <SecondaryButton onClick={generateScoresheets} disabled={scoresheetGenerating}>
+          {scoresheetGenerating ? 'Generating…' : 'Generate scoresheets'}
+        </SecondaryButton>
+        {scoresheetGenerateError && <div className="text-xs text-danger-ink">{scoresheetGenerateError}</div>}
+      </div>
+      <List>
+        <ListRow className="flex-col items-start gap-3 sm:flex-row sm:items-center">
+          <div className="flex-1">
+            <div className="text-sm font-display tracking-[0.12em]">Scoresheet</div>
+            <div className="mt-1 text-xs text-muted">
+              {event.scoresheet_key ? event.scoresheet_name ?? 'scoresheet.pdf' : 'Not generated yet'}
+            </div>
           </div>
-        </Panel>
+          <div className="flex flex-wrap items-center gap-2">
+            {event.scoresheet_key && (
+              <TextLink href={api.mediaUrl(event.scoresheet_key)} download={event.scoresheet_name ?? 'scoresheet.pdf'}>
+                Download
+              </TextLink>
+            )}
+            <label htmlFor={scoresheetInputId} className={fileButtonClass}>
+              Replace
+            </label>
+            <input
+              id={scoresheetInputId}
+              type="file"
+              accept="application/pdf"
+              className="sr-only"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                event.target.value = '';
+                if (file) uploadDocument('scoresheet', file);
+              }}
+              disabled={scoresheetUploading}
+            />
+            <DangerButton
+              className="px-2 py-1 text-xs"
+              onClick={() => removeDocument('scoresheet')}
+              disabled={!event.scoresheet_key || scoresheetUploading}
+            >
+              Remove
+            </DangerButton>
+            {scoresheetUploading && <span className="text-xs text-muted">Uploading…</span>}
+          </div>
+        </ListRow>
+        {scoresheetError && <div className="px-4 py-2 text-xs text-danger-ink">{scoresheetError}</div>}
+        <ListRow className="flex-col items-start gap-3 sm:flex-row sm:items-center">
+          <div className="flex-1">
+            <div className="text-sm font-display tracking-[0.12em]">Answer sheet</div>
+            <div className="mt-1 text-xs text-muted">
+              {event.answersheet_key ? event.answersheet_name ?? 'answersheet.pdf' : 'Not generated yet'}
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {event.answersheet_key && (
+              <TextLink href={api.mediaUrl(event.answersheet_key)} download={event.answersheet_name ?? 'answersheet.pdf'}>
+                Download
+              </TextLink>
+            )}
+            <label htmlFor={answersheetInputId} className={fileButtonClass}>
+              Replace
+            </label>
+            <input
+              id={answersheetInputId}
+              type="file"
+              accept="application/pdf"
+              className="sr-only"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                event.target.value = '';
+                if (file) uploadDocument('answersheet', file);
+              }}
+              disabled={answersheetUploading}
+            />
+            <DangerButton
+              className="px-2 py-1 text-xs"
+              onClick={() => removeDocument('answersheet')}
+              disabled={!event.answersheet_key || answersheetUploading}
+            >
+              Remove
+            </DangerButton>
+            {answersheetUploading && <span className="text-xs text-muted">Uploading…</span>}
+          </div>
+        </ListRow>
+        {answersheetError && <div className="px-4 py-2 text-xs text-danger-ink">{answersheetError}</div>}
+      </List>
+      {event.public_code && (
+        <div className="border-t border-border pt-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">Share event</div>
+            <SecondaryButton className="px-3 py-2 text-xs" onClick={() => setShowQr((prev) => !prev)}>
+              {showQr ? 'Hide QR' : 'Show QR'}
+            </SecondaryButton>
+          </div>
+          {showQr && (
+            <div className="mt-3 space-y-2">
+              {qrLoading && <div className="text-xs text-muted">Generating…</div>}
+              {qrError && <div className="text-xs text-danger-ink">{qrError}</div>}
+              {qrUrl && (
+                <div className="flex flex-col items-start gap-3">
+                  <img src={qrUrl} alt="Event QR Code" className="h-36 w-36 border border-border bg-panel" />
+                  <TextLink href={qrUrl} download={`trivia-ops-${event.public_code}.png`}>
+                    Download QR code
+                  </TextLink>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
+  const settingsContent = (
+    <div className="space-y-3">
+      <div className="grid gap-3">
+        <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+          Location
+          <select className="h-10 px-3" value={locationId} onChange={(event) => setLocationId(event.target.value)}>
+            <option value="">No location</option>
+            {locations.map((location) => (
+              <option key={location.id} value={location.id}>
+                {location.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+          Host
+          <select className="h-10 px-3" value={hostUserId} onChange={(event) => setHostUserId(event.target.value)}>
+            <option value="">Select host</option>
+            {hosts.map((host) => (
+              <option key={host.id} value={host.id}>
+                {host.first_name || host.last_name
+                  ? `${host.first_name ?? ''} ${host.last_name ?? ''}`.trim()
+                  : host.username ?? host.email}{' '}
+                ({host.user_type})
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+          Status
+          <select className="h-10 px-3" value={status} onChange={(event) => setStatus(event.target.value)}>
+            <option value="planned">Planned</option>
+            <option value="live">Live</option>
+            <option value="completed">Completed</option>
+            <option value="canceled">Canceled</option>
+          </select>
+        </label>
+        <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+          Event type
+          <select
+            className="h-10 px-3"
+            value={eventType}
+            onChange={(event) => setEventType(event.target.value as 'Pub Trivia' | 'Music Trivia')}
+          >
+            <option value="Pub Trivia">Pub Trivia</option>
+            <option value="Music Trivia">Music Trivia</option>
+          </select>
+        </label>
+        <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+          Notes
+          <textarea
+            className="min-h-[80px] px-3 py-2"
+            value={notes}
+            onChange={(event) => setNotes(event.target.value)}
+          />
+        </label>
+      </div>
+      <SecondaryButton onClick={updateEvent}>Update event</SecondaryButton>
+      <div className="border-t border-border pt-4">
+        <div className="text-xs font-display uppercase tracking-[0.3em] text-danger-ink">Danger zone</div>
+        <div className="mt-2 text-xs text-muted">Deleting an event cannot be undone.</div>
+        <div className="mt-3">
+          <DangerButton onClick={deleteEvent}>Delete event</DangerButton>
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <AppShell title="Event detail" showTitle={false}>
+      <div className="space-y-4">
+        <div className="sticky top-0 z-20 -mx-4 border-b border-border bg-bg/95 px-4 pb-4 pt-3 backdrop-blur sm:static sm:mx-0 sm:border-none sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-0 sm:backdrop-blur-0">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="space-y-2">
+              <h1 className="text-2xl font-display tracking-tight">{event.title}</h1>
+              <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
+                <span>{new Date(event.starts_at).toLocaleString()}</span>
+                {locationName && <span>• {locationName}</span>}
+                <StatusPill status={event.status} label={event.status} />
+              </div>
+              {event.public_code && (
+                <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
+                  <span className="uppercase tracking-[0.2em]">Code</span>
+                  <span className="font-display tracking-[0.2em] text-text">{event.public_code}</span>
+                  <SecondaryButton className="h-8 px-2 text-xs" onClick={copyEventCode}>
+                    Copy
+                  </SecondaryButton>
+                  {codeCopied && <span className="text-xs text-accent-ink">Copied</span>}
+                </div>
+              )}
+            </div>
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-end">
+              <ButtonLink to={`/events/${event.id}/leaderboard`} variant="outline" className="w-full sm:w-auto">
+                Leaderboard
+              </ButtonLink>
+              <ButtonLink to={`/events/${event.id}/run`} variant="primary" className="w-full sm:w-auto">
+                Run event
+              </ButtonLink>
+            </div>
+          </div>
+        </div>
+
+        <div className="hidden sm:block">
+          <div className="grid gap-4 lg:grid-cols-[1fr,340px]">
+            <div className="space-y-4">
+              <Section title="Rounds">{roundsContent}</Section>
+              <Section title="Teams">{teamsContent}</Section>
+              <Section title="Round scores">{scoresContent}</Section>
+            </div>
+            <div className="space-y-4">
+              <Section title="Documents & share">{documentsContent}</Section>
+              <Section title="Event settings">{settingsContent}</Section>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-3 sm:hidden">
+          <AccordionSection title="Rounds" defaultOpen>
+            {roundsContent}
+          </AccordionSection>
+          <AccordionSection title="Teams">{teamsContent}</AccordionSection>
+          <AccordionSection title="Round scores">{scoresContent}</AccordionSection>
+          <AccordionSection title="Documents & share">{documentsContent}</AccordionSection>
+          <AccordionSection title="Event settings">{settingsContent}</AccordionSection>
+        </div>
       </div>
     </AppShell>
   );
