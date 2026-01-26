@@ -103,6 +103,8 @@ export function PlayEventPage() {
   const menuRef = useRef<HTMLDivElement | null>(null);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const countdownRef = useRef<number | null>(null);
+  const lastResponseTotalRef = useRef(0);
+  const [responseSync, setResponseSync] = useState<{ expectedTotal: number; expiresAt: number } | null>(null);
   const normalizedCode = useMemo(() => (code ?? '').trim().toUpperCase(), [code]);
 
   const load = async () => {
@@ -164,6 +166,7 @@ export function PlayEventPage() {
     setSubmittedChoiceIndex(null);
     setSubmitStatus('idle');
     setSubmitError(null);
+    setResponseSync(null);
   }, [data?.live?.active_round_id, data?.live?.current_item_ordinal, data?.current_item?.id]);
 
   useEffect(() => {
@@ -221,6 +224,31 @@ export function PlayEventPage() {
   const visualMode = Boolean(isLive && data?.visual_round && visualItems.length > 0);
   const displayItem = visualMode ? visualItems[visualIndex] : data?.current_item ?? null;
   const timerExpired = timerRemainingSeconds !== null && timerRemainingSeconds <= 0;
+  const responseCounts = data?.response_counts ?? null;
+
+  useEffect(() => {
+    if (!responseCounts) {
+      lastResponseTotalRef.current = 0;
+      return;
+    }
+    lastResponseTotalRef.current = responseCounts.total;
+  }, [responseCounts?.total, displayItem?.id]);
+
+  useEffect(() => {
+    if (!responseSync || !responseCounts) return;
+    if (responseCounts.total >= responseSync.expectedTotal) {
+      setResponseSync(null);
+    }
+  }, [responseCounts?.total, responseSync]);
+
+  useEffect(() => {
+    if (!responseSync) return;
+    const delay = Math.max(0, responseSync.expiresAt - Date.now());
+    const timeout = window.setTimeout(() => {
+      setResponseSync(null);
+    }, delay);
+    return () => window.clearTimeout(timeout);
+  }, [responseSync]);
 
   const handleSwipeStart = (event: React.TouchEvent) => {
     if (event.touches.length !== 1) return;
@@ -286,6 +314,8 @@ export function PlayEventPage() {
     if (res.ok) {
       setSubmittedChoiceIndex(selectedChoiceIndex);
       setSubmitStatus('submitted');
+      const expectedTotal = Math.max(0, lastResponseTotalRef.current) + 1;
+      setResponseSync({ expectedTotal, expiresAt: Date.now() + 3000 });
     } else {
       setSubmitStatus('error');
       setSubmitError(res.error.message ?? 'Failed to submit choice.');
@@ -358,7 +388,7 @@ export function PlayEventPage() {
       : '';
   const choiceOptions =
     displayItem?.question_type === 'multiple_choice' ? parseChoices(displayItem.choices_json) : [];
-  const responseCounts = data.response_counts ?? null;
+  const awaitingResponseSync = Boolean(responseSync);
   const maxResponseCount = responseCounts?.counts
     ? Math.max(1, ...responseCounts.counts)
     : 1;
@@ -649,7 +679,14 @@ export function PlayEventPage() {
                               <div className="text-xs uppercase tracking-[0.2em] text-danger">{submitError}</div>
                             )}
                           </div>
-                          {timerExpired && responseCounts && choiceOptions.length > 0 && (
+                          {timerExpired && awaitingResponseSync && (
+                            <div className="mt-6 border-t border-border pt-4">
+                              <div className="text-xs uppercase tracking-[0.3em] text-muted">
+                                Collecting responses…
+                              </div>
+                            </div>
+                          )}
+                          {timerExpired && responseCounts && choiceOptions.length > 0 && !awaitingResponseSync && submitStatus !== 'submitting' && (
                             <div className="mt-6 border-t border-border pt-4">
                               <div className="text-xs uppercase tracking-[0.3em] text-muted">
                                 Team Answers
