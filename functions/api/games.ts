@@ -33,11 +33,11 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, data }) 
 
   const defaultSettings = payloadData.default_settings_json ?? gameType?.default_settings_json ?? null;
 
+  const showThemeValue = payloadData.show_theme === undefined ? 1 : payloadData.show_theme ? 1 : 0;
   await execute(
     env,
-    `INSERT INTO games (id, name, game_type_id, description, subtype, default_settings_json, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
-    ,
+    `INSERT INTO games (id, name, game_type_id, description, subtype, default_settings_json, show_theme, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id,
       payloadData.name,
@@ -45,6 +45,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, data }) 
       payloadData.description ?? null,
       payloadData.subtype ?? null,
       defaultSettings,
+      showThemeValue,
       createdAt
     ]
   );

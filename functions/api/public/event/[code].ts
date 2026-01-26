@@ -27,9 +27,14 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
 
   const rounds = await queryAll<{ id: string; round_number: number; label: string; status: string; timer_seconds: number | null }>(
     env,
-    `SELECT er.id, er.round_number, er.label, er.status, ed.timer_seconds
+    `SELECT er.id,
+            er.round_number,
+            CASE WHEN g.show_theme = 0 THEN '' ELSE er.label END AS label,
+            er.status,
+            ed.timer_seconds
      FROM event_rounds er
      JOIN editions ed ON ed.id = er.edition_id
+     JOIN games g ON g.id = ed.game_id
      WHERE er.event_id = ? AND COALESCE(er.deleted, 0) = 0
      ORDER BY er.round_number ASC`,
     [event.id]

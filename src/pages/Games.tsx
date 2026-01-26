@@ -56,6 +56,7 @@ export function GamesPage() {
   const [subtype, setSubtype] = useState('');
   const [filterTypeId, setFilterTypeId] = useState('');
   const [description, setDescription] = useState('');
+  const [showTheme, setShowTheme] = useState(true);
   const [loading, setLoading] = useState(false);
 
   const load = async () => {
@@ -75,7 +76,8 @@ export function GamesPage() {
       name,
       description,
       game_type_id: gameTypeId,
-      subtype: subtype.trim() || null
+      subtype: subtype.trim() || null,
+      show_theme: showTheme
     });
     setLoading(false);
     if (res.ok) {
@@ -83,6 +85,7 @@ export function GamesPage() {
       setDescription('');
       setGameTypeId('');
       setSubtype('');
+      setShowTheme(true);
       load();
     }
   };
@@ -167,6 +170,14 @@ export function GamesPage() {
                 onChange={(event) => setDescription(event.target.value)}
               />
             </label>
+            <label className="flex items-center gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+              <input
+                type="checkbox"
+                checked={showTheme}
+                onChange={(event) => setShowTheme(event.target.checked)}
+              />
+              Show theme when presenting
+            </label>
             <div className="flex items-center gap-2">
               <PrimaryButton onClick={handleCreate} disabled={loading}>
                 {loading ? 'Saving' : 'Create'}
@@ -177,6 +188,7 @@ export function GamesPage() {
                   setDescription('');
                   setGameTypeId('');
                   setSubtype('');
+                  setShowTheme(true);
                 }}
               >
                 Clear

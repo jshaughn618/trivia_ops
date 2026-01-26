@@ -43,6 +43,7 @@ export type Game = {
   description: string | null;
   subtype: string | null;
   default_settings_json: string | null;
+  show_theme: number | null;
   created_at: string;
 };
 

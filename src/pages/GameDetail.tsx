@@ -16,6 +16,7 @@ export function GameDetailPage() {
   const [gameTypeId, setGameTypeId] = useState('');
   const [subtype, setSubtype] = useState('');
   const [description, setDescription] = useState('');
+  const [showTheme, setShowTheme] = useState(true);
   const [descLoading, setDescLoading] = useState(false);
   const [descError, setDescError] = useState<string | null>(null);
 
@@ -33,6 +34,7 @@ export function GameDetailPage() {
         setGameTypeId(gameRes.data.game_type_id);
         setDescription(gameRes.data.description ?? '');
         setSubtype(gameRes.data.subtype ?? '');
+        setShowTheme(Boolean(gameRes.data.show_theme ?? 1));
       }
       if (editionsRes.ok) setEditions(editionsRes.data);
       if (typesRes.ok) setGameTypes(typesRes.data);
@@ -46,7 +48,8 @@ export function GameDetailPage() {
       name,
       description,
       game_type_id: gameTypeId,
-      subtype: subtype.trim() || null
+      subtype: subtype.trim() || null,
+      show_theme: showTheme
     });
     if (res.ok) setGame(res.data);
   };
@@ -135,6 +138,14 @@ export function GameDetailPage() {
                 onChange={(event) => setDescription(event.target.value)}
               />
               {descError && <span className="text-[10px] tracking-[0.2em] text-danger">{descError}</span>}
+            </label>
+            <label className="flex items-center gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+              <input
+                type="checkbox"
+                checked={showTheme}
+                onChange={(event) => setShowTheme(event.target.checked)}
+              />
+              Show theme when presenting
             </label>
             <div className="flex flex-wrap items-center gap-2">
               <PrimaryButton onClick={handleUpdate}>Update</PrimaryButton>

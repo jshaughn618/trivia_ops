@@ -20,7 +20,8 @@ export const gameCreateSchema = z.object({
   game_type_id: idSchema,
   description: z.string().nullable().optional(),
   subtype: z.string().nullable().optional(),
-  default_settings_json: z.string().nullable().optional()
+  default_settings_json: z.string().nullable().optional(),
+  show_theme: z.boolean().optional()
 });
 
 export const gameUpdateSchema = z.object({
@@ -28,7 +29,8 @@ export const gameUpdateSchema = z.object({
   game_type_id: idSchema.optional(),
   description: z.string().nullable().optional(),
   subtype: z.string().nullable().optional(),
-  default_settings_json: z.string().nullable().optional()
+  default_settings_json: z.string().nullable().optional(),
+  show_theme: z.boolean().optional()
 });
 
 const editionStatusSchema = z.enum(['draft', 'published', 'archived']);

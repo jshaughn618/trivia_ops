@@ -30,15 +30,17 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
   }
 
   const merged = { ...existing, ...parsed.data };
+  const showThemeValue = merged.show_theme === undefined || merged.show_theme === null ? 1 : merged.show_theme ? 1 : 0;
   await execute(
     env,
-    `UPDATE games SET name = ?, game_type_id = ?, description = ?, subtype = ?, default_settings_json = ? WHERE id = ?`,
+    `UPDATE games SET name = ?, game_type_id = ?, description = ?, subtype = ?, default_settings_json = ?, show_theme = ? WHERE id = ?`,
     [
       merged.name,
       merged.game_type_id,
       merged.description ?? null,
       merged.subtype ?? null,
       merged.default_settings_json ?? null,
+      showThemeValue,
       params.id
     ]
   );
