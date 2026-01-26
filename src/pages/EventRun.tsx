@@ -459,6 +459,9 @@ export function EventRunPage() {
     if (!eventId || !activeRound) return;
     const duration = activeRound.timer_seconds ?? timerDurationSeconds ?? 15;
     const startedAt = new Date().toISOString();
+    if (item?.question_type === 'multiple_choice') {
+      await api.clearRoundResponses(activeRound.id, item.id);
+    }
     setTimerStartedAt(startedAt);
     setTimerDurationSeconds(duration);
     setTimerRemainingSeconds(duration);
