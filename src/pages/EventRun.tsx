@@ -542,9 +542,6 @@ export function EventRunPage() {
                 <SecondaryButton onClick={clearRoundResponses} disabled={!activeRound || clearResponsesStatus === 'clearing'}>
                   {clearResponsesStatus === 'clearing' ? 'Clearing…' : 'Clear Responses'}
                 </SecondaryButton>
-                <SecondaryButton onClick={nextItem} disabled={!item} className="py-4 text-sm">
-                  Next
-                </SecondaryButton>
                 <SecondaryButton
                   onClick={() => {
                     const next = !showAnswer;
@@ -564,6 +561,9 @@ export function EventRunPage() {
                   disabled={!item}
                 >
                   {showFact ? 'Hide Fact' : 'Reveal Fact'}
+                </SecondaryButton>
+                <SecondaryButton onClick={nextItem} disabled={!item} className="py-4 text-sm">
+                  Next
                 </SecondaryButton>
                 {(activeRound?.status === 'completed' || activeRound?.status === 'locked') && (
                   <SecondaryButton onClick={reopenRound} disabled={!activeRound} className="py-4 text-sm">
