@@ -900,64 +900,64 @@ export function EditionDetailPage() {
     let updated = 0;
 
     const sorted = [...groups.entries()].sort((a, b) => a[0] - b[0]);
-    const totalFiles = files.length;
     const totalGroups = sorted.length;
-    let uploadedCount = 0;
+    let processedCount = 0;
+    setMusicBulkStatus(`Processing ${processedCount} of ${totalGroups}`);
     for (const [ordinal, entry] of sorted) {
-      if (!entry.question) {
-        errors.push(`Missing question clip for ${ordinal}`);
-        continue;
-      }
-      if (!entry.title) {
-        errors.push(`Missing title in filename for ${ordinal}`);
-        continue;
-      }
-
-      setMusicBulkStatus(`Uploading ${uploadedCount + 1} of ${totalFiles} files`);
-      const uploadQuestion = await api.uploadMedia(entry.question, 'audio');
-      uploadedCount += 1;
-      if (!uploadQuestion.ok) {
-        errors.push(`Upload failed for ${entry.question.name}`);
-        continue;
-      }
-      const questionKey = uploadQuestion.data.key;
-
-      let answerKey: string | null = null;
-      if (entry.answer) {
-        setMusicBulkStatus(`Uploading ${uploadedCount + 1} of ${totalFiles} files`);
-        const uploadAnswer = await api.uploadMedia(entry.answer, 'audio');
-        uploadedCount += 1;
-        if (!uploadAnswer.ok) {
-          errors.push(`Upload failed for ${entry.answer.name}`);
-        } else {
-          answerKey = uploadAnswer.data.key;
+      try {
+        if (!entry.question) {
+          errors.push(`Missing question clip for ${ordinal}`);
+          continue;
         }
-      }
+        if (!entry.title) {
+          errors.push(`Missing title in filename for ${ordinal}`);
+          continue;
+        }
 
-      setMusicBulkStatus(`Saving ${ordinal} of ${totalGroups} items`);
-      const existing = itemsByOrdinal.get(ordinal);
-      const answerParts = [{ label: 'Answer', answer: entry.title }];
-      if (existing) {
-        const res = await api.updateEditionItem(existing.id, {
-          prompt: existing.prompt ?? '',
-          answer: entry.title,
-          answer_parts_json: answerParts,
-          media_type: 'audio',
-          media_key: questionKey,
-          audio_answer_key: answerKey
-        });
-        if (res.ok) updated += 1;
-      } else {
-        const res = await api.createEditionItem(editionId, {
-          prompt: '',
-          answer: entry.title,
-          answer_parts_json: answerParts,
-          media_type: 'audio',
-          media_key: questionKey,
-          audio_answer_key: answerKey,
-          ordinal
-        });
-        if (res.ok) created += 1;
+        const uploadQuestion = await api.uploadMedia(entry.question, 'audio');
+        if (!uploadQuestion.ok) {
+          errors.push(`Upload failed for ${entry.question.name}`);
+          continue;
+        }
+        const questionKey = uploadQuestion.data.key;
+
+        let answerKey: string | null = null;
+        if (entry.answer) {
+          const uploadAnswer = await api.uploadMedia(entry.answer, 'audio');
+          if (!uploadAnswer.ok) {
+            errors.push(`Upload failed for ${entry.answer.name}`);
+          } else {
+            answerKey = uploadAnswer.data.key;
+          }
+        }
+
+        const existing = itemsByOrdinal.get(ordinal);
+        const answerParts = [{ label: 'Answer', answer: entry.title }];
+        if (existing) {
+          const res = await api.updateEditionItem(existing.id, {
+            prompt: existing.prompt ?? '',
+            answer: entry.title,
+            answer_parts_json: answerParts,
+            media_type: 'audio',
+            media_key: questionKey,
+            audio_answer_key: answerKey
+          });
+          if (res.ok) updated += 1;
+        } else {
+          const res = await api.createEditionItem(editionId, {
+            prompt: '',
+            answer: entry.title,
+            answer_parts_json: answerParts,
+            media_type: 'audio',
+            media_key: questionKey,
+            audio_answer_key: answerKey,
+            ordinal
+          });
+          if (res.ok) created += 1;
+        }
+      } finally {
+        processedCount += 1;
+        setMusicBulkStatus(`Processing ${processedCount} of ${totalGroups}`);
       }
     }
 
