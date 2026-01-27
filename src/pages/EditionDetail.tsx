@@ -33,6 +33,7 @@ const defaultMusicAnswerParts: AnswerPart[] = [
 ];
 const MUSIC_AI_PARSE_LIMIT = 60;
 const MUSIC_AI_INSTRUCTION_LIMIT = 600;
+const SPEED_ROUND_MAX_ITEMS = 60;
 
 const parseChoices = (choicesJson: string | null) => {
   if (!choicesJson) return ['', '', '', ''];
@@ -115,6 +116,7 @@ export function EditionDetailPage() {
   const [timerSeconds, setTimerSeconds] = useState(15);
   const [gameTypeId, setGameTypeId] = useState('');
   const [gameId, setGameId] = useState('');
+  const [gameSubtype, setGameSubtype] = useState('');
   const [refineOpen, setRefineOpen] = useState(false);
   const [refineLoading, setRefineLoading] = useState(false);
   const [refineOptions, setRefineOptions] = useState<string[]>([]);
@@ -142,6 +144,14 @@ export function EditionDetailPage() {
   const [musicBulkResult, setMusicBulkResult] = useState<string | null>(null);
   const [musicBulkStatus, setMusicBulkStatus] = useState<string | null>(null);
   const [musicBulkInstructions, setMusicBulkInstructions] = useState('');
+  const [speedRoundClipKey, setSpeedRoundClipKey] = useState<string | null>(null);
+  const [speedRoundClipName, setSpeedRoundClipName] = useState('');
+  const [speedRoundUploading, setSpeedRoundUploading] = useState(false);
+  const [speedRoundText, setSpeedRoundText] = useState('');
+  const [speedRoundStatus, setSpeedRoundStatus] = useState<string | null>(null);
+  const [speedRoundError, setSpeedRoundError] = useState<string | null>(null);
+  const [speedRoundResult, setSpeedRoundResult] = useState<string | null>(null);
+  const [speedRoundInstructions, setSpeedRoundInstructions] = useState('');
   const [activeItemId, setActiveItemId] = useState<string | null>(null);
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [itemMenuId, setItemMenuId] = useState<string | null>(null);
@@ -149,6 +159,7 @@ export function EditionDetailPage() {
   const editUploadRef = useRef<HTMLInputElement | null>(null);
   const newUploadRef = useRef<HTMLInputElement | null>(null);
   const musicUploadRef = useRef<HTMLInputElement | null>(null);
+  const speedRoundUploadRef = useRef<HTMLInputElement | null>(null);
 
   const load = async () => {
     if (!editionId) return;
@@ -166,7 +177,10 @@ export function EditionDetailPage() {
       setTimerSeconds(editionRes.data.timer_seconds ?? 15);
       setGameId(editionRes.data.game_id);
       const gameRes = await api.getGame(editionRes.data.game_id);
-      if (gameRes.ok) setGameTypeId(gameRes.data.game_type_id);
+      if (gameRes.ok) {
+        setGameTypeId(gameRes.data.game_type_id);
+        setGameSubtype(gameRes.data.subtype ?? '');
+      }
     }
     if (itemsRes.ok) {
       setItems(itemsRes.data.sort((a, b) => a.ordinal - b.ordinal));
@@ -195,6 +209,8 @@ export function EditionDetailPage() {
   const nextOrdinal = useMemo(() => {
     return items.length === 0 ? 1 : Math.max(...items.map((item) => item.ordinal)) + 1;
   }, [items]);
+
+  const isMusicSpeedRound = gameTypeId === 'music' && gameSubtype === 'speed_round';
 
   const orderedItems = useMemo(() => {
     return [...items].sort((a, b) => a.ordinal - b.ordinal);
@@ -988,6 +1004,180 @@ export function EditionDetailPage() {
     return { parts, factoid: song || null };
   };
 
+  const normalizeSpeedRoundEntry = (entry: Record<string, unknown>) => {
+    const ordinal = Number(entry.ordinal);
+    if (!Number.isFinite(ordinal)) return null;
+    const artist1 = typeof entry.artist_1 === 'string' ? entry.artist_1.trim() : '';
+    const artist2 = typeof entry.artist_2 === 'string' ? entry.artist_2.trim() : '';
+    const artist =
+      typeof entry.artist === 'string'
+        ? entry.artist.trim()
+        : typeof entry.artists === 'string'
+          ? entry.artists.trim()
+          : '';
+    const song =
+      typeof entry.song === 'string'
+        ? entry.song.trim()
+        : typeof entry.track === 'string'
+          ? entry.track.trim()
+          : '';
+    const parts: AnswerPart[] = [];
+    if (artist1) parts.push({ label: 'Artist 1', answer: artist1 });
+    if (artist2) parts.push({ label: 'Artist 2', answer: artist2 });
+    if (!artist1 && !artist2 && artist) parts.push({ label: 'Artist', answer: artist });
+    if (song) parts.push({ label: 'Song', answer: song });
+    const normalizedParts = sanitizeAnswerParts(parts);
+    if (normalizedParts.length === 0) return null;
+    return { ordinal, parts: normalizedParts };
+  };
+
+  const parseSpeedRoundText = (text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed) return [];
+    if (trimmed.startsWith('[')) {
+      try {
+        const parsed = parseAiJsonArray(trimmed);
+        return parsed
+          .map((entry) => (entry && typeof entry === 'object' ? normalizeSpeedRoundEntry(entry as Record<string, unknown>) : null))
+          .filter((entry): entry is { ordinal: number; parts: AnswerPart[] } => Boolean(entry));
+      } catch {
+        // fall through
+      }
+    }
+    const lines = trimmed
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean);
+    const entries: Array<{ ordinal: number; parts: AnswerPart[] }> = [];
+    for (const line of lines) {
+      const match = /^(\d{1,3})\s*[-:\|,]\s*(.+)$/.exec(line);
+      if (!match) continue;
+      const ordinal = Number(match[1]);
+      if (!Number.isFinite(ordinal)) continue;
+      const rest = match[2]?.trim() ?? '';
+      const parsed = parseArtistPairTitle(rest);
+      if (parsed?.parts?.length) {
+        const parts = [...parsed.parts];
+        if (parsed.factoid) parts.push({ label: 'Song', answer: parsed.factoid });
+        const finalParts = sanitizeAnswerParts(parts);
+        if (finalParts.length > 0) {
+          entries.push({ ordinal, parts: finalParts });
+        }
+      }
+    }
+    return entries;
+  };
+
+  const parseSpeedRoundAiResponse = (text: string) => {
+    let parsed: unknown[] = [];
+    try {
+      parsed = parseAiJsonArray(text);
+    } catch {
+      return [];
+    }
+    return parsed
+      .map((entry) => (entry && typeof entry === 'object' ? normalizeSpeedRoundEntry(entry as Record<string, unknown>) : null))
+      .filter((entry): entry is { ordinal: number; parts: AnswerPart[] } => Boolean(entry));
+  };
+
+  const handleSpeedRoundUpload = async (file: File) => {
+    const isMp3 = file.type === 'audio/mpeg' || file.name.toLowerCase().endsWith('.mp3');
+    if (!isMp3) {
+      setSpeedRoundError('Speed round requires an MP3 file.');
+      return;
+    }
+    setSpeedRoundUploading(true);
+    setSpeedRoundError(null);
+    setSpeedRoundResult(null);
+    const uploadRes = await api.uploadMedia(file, 'audio');
+    setSpeedRoundUploading(false);
+    if (!uploadRes.ok) {
+      setSpeedRoundError(uploadRes.error.message);
+      return;
+    }
+    setSpeedRoundClipKey(uploadRes.data.key);
+    setSpeedRoundClipName(file.name);
+  };
+
+  const handleSpeedRoundCreate = async () => {
+    if (!editionId) return;
+    if (!speedRoundClipKey) {
+      setSpeedRoundError('Upload the speed round audio clip first.');
+      return;
+    }
+    if (!speedRoundText.trim()) {
+      setSpeedRoundError('Paste your speed round answers first.');
+      return;
+    }
+    setSpeedRoundError(null);
+    setSpeedRoundResult(null);
+    setSpeedRoundStatus('Parsing answers...');
+
+    let entries = parseSpeedRoundText(speedRoundText);
+    if (entries.length === 0) {
+      const instructions = speedRoundInstructions.trim();
+      const prompt = [
+        'Parse speed round answers into JSON.',
+        instructions ? `Instructions:\n${instructions}` : 'Instructions: Parse lines into ordinal, artist_1, artist_2, song.',
+        'Return ONLY valid JSON array in this format:',
+        '[{"ordinal":1,"artist_1":"...","artist_2":"...","song":"..."}]',
+        'Rules:',
+        '- Use only the provided ordinals.',
+        '- If there is only one artist, return artist and omit artist_2.',
+        `Input:\n${speedRoundText.trim()}`
+      ].join('\n\n');
+      const aiRes = await api.aiGenerate({ prompt, max_output_tokens: 900 });
+      if (aiRes.ok) {
+        entries = parseSpeedRoundAiResponse(aiRes.data.text);
+      }
+    }
+
+    if (entries.length === 0) {
+      setSpeedRoundStatus(null);
+      setSpeedRoundError('Could not parse any speed round answers.');
+      return;
+    }
+
+    const limited = entries.slice(0, SPEED_ROUND_MAX_ITEMS);
+    if (entries.length > SPEED_ROUND_MAX_ITEMS) {
+      setSpeedRoundResult(`Parsed ${entries.length} entries. Using first ${SPEED_ROUND_MAX_ITEMS}.`);
+    }
+
+    let processed = 0;
+    const itemsByOrdinal = new Map(items.map((item) => [item.ordinal, item]));
+    setSpeedRoundStatus(`Processing ${processed} of ${limited.length}`);
+    for (const entry of limited) {
+      const answerValue = entry.parts.map((part) => part.answer).join(' / ');
+      const existing = itemsByOrdinal.get(entry.ordinal);
+      if (existing) {
+        await api.updateEditionItem(existing.id, {
+          prompt: existing.prompt ?? '',
+          answer: answerValue,
+          answer_parts_json: entry.parts,
+          media_type: 'audio',
+          media_key: speedRoundClipKey,
+          audio_answer_key: null
+        });
+      } else {
+        await api.createEditionItem(editionId, {
+          prompt: '',
+          answer: answerValue,
+          answer_parts_json: entry.parts,
+          media_type: 'audio',
+          media_key: speedRoundClipKey,
+          audio_answer_key: null,
+          ordinal: entry.ordinal
+        });
+      }
+      processed += 1;
+      setSpeedRoundStatus(`Processing ${processed} of ${limited.length}`);
+    }
+
+    setSpeedRoundStatus(null);
+    setSpeedRoundResult(`Processed ${limited.length} items.`);
+    load();
+  };
+
   const handleMusicBulkUpload = async (files: File[]) => {
     if (!editionId) return;
     setMusicBulkLoading(true);
@@ -1314,52 +1504,145 @@ export function EditionDetailPage() {
           )}
           {gameTypeId === 'music' && (
             <div className="mb-4 border-2 border-border bg-panel2 p-3">
-              <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">Music Bulk Upload</div>
-              <div className="mt-2 text-[10px] uppercase tracking-[0.2em] text-muted">
-                Upload MP3s named like “01 - Song Name.mp3” and “A01 - Song Name.mp3”.
+              <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">
+                {isMusicSpeedRound ? 'Speed Round Setup' : 'Music Bulk Upload'}
               </div>
-              <label className="mt-3 flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-                Parse instructions (optional)
-                <textarea
-                  className="min-h-[84px] px-3 py-2"
-                  value={musicBulkInstructions}
-                  onChange={(event) => setMusicBulkInstructions(event.target.value)}
-                  placeholder="Example: Titles look like 'Song - Artist - Movie'. Create answer parts Song, Artist, Movie."
-                />
-                <span className="text-[10px] normal-case tracking-[0.2em] text-muted">
-                  If provided, AI will parse answer parts before processing uploads.
-                </span>
-              </label>
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <input
-                  ref={musicUploadRef}
-                  type="file"
-                  accept="audio/mpeg,audio/mp3"
-                  multiple
-                  className="hidden"
-                  onChange={(event) => {
-                    const selection = Array.from(event.currentTarget.files ?? []);
-                    event.currentTarget.value = '';
-                    if (selection.length > 0) handleMusicBulkUpload(selection);
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={() => musicUploadRef.current?.click()}
-                  className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
-                  disabled={musicBulkLoading}
-                >
-                  {musicBulkLoading ? 'Uploading' : 'Upload MP3s'}
-                </button>
-              </div>
-              {musicBulkStatus && (
-                <div className="mt-2 text-xs uppercase tracking-[0.2em] text-muted">{musicBulkStatus}</div>
-              )}
-              {musicBulkError && (
-                <div className="mt-2 text-xs uppercase tracking-[0.2em] text-danger">{musicBulkError}</div>
-              )}
-              {musicBulkResult && (
-                <div className="mt-2 text-xs uppercase tracking-[0.2em] text-muted">{musicBulkResult}</div>
+              {isMusicSpeedRound ? (
+                <div className="mt-3 flex flex-col gap-3">
+                  <div className="text-[10px] uppercase tracking-[0.2em] text-muted">
+                    Upload one MP3 clip for the full speed round, then paste ordinal/artist/song lines below.
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      ref={speedRoundUploadRef}
+                      type="file"
+                      accept="audio/mpeg,audio/mp3"
+                      className="hidden"
+                      onChange={(event) => {
+                        const file = event.currentTarget.files?.[0];
+                        event.currentTarget.value = '';
+                        if (file) handleSpeedRoundUpload(file);
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => speedRoundUploadRef.current?.click()}
+                      className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
+                      disabled={speedRoundUploading}
+                    >
+                      {speedRoundUploading ? 'Uploading' : 'Upload Round MP3'}
+                    </button>
+                    {speedRoundClipName && (
+                      <span className="text-[10px] uppercase tracking-[0.2em] text-muted">
+                        {speedRoundClipName}
+                      </span>
+                    )}
+                    {speedRoundClipKey && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSpeedRoundClipKey(null);
+                          setSpeedRoundClipName('');
+                        }}
+                        className="border-2 border-danger px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-danger hover:border-[#9d2a24]"
+                      >
+                        Remove Clip
+                      </button>
+                    )}
+                  </div>
+                  <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+                    Speed round answers
+                    <textarea
+                      className="min-h-[120px] px-3 py-2"
+                      value={speedRoundText}
+                      onChange={(event) => setSpeedRoundText(event.target.value)}
+                      placeholder="1 - Artist 1 & Artist 2 - Song Title"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+                    Parsing instructions (optional)
+                    <textarea
+                      className="min-h-[80px] px-3 py-2"
+                      value={speedRoundInstructions}
+                      onChange={(event) => setSpeedRoundInstructions(event.target.value)}
+                      placeholder="Example: Split artist_1 & artist_2 on '&'. Song is after the final dash."
+                    />
+                  </label>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <PrimaryButton onClick={handleSpeedRoundCreate} disabled={speedRoundUploading}>
+                      Create speed round items
+                    </PrimaryButton>
+                    <SecondaryButton
+                      onClick={() => {
+                        setSpeedRoundText('');
+                        setSpeedRoundInstructions('');
+                        setSpeedRoundError(null);
+                        setSpeedRoundResult(null);
+                        setSpeedRoundStatus(null);
+                      }}
+                    >
+                      Clear
+                    </SecondaryButton>
+                  </div>
+                  {speedRoundStatus && (
+                    <div className="text-xs uppercase tracking-[0.2em] text-muted">{speedRoundStatus}</div>
+                  )}
+                  {speedRoundError && (
+                    <div className="text-xs uppercase tracking-[0.2em] text-danger">{speedRoundError}</div>
+                  )}
+                  {speedRoundResult && (
+                    <div className="text-xs uppercase tracking-[0.2em] text-muted">{speedRoundResult}</div>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <div className="mt-2 text-[10px] uppercase tracking-[0.2em] text-muted">
+                    Upload MP3s named like “01 - Song Name.mp3” and “A01 - Song Name.mp3”.
+                  </div>
+                  <label className="mt-3 flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+                    Parse instructions (optional)
+                    <textarea
+                      className="min-h-[84px] px-3 py-2"
+                      value={musicBulkInstructions}
+                      onChange={(event) => setMusicBulkInstructions(event.target.value)}
+                      placeholder="Example: Titles look like 'Song - Artist - Movie'. Create answer parts Song, Artist, Movie."
+                    />
+                    <span className="text-[10px] normal-case tracking-[0.2em] text-muted">
+                      If provided, AI will parse answer parts before processing uploads.
+                    </span>
+                  </label>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <input
+                      ref={musicUploadRef}
+                      type="file"
+                      accept="audio/mpeg,audio/mp3"
+                      multiple
+                      className="hidden"
+                      onChange={(event) => {
+                        const selection = Array.from(event.currentTarget.files ?? []);
+                        event.currentTarget.value = '';
+                        if (selection.length > 0) handleMusicBulkUpload(selection);
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => musicUploadRef.current?.click()}
+                      className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
+                      disabled={musicBulkLoading}
+                    >
+                      {musicBulkLoading ? 'Uploading' : 'Upload MP3s'}
+                    </button>
+                  </div>
+                  {musicBulkStatus && (
+                    <div className="mt-2 text-xs uppercase tracking-[0.2em] text-muted">{musicBulkStatus}</div>
+                  )}
+                  {musicBulkError && (
+                    <div className="mt-2 text-xs uppercase tracking-[0.2em] text-danger">{musicBulkError}</div>
+                  )}
+                  {musicBulkResult && (
+                    <div className="mt-2 text-xs uppercase tracking-[0.2em] text-muted">{musicBulkResult}</div>
+                  )}
+                </>
               )}
             </div>
           )}

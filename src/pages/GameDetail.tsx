@@ -9,6 +9,10 @@ import type { Game, GameEdition, GameType } from '../types';
 export function GameDetailPage() {
   const { gameId } = useParams();
   const navigate = useNavigate();
+  const musicSubtypeOptions = [
+    { value: '', label: 'Standard' },
+    { value: 'speed_round', label: 'Speed Round' }
+  ];
   const [game, setGame] = useState<Game | null>(null);
   const [editions, setEditions] = useState<GameEdition[]>([]);
   const [gameTypes, setGameTypes] = useState<GameType[]>([]);
@@ -117,7 +121,17 @@ export function GameDetailPage() {
             {isMusicType && (
               <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
                 Music Subtype
-                <input className="h-10 px-3" value={subtype} onChange={(event) => setSubtype(event.target.value)} />
+                <select
+                  className="h-10 px-3"
+                  value={subtype}
+                  onChange={(event) => setSubtype(event.target.value)}
+                >
+                  {musicSubtypeOptions.map((option) => (
+                    <option key={option.value || 'none'} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
               </label>
             )}
             <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
