@@ -11,7 +11,9 @@ export function GameDetailPage() {
   const navigate = useNavigate();
   const musicSubtypeOptions = [
     { value: '', label: 'Standard' },
-    { value: 'speed_round', label: 'Speed Round' }
+    { value: 'speed_round', label: 'Speed Round' },
+    { value: 'mashup', label: 'Mashup' },
+    { value: 'covers', label: 'Covers' }
   ];
   const [game, setGame] = useState<Game | null>(null);
   const [editions, setEditions] = useState<GameEdition[]>([]);

@@ -113,6 +113,7 @@ export function EditionDetailPage() {
   const [tags, setTags] = useState('');
   const [theme, setTheme] = useState('');
   const [description, setDescription] = useState('');
+  const [editionNumber, setEditionNumber] = useState('');
   const [timerSeconds, setTimerSeconds] = useState(15);
   const [gameTypeId, setGameTypeId] = useState('');
   const [gameId, setGameId] = useState('');
@@ -174,6 +175,11 @@ export function EditionDetailPage() {
       setTags(editionRes.data.tags_csv ?? '');
       setTheme(editionRes.data.theme ?? '');
       setDescription(editionRes.data.description ?? '');
+      setEditionNumber(
+        editionRes.data.edition_number !== null && editionRes.data.edition_number !== undefined
+          ? String(editionRes.data.edition_number)
+          : ''
+      );
       setTimerSeconds(editionRes.data.timer_seconds ?? 15);
       setGameId(editionRes.data.game_id);
       const gameRes = await api.getGame(editionRes.data.game_id);
@@ -210,7 +216,11 @@ export function EditionDetailPage() {
     return items.length === 0 ? 1 : Math.max(...items.map((item) => item.ordinal)) + 1;
   }, [items]);
 
-  const isMusicSpeedRound = gameTypeId === 'music' && gameSubtype === 'speed_round';
+  const musicSubtype = gameSubtype || 'standard';
+  const isMusicSpeedRound = gameTypeId === 'music' && musicSubtype === 'speed_round';
+  const isMusicMashup = gameTypeId === 'music' && musicSubtype === 'mashup';
+  const isMusicCovers = gameTypeId === 'music' && musicSubtype === 'covers';
+  const hasMusicTemplate = isMusicSpeedRound || isMusicMashup || isMusicCovers;
 
   const orderedItems = useMemo(() => {
     return [...items].sort((a, b) => a.ordinal - b.ordinal);
@@ -235,12 +245,15 @@ export function EditionDetailPage() {
 
   const handleEditionUpdate = async () => {
     if (!editionId || !gameId) return;
+    const parsedNumber = Number(editionNumber);
+    const editionNumberValue = Number.isFinite(parsedNumber) && parsedNumber > 0 ? parsedNumber : null;
     const res = await api.updateEdition(editionId, {
       title: theme,
       status,
       tags_csv: tags,
       theme,
       description,
+      edition_number: editionNumberValue,
       game_id: gameId,
       timer_seconds: timerSeconds
     });
@@ -989,31 +1002,38 @@ export function EditionDetailPage() {
   };
 
   const parseArtistPairTitle = (title: string) => {
-    // Heuristic fallback for common music formats like "Artist 1 & Artist 2 - Song".
+    // Heuristic fallback for "Artist 1 & Artist 2 - Song".
     const match = /^(.*?)\s*&\s*(.*?)\s*-\s*(.+)$/.exec(title.trim());
     if (!match) return null;
     const artist1 = match[1]?.trim() ?? '';
     const artist2 = match[2]?.trim() ?? '';
     const song = match[3]?.trim() ?? '';
     if (!artist1 || !artist2) return null;
-    const parts = sanitizeAnswerParts([
-      { label: 'Artist 1', answer: artist1 },
-      { label: 'Artist 2', answer: artist2 }
-    ]);
-    if (parts.length === 0) return null;
-    return { parts, factoid: song || null };
+    return { artist1, artist2, song };
   };
 
   const normalizeSpeedRoundEntry = (entry: Record<string, unknown>) => {
     const ordinal = Number(entry.ordinal);
     if (!Number.isFinite(ordinal)) return null;
-    const artist1 = typeof entry.artist_1 === 'string' ? entry.artist_1.trim() : '';
-    const artist2 = typeof entry.artist_2 === 'string' ? entry.artist_2.trim() : '';
     const artist =
       typeof entry.artist === 'string'
         ? entry.artist.trim()
         : typeof entry.artists === 'string'
           ? entry.artists.trim()
+          : '';
+    const artist1 = typeof entry.artist_1 === 'string' ? entry.artist_1.trim() : '';
+    const artist2 = typeof entry.artist_2 === 'string' ? entry.artist_2.trim() : '';
+    const coverArtist =
+      typeof entry.cover_artist === 'string'
+        ? entry.cover_artist.trim()
+        : typeof entry.cover === 'string'
+          ? entry.cover.trim()
+          : '';
+    const originalArtist =
+      typeof entry.original_artist === 'string'
+        ? entry.original_artist.trim()
+        : typeof entry.original === 'string'
+          ? entry.original.trim()
           : '';
     const song =
       typeof entry.song === 'string'
@@ -1022,10 +1042,24 @@ export function EditionDetailPage() {
           ? entry.track.trim()
           : '';
     const parts: AnswerPart[] = [];
-    if (artist1) parts.push({ label: 'Artist 1', answer: artist1 });
-    if (artist2) parts.push({ label: 'Artist 2', answer: artist2 });
-    if (!artist1 && !artist2 && artist) parts.push({ label: 'Artist', answer: artist });
-    if (song) parts.push({ label: 'Song', answer: song });
+    if (isMusicMashup) {
+      if (artist1) parts.push({ label: 'Artist 1', answer: artist1 });
+      if (artist2) parts.push({ label: 'Artist 2', answer: artist2 });
+      if (!artist1 && !artist2 && artist) {
+        const split = artist.split('&').map((value) => value.trim()).filter(Boolean);
+        if (split.length > 0) parts.push({ label: 'Artist 1', answer: split[0] });
+        if (split.length > 1) parts.push({ label: 'Artist 2', answer: split[1] });
+        if (split.length === 1) parts.push({ label: 'Artist 2', answer: '' });
+      }
+      if (song) parts.push({ label: 'Song', answer: song });
+    } else if (isMusicCovers) {
+      if (song) parts.push({ label: 'Song', answer: song });
+      if (coverArtist) parts.push({ label: 'Cover artist', answer: coverArtist });
+      if (originalArtist) parts.push({ label: 'Original artist', answer: originalArtist });
+    } else {
+      if (song) parts.push({ label: 'Song', answer: song });
+      if (artist) parts.push({ label: 'Artist', answer: artist });
+    }
     const normalizedParts = sanitizeAnswerParts(parts);
     if (normalizedParts.length === 0) return null;
     return { ordinal, parts: normalizedParts };
@@ -1055,13 +1089,39 @@ export function EditionDetailPage() {
       const ordinal = Number(match[1]);
       if (!Number.isFinite(ordinal)) continue;
       const rest = match[2]?.trim() ?? '';
-      const parsed = parseArtistPairTitle(rest);
-      if (parsed?.parts?.length) {
-        const parts = [...parsed.parts];
-        if (parsed.factoid) parts.push({ label: 'Song', answer: parsed.factoid });
-        const finalParts = sanitizeAnswerParts(parts);
-        if (finalParts.length > 0) {
-          entries.push({ ordinal, parts: finalParts });
+      if (isMusicMashup) {
+        const mashupParsed = parseArtistPairTitle(rest);
+        if (mashupParsed) {
+          const parts = sanitizeAnswerParts([
+            { label: 'Artist 1', answer: mashupParsed.artist1 },
+            { label: 'Artist 2', answer: mashupParsed.artist2 },
+            { label: 'Song', answer: mashupParsed.song }
+          ]);
+          if (parts.length > 0) entries.push({ ordinal, parts });
+        }
+      } else if (isMusicCovers) {
+        const coverMatch = /^(.*?)\s*-\s*(.*?)\s*-\s*(.+)$/.exec(rest);
+        if (coverMatch) {
+          const song = coverMatch[1]?.trim() ?? '';
+          const coverArtist = coverMatch[2]?.trim() ?? '';
+          const originalArtist = coverMatch[3]?.trim() ?? '';
+          const parts = sanitizeAnswerParts([
+            { label: 'Song', answer: song },
+            { label: 'Cover artist', answer: coverArtist },
+            { label: 'Original artist', answer: originalArtist }
+          ]);
+          if (parts.length > 0) entries.push({ ordinal, parts });
+        }
+      } else {
+        const simpleMatch = /^(.*?)\s*-\s*(.+)$/.exec(rest);
+        if (simpleMatch) {
+          const artist = simpleMatch[1]?.trim() ?? '';
+          const song = simpleMatch[2]?.trim() ?? '';
+          const parts = sanitizeAnswerParts([
+            { label: 'Song', answer: song },
+            { label: 'Artist', answer: artist }
+          ]);
+          if (parts.length > 0) entries.push({ ordinal, parts });
         }
       }
     }
@@ -1117,13 +1177,27 @@ export function EditionDetailPage() {
     if (entries.length === 0) {
       const instructions = speedRoundInstructions.trim();
       const prompt = [
-        'Parse speed round answers into JSON.',
-        instructions ? `Instructions:\n${instructions}` : 'Instructions: Parse lines into ordinal, artist_1, artist_2, song.',
+        'Parse music answers into JSON.',
+        instructions
+          ? `Instructions:\n${instructions}`
+          : isMusicMashup
+            ? 'Instructions: Parse lines into ordinal, artist_1, artist_2, song.'
+            : isMusicCovers
+              ? 'Instructions: Parse lines into ordinal, song, cover_artist, original_artist.'
+              : 'Instructions: Parse lines into ordinal, artist, song.',
         'Return ONLY valid JSON array in this format:',
-        '[{"ordinal":1,"artist_1":"...","artist_2":"...","song":"..."}]',
+        isMusicMashup
+          ? '[{"ordinal":1,"artist_1":"...","artist_2":"...","song":"..."}]'
+          : isMusicCovers
+            ? '[{"ordinal":1,"song":"...","cover_artist":"...","original_artist":"..."}]'
+            : '[{"ordinal":1,"artist":"...","song":"..."}]',
         'Rules:',
         '- Use only the provided ordinals.',
-        '- If there is only one artist, return artist and omit artist_2.',
+        isMusicMashup
+          ? '- Two artists required (artist_1 and artist_2).'
+          : isMusicCovers
+            ? '- Include both cover_artist and original_artist.'
+            : '- Artist is a single string (include & for duets).',
         `Input:\n${speedRoundText.trim()}`
       ].join('\n\n');
       const aiRes = await api.aiGenerate({ prompt, max_output_tokens: 900 });
@@ -1237,7 +1311,13 @@ export function EditionDetailPage() {
     const totalGroups = sorted.length;
     const heuristicMatches = sorted.reduce((count, [, entry]) => {
       if (!entry.title) return count;
-      return parseArtistPairTitle(entry.title) ? count + 1 : count;
+      if (isMusicMashup) {
+        return parseArtistPairTitle(entry.title) ? count + 1 : count;
+      }
+      if (isMusicCovers) {
+        return /^(.*?)\s*-\s*(.*?)\s*-\s*(.+)$/.exec(entry.title) ? count + 1 : count;
+      }
+      return /^(.*?)\s*-\s*(.+)$/.exec(entry.title) ? count + 1 : count;
     }, 0);
     const instructionsRaw = musicBulkInstructions.trim();
     const instructions = instructionsRaw.slice(0, MUSIC_AI_INSTRUCTION_LIMIT);
@@ -1449,6 +1529,16 @@ export function EditionDetailPage() {
               {metaError && <span className="text-[10px] tracking-[0.2em] text-danger">{metaError}</span>}
             </label>
             <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+              Edition number
+              <input
+                type="number"
+                min={1}
+                className="h-10 px-3"
+                value={editionNumber}
+                onChange={(event) => setEditionNumber(event.target.value)}
+              />
+            </label>
+            <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
               Theme
               <input className="h-10 px-3" value={theme} onChange={(event) => setTheme(event.target.value)} />
             </label>
@@ -1505,12 +1595,12 @@ export function EditionDetailPage() {
           {gameTypeId === 'music' && (
             <div className="mb-4 border-2 border-border bg-panel2 p-3">
               <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">
-                {isMusicSpeedRound ? 'Speed Round Setup' : 'Music Bulk Upload'}
+                {hasMusicTemplate ? 'Music Template Setup' : 'Music Bulk Upload'}
               </div>
-              {isMusicSpeedRound ? (
+              {hasMusicTemplate ? (
                 <div className="mt-3 flex flex-col gap-3">
                   <div className="text-[10px] uppercase tracking-[0.2em] text-muted">
-                    Upload one MP3 clip for the full speed round, then paste ordinal/artist/song lines below.
+                    Upload one MP3 clip for the full round, then paste answer lines below.
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <input
@@ -1551,12 +1641,18 @@ export function EditionDetailPage() {
                     )}
                   </div>
                   <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-                    Speed round answers
+                    Round answers
                     <textarea
                       className="min-h-[120px] px-3 py-2"
                       value={speedRoundText}
                       onChange={(event) => setSpeedRoundText(event.target.value)}
-                      placeholder="1 - Artist 1 & Artist 2 - Song Title"
+                      placeholder={
+                        isMusicMashup
+                          ? '1 - Artist 1 & Artist 2 - Song Title'
+                          : isMusicCovers
+                            ? '1 - Song Title - Cover Artist - Original Artist'
+                            : '1 - Artist - Song Title'
+                      }
                     />
                   </label>
                   <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
@@ -1565,12 +1661,18 @@ export function EditionDetailPage() {
                       className="min-h-[80px] px-3 py-2"
                       value={speedRoundInstructions}
                       onChange={(event) => setSpeedRoundInstructions(event.target.value)}
-                      placeholder="Example: Split artist_1 & artist_2 on '&'. Song is after the final dash."
+                      placeholder={
+                        isMusicMashup
+                          ? "Example: Split artist_1 & artist_2 on '&'. Song is after the final dash."
+                          : isMusicCovers
+                            ? 'Example: Song - Cover Artist - Original Artist.'
+                            : 'Example: Artist - Song.'
+                      }
                     />
                   </label>
                   <div className="flex flex-wrap items-center gap-2">
                     <PrimaryButton onClick={handleSpeedRoundCreate} disabled={speedRoundUploading}>
-                      Create speed round items
+                      Create round items
                     </PrimaryButton>
                     <SecondaryButton
                       onClick={() => {

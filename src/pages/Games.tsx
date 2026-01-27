@@ -15,7 +15,9 @@ export function GamesPage() {
   const location = useLocation();
   const musicSubtypeOptions = [
     { value: '', label: 'Standard' },
-    { value: 'speed_round', label: 'Speed Round' }
+    { value: 'speed_round', label: 'Speed Round' },
+    { value: 'mashup', label: 'Mashup' },
+    { value: 'covers', label: 'Covers' }
   ];
   const [editions, setEditions] = useState<GameEdition[]>([]);
   const [games, setGames] = useState<Game[]>([]);
@@ -308,7 +310,10 @@ export function GamesPage() {
                             </div>
                           )}
                           {gameEditions.map((edition) => {
-                            const primaryTitle = edition.theme ?? edition.title ?? 'Untitled edition';
+                            const baseTitle = edition.theme ?? edition.title ?? 'Untitled edition';
+                            const primaryTitle = edition.edition_number
+                              ? `${edition.edition_number} - ${baseTitle}`
+                              : baseTitle;
                             const secondary = edition.tags_csv ? `Tags: ${edition.tags_csv}` : '';
                             return (
                               <ListRow key={edition.id} to={`/editions/${edition.id}`} className="py-3 pl-8">

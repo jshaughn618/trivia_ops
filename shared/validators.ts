@@ -42,6 +42,7 @@ const userTypeSchema = z.enum(['admin', 'host', 'player']);
 export const editionCreateSchema = z.object({
   game_id: idSchema,
   title: z.string().min(1).optional(),
+  edition_number: z.number().int().min(1).nullable().optional(),
   description: z.string().nullable().optional(),
   status: editionStatusSchema.default('draft'),
   tags_csv: z.string().nullable().optional(),
@@ -52,6 +53,7 @@ export const editionCreateSchema = z.object({
 export const editionUpdateSchema = z.object({
   game_id: idSchema.optional(),
   title: z.string().min(1).optional(),
+  edition_number: z.number().int().min(1).nullable().optional(),
   description: z.string().nullable().optional(),
   status: editionStatusSchema.optional(),
   tags_csv: z.string().nullable().optional(),

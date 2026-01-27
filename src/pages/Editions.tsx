@@ -188,7 +188,10 @@ export function EditionsPage() {
                       {isOpen && (
                         <List id={editionListId} className="mt-1">
                           {gameEditions.map((edition) => {
-                            const primaryTitle = edition.theme ?? edition.title ?? 'Untitled edition';
+                  const baseTitle = edition.theme ?? edition.title ?? 'Untitled edition';
+                  const primaryTitle = edition.edition_number
+                    ? `${edition.edition_number} - ${baseTitle}`
+                    : baseTitle;
                             const secondary = edition.tags_csv ? `Tags: ${edition.tags_csv}` : '';
                             return (
                               <ListRow

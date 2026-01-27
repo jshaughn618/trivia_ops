@@ -9,6 +9,7 @@ import type { Game } from '../types';
 export function EditionNewPage() {
   const [games, setGames] = useState<Game[]>([]);
   const [gameId, setGameId] = useState('');
+  const [editionNumber, setEditionNumber] = useState('');
   const [tags, setTags] = useState('');
   const [theme, setTheme] = useState('');
   const [description, setDescription] = useState('');
@@ -27,10 +28,30 @@ export function EditionNewPage() {
     if (fromGame) setGameId(fromGame);
   }, [location.search]);
 
+  useEffect(() => {
+    if (!gameId) {
+      setEditionNumber('');
+      return;
+    }
+    api.listEditions({ game_id: gameId }).then((res) => {
+      if (!res.ok) return;
+      const maxNumber = res.data.reduce((max, edition) => {
+        const value = typeof edition.edition_number === 'number' ? edition.edition_number : null;
+        if (!value) return max;
+        return value > max ? value : max;
+      }, 0);
+      const nextNumber = maxNumber + 1;
+      setEditionNumber(String(nextNumber));
+    });
+  }, [gameId]);
+
   const handleCreate = async () => {
     if (!gameId || !theme.trim()) return;
+    const parsedNumber = Number(editionNumber);
+    const editionNumberValue = Number.isFinite(parsedNumber) && parsedNumber > 0 ? parsedNumber : null;
     const res = await api.createEdition({
       game_id: gameId,
+      edition_number: editionNumberValue,
       tags_csv: tags,
       theme,
       description,
@@ -59,6 +80,16 @@ export function EditionNewPage() {
           <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
             Tags (comma separated)
             <input className="h-10 px-3" value={tags} onChange={(event) => setTags(event.target.value)} />
+          </label>
+          <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+            Edition number
+            <input
+              type="number"
+              min={1}
+              className="h-10 px-3"
+              value={editionNumber}
+              onChange={(event) => setEditionNumber(event.target.value)}
+            />
           </label>
           <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
             Theme

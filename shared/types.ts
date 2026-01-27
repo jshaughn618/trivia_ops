@@ -58,6 +58,7 @@ export type GameType = {
 export type GameEdition = {
   id: Id;
   game_id: Id;
+  edition_number: number | null;
   title: string;
   description: string | null;
   status: EditionStatus;
