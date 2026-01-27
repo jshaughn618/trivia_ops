@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import QRCode from 'qrcode';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { api } from '../api';
+import logoDark from '../assets/trivia_ops_logo_dark.png';
 import { AppShell } from '../components/AppShell';
 import { PrimaryButton, SecondaryButton, DangerButton, ButtonLink, TextLink } from '../components/Buttons';
 import { Section } from '../components/Section';
@@ -270,57 +271,79 @@ const renderExtrasBlock = (
   page: any,
   cell: { x: number; y: number; width: number; height: number },
   fonts: { regular: any; bold: any },
-  extras: { qrImage?: any; eventCode?: string; upcomingLines?: string[] }
+  extras: {
+    qrImage?: any;
+    logoImage?: any;
+    eventCode?: string;
+    upcomingLines?: string[];
+    locationName?: string;
+  }
 ) => {
   const padding = CELL_PADDING;
-  const titleSize = 10;
-  const textSize = 8.5;
-  const titleY = cell.y + cell.height - padding - titleSize;
-  page.drawText('Event info', {
-    x: cell.x + padding,
-    y: titleY,
-    size: titleSize,
-    font: fonts.bold
-  });
+  const textSize = 9;
+  const upcomingTitleSize = 10.5;
+  const upcomingTextSize = 10;
+  let cursorY = cell.y + cell.height - padding;
 
-  let cursorY = titleY - 14;
-  const codeText = extras.eventCode ? `Code: ${extras.eventCode}` : 'Code: —';
+  if (extras.logoImage) {
+    const maxLogoWidth = 120;
+    const maxLogoHeight = 34;
+    const scale = Math.min(
+      maxLogoWidth / extras.logoImage.width,
+      maxLogoHeight / extras.logoImage.height,
+      1
+    );
+    const logoWidth = extras.logoImage.width * scale;
+    const logoHeight = extras.logoImage.height * scale;
+    page.drawImage(extras.logoImage, {
+      x: cell.x + padding,
+      y: cursorY - logoHeight,
+      width: logoWidth,
+      height: logoHeight
+    });
+    cursorY -= logoHeight + 8;
+  }
+
+  const codeText = extras.eventCode ? `Event Code: ${extras.eventCode}` : 'Event Code: —';
   page.drawText(codeText, {
     x: cell.x + padding,
-    y: cursorY,
+    y: cursorY - textSize,
     size: textSize,
-    font: fonts.regular
+    font: fonts.bold
   });
+  cursorY -= textSize + 8;
 
-  const qrSize = 90;
+  const qrSize = 96;
   if (extras.qrImage) {
     page.drawImage(extras.qrImage, {
       x: cell.x + padding,
-      y: cell.y + padding + 10,
+      y: cursorY - qrSize,
       width: qrSize,
       height: qrSize
     });
+    cursorY -= qrSize + 10;
   }
 
   const upcoming = extras.upcomingLines ?? [];
   if (upcoming.length > 0) {
-    const listX = cell.x + padding + qrSize + 12;
-    let listY = cursorY;
-    page.drawText('Upcoming', {
-      x: listX,
-      y: listY,
-      size: textSize,
+    const locationLabel = extras.locationName?.trim()
+      ? `Upcoming Trivia Events at ${extras.locationName.trim()}`
+      : 'Upcoming Trivia Events';
+    page.drawText(locationLabel, {
+      x: cell.x + padding,
+      y: cursorY - upcomingTitleSize,
+      size: upcomingTitleSize,
       font: fonts.bold
     });
-    listY -= 12;
+    cursorY -= upcomingTitleSize + 8;
     upcoming.forEach((line) => {
       page.drawText(line, {
-        x: listX,
-        y: listY,
-        size: textSize,
+        x: cell.x + padding,
+        y: cursorY - upcomingTextSize,
+        size: upcomingTextSize,
         font: fonts.regular
       });
-      listY -= 11;
+      cursorY -= upcomingTextSize + 6;
     });
   }
 };
@@ -330,7 +353,13 @@ const buildPdf = async (
   locationName: string,
   rounds: RoundBundle[],
   mode: 'scoresheet' | 'answersheet',
-  extras?: { qrDataUrl?: string; eventCode?: string; upcomingLines?: string[] }
+  extras?: {
+    qrDataUrl?: string;
+    eventCode?: string;
+    upcomingLines?: string[];
+    locationName?: string;
+    logoBytes?: Uint8Array;
+  }
 ) => {
   const pdfDoc = await PDFDocument.create();
   const fonts = {
@@ -338,6 +367,7 @@ const buildPdf = async (
     bold: await pdfDoc.embedFont(StandardFonts.HelveticaBold)
   };
   let qrImage: any | null = null;
+  let logoImage: any | null = null;
   if (mode === 'scoresheet' && extras?.qrDataUrl) {
     const qrBytes = dataUrlToBytes(extras.qrDataUrl);
     if (qrBytes.length > 0) {
@@ -346,6 +376,13 @@ const buildPdf = async (
       } catch {
         qrImage = null;
       }
+    }
+  }
+  if (mode === 'scoresheet' && extras?.logoBytes) {
+    try {
+      logoImage = await pdfDoc.embedPng(extras.logoBytes);
+    } catch {
+      logoImage = null;
     }
   }
   const gridTop = PAGE_HEIGHT - PAGE_MARGIN - HEADER_HEIGHT;
@@ -386,8 +423,10 @@ const buildPdf = async (
       fonts,
       {
         qrImage: qrImage ?? undefined,
+        logoImage: logoImage ?? undefined,
         eventCode: extras.eventCode,
-        upcomingLines: extras.upcomingLines
+        upcomingLines: extras.upcomingLines,
+        locationName: extras.locationName
       }
     );
   }
@@ -829,10 +868,22 @@ export function EventDetailPage() {
           qrDataUrl = undefined;
         }
       }
+      let logoBytes: Uint8Array | undefined;
+      try {
+        const logoRes = await fetch(logoDark);
+        if (logoRes.ok) {
+          const buffer = await logoRes.arrayBuffer();
+          logoBytes = new Uint8Array(buffer);
+        }
+      } catch {
+        logoBytes = undefined;
+      }
       const scoresheetBytes = await buildPdf(event, locationName, bundles, 'scoresheet', {
         qrDataUrl,
         eventCode: event.public_code ?? undefined,
-        upcomingLines
+        upcomingLines,
+        locationName,
+        logoBytes
       });
       const answersheetBytes = await buildPdf(event, locationName, bundles, 'answersheet');
       const baseName = safeFileName(event.title, `event-${event.id.slice(0, 8)}`);
