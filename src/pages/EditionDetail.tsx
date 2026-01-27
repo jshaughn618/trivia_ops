@@ -145,6 +145,8 @@ export function EditionDetailPage() {
   const [musicBulkResult, setMusicBulkResult] = useState<string | null>(null);
   const [musicBulkStatus, setMusicBulkStatus] = useState<string | null>(null);
   const [musicBulkInstructions, setMusicBulkInstructions] = useState('');
+  const [audioDownloadStatus, setAudioDownloadStatus] = useState<string | null>(null);
+  const [audioDownloadError, setAudioDownloadError] = useState<string | null>(null);
   const [speedRoundClipKey, setSpeedRoundClipKey] = useState<string | null>(null);
   const [speedRoundClipName, setSpeedRoundClipName] = useState('');
   const [speedRoundUploading, setSpeedRoundUploading] = useState(false);
@@ -1140,6 +1142,78 @@ export function EditionDetailPage() {
       .filter((entry): entry is { ordinal: number; parts: AnswerPart[] } => Boolean(entry));
   };
 
+  const buildAudioDownloads = () => {
+    const audioItems = items.filter((item) => item.media_type === 'audio' || item.audio_answer_key || item.media_key);
+    const keyCounts = new Map<string, number>();
+    const questionKeys = audioItems
+      .map((item) => item.media_key)
+      .filter((key): key is string => Boolean(key));
+    const answerKeys = audioItems
+      .map((item) => item.audio_answer_key)
+      .filter((key): key is string => Boolean(key));
+    [...questionKeys, ...answerKeys].forEach((key) => {
+      keyCounts.set(key, (keyCounts.get(key) ?? 0) + 1);
+    });
+
+    const padOrdinal = (value: number) => String(value).padStart(2, '0');
+    const downloads: Array<{ key: string; filename: string }> = [];
+    const seen = new Set<string>();
+
+    audioItems.forEach((item) => {
+      const ordinal = typeof item.ordinal === 'number' ? item.ordinal : 0;
+      if (item.media_key) {
+        if (!seen.has(item.media_key)) {
+          seen.add(item.media_key);
+          const isShared = (keyCounts.get(item.media_key) ?? 0) > 1;
+          const filename = isShared
+            ? 'speed-round.mp3'
+            : `${padOrdinal(ordinal || 1)}-question.mp3`;
+          downloads.push({ key: item.media_key, filename });
+        }
+      }
+      if (item.audio_answer_key) {
+        if (!seen.has(item.audio_answer_key)) {
+          seen.add(item.audio_answer_key);
+          const filename = `A${padOrdinal(ordinal || 1)}-answer.mp3`;
+          downloads.push({ key: item.audio_answer_key, filename });
+        }
+      }
+    });
+
+    return downloads;
+  };
+
+  const downloadAllAudio = async () => {
+    const downloads = buildAudioDownloads();
+    if (downloads.length === 0) {
+      setAudioDownloadError('No audio files found for this edition.');
+      return;
+    }
+    setAudioDownloadError(null);
+    setAudioDownloadStatus(`Downloading 0 of ${downloads.length}`);
+    for (let index = 0; index < downloads.length; index += 1) {
+      const entry = downloads[index];
+      try {
+        const res = await fetch(api.mediaUrl(entry.key));
+        if (!res.ok) throw new Error('Download failed');
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = entry.filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
+      } catch {
+        setAudioDownloadError(`Failed to download ${entry.filename}.`);
+      }
+      setAudioDownloadStatus(`Downloading ${index + 1} of ${downloads.length}`);
+      await new Promise((resolve) => setTimeout(resolve, 150));
+    }
+    setAudioDownloadStatus(null);
+  };
+
   const handleSpeedRoundUpload = async (file: File) => {
     const isMp3 = file.type === 'audio/mpeg' || file.name.toLowerCase().endsWith('.mp3');
     if (!isMp3) {
@@ -1592,11 +1666,22 @@ export function EditionDetailPage() {
               )}
             </div>
           )}
-          {gameTypeId === 'music' && (
+          {(gameTypeId === 'music' || gameTypeId === 'audio') && (
             <div className="mb-4 border-2 border-border bg-panel2 p-3">
-              <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">
-                {hasMusicTemplate ? 'Music Template Setup' : 'Music Bulk Upload'}
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">
+                  {hasMusicTemplate ? 'Music Template Setup' : 'Music Bulk Upload'}
+                </div>
+                <SecondaryButton className="px-3 py-2 text-xs" onClick={downloadAllAudio}>
+                  Download all MP3s
+                </SecondaryButton>
               </div>
+              {audioDownloadStatus && (
+                <div className="mt-2 text-xs uppercase tracking-[0.2em] text-muted">{audioDownloadStatus}</div>
+              )}
+              {audioDownloadError && (
+                <div className="mt-2 text-xs uppercase tracking-[0.2em] text-danger">{audioDownloadError}</div>
+              )}
               {hasMusicTemplate ? (
                 <div className="mt-3 flex flex-col gap-3">
                   <div className="text-[10px] uppercase tracking-[0.2em] text-muted">
