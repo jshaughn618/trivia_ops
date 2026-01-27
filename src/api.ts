@@ -14,6 +14,9 @@ import type {
 } from './types';
 import { createRequestId, logError, logInfo, logWarn } from './lib/log';
 
+type AnswerPartPayload = { label: string; answer: string };
+type EditionItemPayload = Partial<EditionItem> & { answer_parts_json?: AnswerPartPayload[] };
+
 async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<ApiEnvelope<T>> {
   const requestId = createRequestId();
   const method = (options.method ?? 'GET').toUpperCase();
@@ -135,12 +138,12 @@ export const api = {
   deleteEdition: (id: string) => apiFetch<{ ok: true }>(`/api/editions/${id}`, { method: 'DELETE' }),
   listEditionItems: (editionId: string) =>
     apiFetch<EditionItem[]>(`/api/editions/${editionId}/items`),
-  createEditionItem: (editionId: string, payload: Partial<EditionItem>) =>
+  createEditionItem: (editionId: string, payload: EditionItemPayload) =>
     apiFetch<EditionItem>(`/api/editions/${editionId}/items`, {
       method: 'POST',
       body: JSON.stringify(payload)
     }),
-  updateEditionItem: (itemId: string, payload: Partial<EditionItem>) =>
+  updateEditionItem: (itemId: string, payload: EditionItemPayload) =>
     apiFetch<EditionItem>(`/api/edition-items/${itemId}`, {
       method: 'PUT',
       body: JSON.stringify(payload)

@@ -103,6 +103,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
     answer_b: string | null;
     answer_a_label: string | null;
     answer_b_label: string | null;
+    answer_parts_json: string | null;
     fun_fact: string | null;
     media_type: string | null;
     media_key: string | null;
@@ -128,6 +129,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
         answer_b: string | null;
         answer_a_label: string | null;
         answer_b_label: string | null;
+        answer_parts_json: string | null;
         fun_fact: string | null;
         media_type: string | null;
         media_key: string | null;
@@ -145,6 +147,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
           ei.answer_b,
           ei.answer_a_label,
           ei.answer_b_label,
+          ei.answer_parts_json,
           COALESCE(eri.overridden_fun_fact, ei.fun_fact) AS fun_fact,
           ei.media_type,
           ei.media_key,
@@ -177,6 +180,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
         ei.answer_b,
         ei.answer_a_label,
         ei.answer_b_label,
+        ei.answer_parts_json,
        COALESCE(eri.overridden_fun_fact, ei.fun_fact) AS fun_fact,
        ei.media_type,
        ei.media_key,

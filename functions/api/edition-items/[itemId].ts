@@ -24,10 +24,13 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
   const choicesJson = parsed.data.choices_json
     ? JSON.stringify(parsed.data.choices_json)
     : merged.choices_json ?? null;
+  const answerPartsJson = parsed.data.answer_parts_json
+    ? JSON.stringify(parsed.data.answer_parts_json)
+    : merged.answer_parts_json ?? null;
   await execute(
     env,
     `UPDATE edition_items
-     SET question_type = ?, choices_json = ?, prompt = ?, answer = ?, answer_a = ?, answer_b = ?, answer_a_label = ?, answer_b_label = ?, fun_fact = ?, ordinal = ?, media_type = ?, media_key = ?, audio_answer_key = ?, media_caption = ?
+     SET question_type = ?, choices_json = ?, prompt = ?, answer = ?, answer_a = ?, answer_b = ?, answer_a_label = ?, answer_b_label = ?, answer_parts_json = ?, fun_fact = ?, ordinal = ?, media_type = ?, media_key = ?, audio_answer_key = ?, media_caption = ?
      WHERE id = ?`,
     [
       questionType,
@@ -38,6 +41,7 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
       merged.answer_b ?? null,
       merged.answer_a_label ?? null,
       merged.answer_b_label ?? null,
+      answerPartsJson,
       merged.fun_fact ?? null,
       merged.ordinal,
       merged.media_type ?? null,

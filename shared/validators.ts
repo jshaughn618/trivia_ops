@@ -68,6 +68,14 @@ const editionItemBaseSchema = z.object({
   answer_b: z.string().min(1).nullable().optional(),
   answer_a_label: z.string().min(1).nullable().optional(),
   answer_b_label: z.string().min(1).nullable().optional(),
+  answer_parts_json: z
+    .array(
+      z.object({
+        label: z.string().min(1),
+        answer: z.string().min(1)
+      })
+    )
+    .optional(),
   fun_fact: z.string().nullable().optional(),
   ordinal: z.number().int().min(0),
   media_type: z.enum(['image', 'audio']).nullable().optional(),
@@ -78,6 +86,13 @@ const editionItemBaseSchema = z.object({
 
 export const editionItemCreateSchema = editionItemBaseSchema
   .refine((data) => {
+    if (!data.answer_parts_json) return true;
+    return data.answer_parts_json.length > 0;
+  }, {
+    message: 'Answer parts must include at least one entry.',
+    path: ['answer_parts_json']
+  })
+  .refine((data) => {
     if (data.media_type === 'audio') return true;
     return data.prompt.trim().length > 0;
   }, {
@@ -85,10 +100,11 @@ export const editionItemCreateSchema = editionItemBaseSchema
     path: ['prompt']
   })
   .refine((data) => {
+    const hasAnswerParts = Boolean(data.answer_parts_json && data.answer_parts_json.length > 0);
     if (data.media_type === 'image') {
-      return Boolean(data.answer);
+      return Boolean(data.answer) || hasAnswerParts;
     }
-    return Boolean(data.answer) || (Boolean(data.answer_a) && Boolean(data.answer_b));
+    return hasAnswerParts || Boolean(data.answer) || (Boolean(data.answer_a) && Boolean(data.answer_b));
   }, {
     message: 'Provide an answer or both answer_a and answer_b',
     path: ['answer']
@@ -111,6 +127,7 @@ export const editionItemUpdateSchema = editionItemBaseSchema
       data.question_type !== undefined ||
       data.choices_json !== undefined ||
       data.prompt !== undefined ||
+      data.answer_parts_json !== undefined ||
       data.fun_fact !== undefined ||
       data.ordinal !== undefined ||
       data.media_type !== undefined ||

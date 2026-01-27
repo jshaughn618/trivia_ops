@@ -31,6 +31,27 @@ const parseChoices = (choicesJson?: string | null) => {
   return [];
 };
 
+type AnswerPart = { label: string; answer: string };
+
+const parseAnswerParts = (value?: string | null): AnswerPart[] => {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map((entry) => {
+        if (!entry || typeof entry !== 'object') return null;
+        const label = typeof entry.label === 'string' ? entry.label : '';
+        const answer = typeof entry.answer === 'string' ? entry.answer : '';
+        if (!label || !answer) return null;
+        return { label, answer } as AnswerPart;
+      })
+      .filter((part): part is AnswerPart => Boolean(part));
+  } catch {
+    return [];
+  }
+};
+
 type PublicEventResponse = {
   event: {
     id: string;
@@ -66,6 +87,7 @@ type PublicEventResponse = {
     answer_b: string | null;
     answer_a_label: string | null;
     answer_b_label: string | null;
+    answer_parts_json: string | null;
     fun_fact: string | null;
     media_type: string | null;
     media_key: string | null;
@@ -81,6 +103,7 @@ type PublicEventResponse = {
     answer_b: string | null;
     answer_a_label: string | null;
     answer_b_label: string | null;
+    answer_parts_json: string | null;
     fun_fact: string | null;
     media_type: string | null;
     media_key: string | null;
@@ -455,9 +478,12 @@ export function PlayEventPage() {
     : activeRound && data.live?.current_item_ordinal
       ? `Round ${activeRound.round_number} • Question ${data.live.current_item_ordinal}`
       : 'Question';
-  const answerText = displayItem?.answer || (displayItem?.answer_a && displayItem?.answer_b
-    ? `${displayItem.answer_a_label ? `${displayItem.answer_a_label}: ` : 'A: '}${displayItem.answer_a} / ${displayItem.answer_b_label ? `${displayItem.answer_b_label}: ` : 'B: '}${displayItem.answer_b}`
-    : null);
+  const answerParts = parseAnswerParts(displayItem?.answer_parts_json);
+  const answerText = answerParts.length > 0
+    ? answerParts.map((part) => `${part.label}: ${part.answer}`).join(' / ')
+    : displayItem?.answer || (displayItem?.answer_a && displayItem?.answer_b
+      ? `${displayItem.answer_a_label ? `${displayItem.answer_a_label}: ` : 'A: '}${displayItem.answer_a} / ${displayItem.answer_b_label ? `${displayItem.answer_b_label}: ` : 'B: '}${displayItem.answer_b}`
+      : null);
   const promptText = displayItem?.prompt?.trim()
     ? displayItem.prompt
     : displayItem?.media_type === 'audio'

@@ -21,6 +21,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params, data }) =>
       ei.answer_b,
       ei.answer_a_label,
       ei.answer_b_label,
+      ei.answer_parts_json,
       COALESCE(eri.overridden_fun_fact, ei.fun_fact) AS fun_fact,
       eri.ordinal AS ordinal,
       ei.media_type,

@@ -31,11 +31,12 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request, 
 
   const questionType = payloadData.question_type ?? 'text';
   const choicesJson = payloadData.choices_json ? JSON.stringify(payloadData.choices_json) : null;
+  const answerPartsJson = payloadData.answer_parts_json ? JSON.stringify(payloadData.answer_parts_json) : null;
   await execute(
     env,
     `INSERT INTO edition_items
-     (id, edition_id, question_type, choices_json, prompt, answer, answer_a, answer_b, answer_a_label, answer_b_label, fun_fact, ordinal, media_type, media_key, audio_answer_key, media_caption, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+     (id, edition_id, question_type, choices_json, prompt, answer, answer_a, answer_b, answer_a_label, answer_b_label, answer_parts_json, fun_fact, ordinal, media_type, media_key, audio_answer_key, media_caption, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ,
     [
       id,
@@ -48,6 +49,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request, 
       payloadData.answer_b ?? null,
       payloadData.answer_a_label ?? null,
       payloadData.answer_b_label ?? null,
+      answerPartsJson,
       payloadData.fun_fact ?? null,
       payloadData.ordinal,
       payloadData.media_type ?? null,
