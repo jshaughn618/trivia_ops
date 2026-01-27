@@ -24,6 +24,16 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, data }) 
   const id = crypto.randomUUID();
   const createdAt = nowIso();
   const payloadData = parsed.data;
+  const name = payloadData.name.trim();
+
+  const duplicate = await queryFirst<{ id: string }>(
+    env,
+    'SELECT id FROM games WHERE lower(name) = lower(?) AND COALESCE(deleted, 0) = 0',
+    [name]
+  );
+  if (duplicate) {
+    return jsonError({ code: 'conflict', message: 'Game name already exists.' }, 409);
+  }
 
   const gameType = await queryFirst<{ default_settings_json: string | null }>(
     env,
@@ -40,7 +50,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, data }) 
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id,
-      payloadData.name,
+      name,
       payloadData.game_type_id,
       payloadData.description ?? null,
       payloadData.subtype ?? null,

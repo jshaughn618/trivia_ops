@@ -23,6 +23,7 @@ export function GameDetailPage() {
   const [showTheme, setShowTheme] = useState(true);
   const [descLoading, setDescLoading] = useState(false);
   const [descError, setDescError] = useState<string | null>(null);
+  const [updateError, setUpdateError] = useState<string | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -48,6 +49,7 @@ export function GameDetailPage() {
 
   const handleUpdate = async () => {
     if (!gameId) return;
+    setUpdateError(null);
     const res = await api.updateGame(gameId, {
       name,
       description,
@@ -55,7 +57,12 @@ export function GameDetailPage() {
       subtype: subtype.trim() || null,
       show_theme: showTheme
     });
-    if (res.ok) setGame(res.data);
+    if (res.ok) {
+      setGame(res.data);
+      setUpdateError(null);
+    } else {
+      setUpdateError(res.error.message);
+    }
   };
 
   const generateDescription = async () => {
@@ -161,6 +168,11 @@ export function GameDetailPage() {
               />
               Show theme when presenting
             </label>
+            {updateError && (
+              <div className="border border-danger bg-panel2 px-3 py-2 text-xs text-danger-ink">
+                {updateError}
+              </div>
+            )}
             <div className="flex flex-wrap items-center gap-2">
               <PrimaryButton onClick={handleUpdate}>Update</PrimaryButton>
               <DangerButton onClick={handleDelete}>Delete</DangerButton>

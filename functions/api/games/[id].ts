@@ -30,12 +30,24 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
   }
 
   const merged = { ...existing, ...parsed.data };
+  const name = typeof merged.name === 'string' ? merged.name.trim() : '';
+  if (!name) {
+    return jsonError({ code: 'validation_error', message: 'Game name is required.' }, 400);
+  }
+  const duplicate = await queryFirst<{ id: string }>(
+    env,
+    'SELECT id FROM games WHERE lower(name) = lower(?) AND COALESCE(deleted, 0) = 0 AND id != ?',
+    [name, params.id]
+  );
+  if (duplicate) {
+    return jsonError({ code: 'conflict', message: 'Game name already exists.' }, 409);
+  }
   const showThemeValue = merged.show_theme === undefined || merged.show_theme === null ? 1 : merged.show_theme ? 1 : 0;
   await execute(
     env,
     `UPDATE games SET name = ?, game_type_id = ?, description = ?, subtype = ?, default_settings_json = ?, show_theme = ? WHERE id = ?`,
     [
-      merged.name,
+      name,
       merged.game_type_id,
       merged.description ?? null,
       merged.subtype ?? null,

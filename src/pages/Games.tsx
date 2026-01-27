@@ -36,6 +36,7 @@ export function GamesPage() {
   const [description, setDescription] = useState('');
   const [showTheme, setShowTheme] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
   const params = useMemo(() => new URLSearchParams(location.search), [location.search]);
   const createMode = params.get('create') === '1';
 
@@ -124,9 +125,7 @@ export function GamesPage() {
   }, [games, gameTypeFilterId]);
 
   const visibleGameIds = useMemo(() => {
-    return filteredGames
-      .filter((game) => (editionsByGame.get(game.id) ?? []).length > 0)
-      .map((game) => game.id);
+    return filteredGames.map((game) => game.id);
   }, [filteredGames, editionsByGame]);
 
   useEffect(() => {
@@ -143,6 +142,7 @@ export function GamesPage() {
   const handleCreate = async () => {
     if (!name.trim() || !gameTypeId) return;
     setLoading(true);
+    setCreateError(null);
     const res = await api.createGame({
       name,
       description,
@@ -157,8 +157,11 @@ export function GamesPage() {
       setGameTypeId('');
       setSubtype('');
       setShowTheme(true);
+      setCreateError(null);
       updateCreateParam(false);
       load();
+    } else {
+      setCreateError(res.error.message);
     }
   };
 
@@ -193,14 +196,19 @@ export function GamesPage() {
         )}
         <div className="grid gap-4 lg:grid-cols-[1fr,320px]">
           <Section title="Edition library">
-            {editions.length > 0 && (
+            {filteredGames.length > 0 && (
               <div className="mb-2 text-xs uppercase tracking-[0.2em] text-muted">
                 Select a game to view editions.
               </div>
             )}
-            {editions.length === 0 && (
+            {filteredGames.length > 0 && editions.length === 0 && (
+              <div className="mb-2 text-xs uppercase tracking-[0.2em] text-muted">
+                No editions match your filters.
+              </div>
+            )}
+            {filteredGames.length === 0 && (
               <div className="flex flex-col gap-2 text-sm text-muted">
-                <span>No editions match your filters.</span>
+                <span>No games match your filters.</span>
                 <button
                   type="button"
                   onClick={() => {
@@ -218,11 +226,10 @@ export function GamesPage() {
                 </button>
               </div>
             )}
-            {editions.length > 0 && (
+            {filteredGames.length > 0 && (
               <div className="divide-y divide-border">
                 {filteredGames.map((game) => {
                   const gameEditions = editionsByGame.get(game.id) ?? [];
-                  if (gameEditions.length === 0) return null;
                   const isOpen = Boolean(openGames[game.id]);
                   const editionListId = `editions-${game.id}`;
                   return (
@@ -295,6 +302,11 @@ export function GamesPage() {
                       </button>
                       {isOpen && (
                         <List id={editionListId} className="mt-1">
+                          {gameEditions.length === 0 && (
+                            <div className="px-6 py-3 text-xs uppercase tracking-[0.2em] text-muted">
+                              No editions yet.
+                            </div>
+                          )}
                           {gameEditions.map((edition) => {
                             const primaryTitle = edition.theme ?? edition.title ?? 'Untitled edition';
                             const secondary = edition.tags_csv ? `Tags: ${edition.tags_csv}` : '';
@@ -378,6 +390,11 @@ export function GamesPage() {
                     />
                     Show theme when presenting
                   </label>
+                  {createError && (
+                    <div className="border border-danger bg-panel2 px-3 py-2 text-xs text-danger-ink">
+                      {createError}
+                    </div>
+                  )}
                   <div className="flex items-center gap-2">
                     <PrimaryButton onClick={handleCreate} disabled={loading}>
                       {loading ? 'Saving' : 'Create'}

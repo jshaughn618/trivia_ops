@@ -2,7 +2,7 @@ import type { Env } from '../../../types';
 import { jsonError, jsonOk } from '../../../responses';
 import { parseJson } from '../../../request';
 import { teamCreateSchema } from '../../../../shared/validators';
-import { execute, nowIso, queryAll } from '../../../db';
+import { execute, nowIso, queryAll, queryFirst } from '../../../db';
 import { requireAdmin, requireEventAccess, requireHostOrAdmin } from '../../../access';
 
 export const onRequestGet: PagesFunction<Env> = async ({ env, params, data }) => {
@@ -30,13 +30,23 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request, 
   const id = crypto.randomUUID();
   const createdAt = nowIso();
   const payloadData = parsed.data;
+  const name = payloadData.name.trim();
+
+  const duplicate = await queryFirst<{ id: string }>(
+    env,
+    'SELECT id FROM teams WHERE event_id = ? AND lower(name) = lower(?) AND COALESCE(deleted, 0) = 0',
+    [params.id, name]
+  );
+  if (duplicate) {
+    return jsonError({ code: 'conflict', message: 'Team name already exists for this event.' }, 409);
+  }
 
   await execute(
     env,
     `INSERT INTO teams (id, event_id, name, table_label, created_at)
      VALUES (?, ?, ?, ?, ?)`
     ,
-    [id, params.id, payloadData.name, payloadData.table_label ?? null, createdAt]
+    [id, params.id, name, payloadData.table_label ?? null, createdAt]
   );
 
   const rows = await queryAll(env, 'SELECT * FROM teams WHERE id = ? AND COALESCE(deleted, 0) = 0', [id]);

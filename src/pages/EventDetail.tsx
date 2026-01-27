@@ -319,6 +319,7 @@ export function EventDetailPage() {
   const [roundEditionId, setRoundEditionId] = useState('');
   const [teamName, setTeamName] = useState('');
   const [teamTable, setTeamTable] = useState('');
+  const [teamError, setTeamError] = useState<string | null>(null);
   const [scoreRoundId, setScoreRoundId] = useState('');
   const [scoreMap, setScoreMap] = useState<Record<string, number>>({});
   const [scoreLoading, setScoreLoading] = useState(false);
@@ -594,10 +595,16 @@ export function EventDetailPage() {
 
   const createTeam = async () => {
     if (!eventId || !teamName.trim()) return;
-    await api.createTeam(eventId, { name: teamName, table_label: teamTable || null });
-    setTeamName('');
-    setTeamTable('');
-    load();
+    setTeamError(null);
+    const res = await api.createTeam(eventId, { name: teamName, table_label: teamTable || null });
+    if (res.ok) {
+      setTeamName('');
+      setTeamTable('');
+      setTeamError(null);
+      load();
+    } else {
+      setTeamError(res.error.message ?? 'Unable to create team.');
+    }
   };
 
   const deleteRound = async (roundId: string) => {
@@ -948,6 +955,11 @@ export function EventDetailPage() {
             Add team
           </SecondaryButton>
         </div>
+        {teamError && (
+          <div className="mt-2 border border-danger bg-panel2 px-3 py-2 text-xs text-danger-ink">
+            {teamError}
+          </div>
+        )}
       </div>
     </div>
   );
