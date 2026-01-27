@@ -972,6 +972,22 @@ export function EditionDetailPage() {
     return { isAnswer, ordinal, title };
   };
 
+  const parseArtistPairTitle = (title: string) => {
+    // Heuristic fallback for common music formats like "Artist 1 & Artist 2 - Song".
+    const match = /^(.*?)\s*&\s*(.*?)\s*-\s*(.+)$/.exec(title.trim());
+    if (!match) return null;
+    const artist1 = match[1]?.trim() ?? '';
+    const artist2 = match[2]?.trim() ?? '';
+    const song = match[3]?.trim() ?? '';
+    if (!artist1 || !artist2) return null;
+    const parts = sanitizeAnswerParts([
+      { label: 'Artist 1', answer: artist1 },
+      { label: 'Artist 2', answer: artist2 }
+    ]);
+    if (parts.length === 0) return null;
+    return { parts, factoid: song || null };
+  };
+
   const handleMusicBulkUpload = async (files: File[]) => {
     if (!editionId) return;
     setMusicBulkLoading(true);
@@ -1071,7 +1087,7 @@ export function EditionDetailPage() {
           aiAnswerPartsByOrdinal = parsedAi.partsByOrdinal;
           aiFunFactsByOrdinal = parsedAi.factByOrdinal;
           if (aiAnswerPartsByOrdinal.size === 0) {
-            warnings.push('AI parsing returned no valid answer parts. Using filename titles.');
+            warnings.push('AI parsing returned no valid answer parts. Using filename titles/heuristics.');
           }
         }
         setMusicBulkStatus(`Processing ${processedCount} of ${totalGroups}`);
@@ -1108,9 +1124,13 @@ export function EditionDetailPage() {
 
         const existing = itemsByOrdinal.get(ordinal);
         const aiParts = aiAnswerPartsByOrdinal.get(ordinal);
-        const answerParts = aiParts && aiParts.length > 0 ? aiParts : [{ label: 'Answer', answer: entry.title }];
+        const heuristic = parseArtistPairTitle(entry.title);
+        const answerParts =
+          aiParts && aiParts.length > 0
+            ? aiParts
+            : heuristic?.parts ?? [{ label: 'Answer', answer: entry.title }];
         const answerValue = answerParts.map((part) => part.answer).join(' / ');
-        const aiFact = aiFunFactsByOrdinal.get(ordinal);
+        const aiFact = aiFunFactsByOrdinal.get(ordinal) ?? heuristic?.factoid ?? null;
         if (existing) {
           const payload: Parameters<typeof api.updateEditionItem>[1] = {
             prompt: existing.prompt ?? '',
