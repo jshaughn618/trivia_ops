@@ -6,7 +6,6 @@ const LoginPage = lazy(() => import('./pages/Login').then((mod) => ({ default: m
 const DashboardPage = lazy(() => import('./pages/Dashboard').then((mod) => ({ default: mod.DashboardPage })));
 const GamesPage = lazy(() => import('./pages/Games').then((mod) => ({ default: mod.GamesPage })));
 const GameDetailPage = lazy(() => import('./pages/GameDetail').then((mod) => ({ default: mod.GameDetailPage })));
-const EditionsPage = lazy(() => import('./pages/Editions').then((mod) => ({ default: mod.EditionsPage })));
 const EditionNewPage = lazy(() => import('./pages/EditionNew').then((mod) => ({ default: mod.EditionNewPage })));
 const EditionDetailPage = lazy(() => import('./pages/EditionDetail').then((mod) => ({ default: mod.EditionDetailPage })));
 const EventsPage = lazy(() => import('./pages/Events').then((mod) => ({ default: mod.EventsPage })));
@@ -71,7 +70,7 @@ export function App() {
           path="/editions"
           element={
             <RequireAdmin>
-              <EditionsPage />
+              <Navigate to="/games" replace />
             </RequireAdmin>
           }
         />
