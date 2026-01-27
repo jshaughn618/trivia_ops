@@ -844,8 +844,29 @@ export function EditionDetailPage() {
     const jsonText = start >= 0 && end >= 0 ? trimmed.slice(start, end + 1) : trimmed;
     const parsed = JSON.parse(jsonText);
     if (Array.isArray(parsed)) return parsed;
-    if (parsed && typeof parsed === 'object' && Array.isArray((parsed as { items?: unknown[] }).items)) {
-      return (parsed as { items: unknown[] }).items;
+    if (parsed && typeof parsed === 'object') {
+      const objectParsed = parsed as {
+        items?: unknown[];
+        results?: unknown[];
+        data?: unknown[];
+        output?: unknown[];
+        [key: string]: unknown;
+      };
+      if (Array.isArray(objectParsed.items)) return objectParsed.items;
+      if (Array.isArray(objectParsed.results)) return objectParsed.results;
+      if (Array.isArray(objectParsed.data)) return objectParsed.data;
+      if (Array.isArray(objectParsed.output)) return objectParsed.output;
+      // Some models return an ordinal-keyed object instead of an array.
+      const ordinalEntries = Object.entries(objectParsed).filter(([key, value]) => {
+        const ordinal = Number(key);
+        return Number.isFinite(ordinal) && value && typeof value === 'object';
+      });
+      if (ordinalEntries.length > 0) {
+        return ordinalEntries.map(([key, value]) => ({
+          ordinal: Number(key),
+          ...(value as Record<string, unknown>)
+        }));
+      }
     }
     return [];
   };
