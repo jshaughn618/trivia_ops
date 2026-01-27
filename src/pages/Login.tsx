@@ -68,6 +68,7 @@ export function LoginPage() {
     <div className="min-h-screen bg-bg text-text flex items-center justify-center px-4">
       <div className="w-full max-w-md border-2 border-border bg-panel p-6">
         <img src={logo} alt="Trivia Ops" className="h-16 w-auto" />
+        <div className="mt-2 text-sm leading-tight text-muted">The command center for live trivia fun.</div>
         <div className="mt-4">
           <div className="text-3xl font-display tracking-tight">Join game</div>
           <div className="mt-2 text-sm text-muted">Enter the 4-digit code from your host</div>
