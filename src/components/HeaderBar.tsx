@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import { useAuth } from '../auth';
 import { useTheme } from '../lib/theme';
@@ -14,10 +14,23 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
 
 export function HeaderBar() {
   const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
   const auth = useAuth();
   const isAdmin = auth.user?.user_type === 'admin';
   const { theme } = useTheme();
   const logo = theme === 'light' ? logoLight : logoDark;
+
+  useEffect(() => {
+    if (!open) return;
+    const handleOutside = (event: MouseEvent) => {
+      const target = event.target as Node | null;
+      if (menuRef.current && target && !menuRef.current.contains(target)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutside);
+    return () => document.removeEventListener('mousedown', handleOutside);
+  }, [open]);
 
   return (
     <header className="relative z-50 border-b border-border bg-panel px-4 py-3">
@@ -39,7 +52,7 @@ export function HeaderBar() {
               Events
             </NavLink>
           </nav>
-          <div className="relative">
+          <div className="relative" ref={menuRef}>
             <button
               type="button"
               onClick={() => setOpen((prev) => !prev)}
