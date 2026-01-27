@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import QRCode from 'qrcode';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { api } from '../api';
-import logoDark from '../assets/trivia_ops_logo_dark.png';
+import logoLight from '../assets/trivia_ops_logo_light.png';
 import { AppShell } from '../components/AppShell';
 import { PrimaryButton, SecondaryButton, DangerButton, ButtonLink, TextLink } from '../components/Buttons';
 import { Section } from '../components/Section';
@@ -280,9 +280,9 @@ const renderExtrasBlock = (
   }
 ) => {
   const padding = CELL_PADDING;
-  const textSize = 9;
+  const textSize = 11;
   const upcomingTitleSize = 10.5;
-  const upcomingTextSize = 10;
+  const upcomingTextSize = 11;
   let cursorY = cell.y + cell.height - padding;
 
   if (extras.logoImage) {
@@ -337,6 +337,10 @@ const renderExtrasBlock = (
     });
     cursorY -= upcomingTitleSize + 8;
     upcoming.forEach((line) => {
+      if (!line.trim()) {
+        cursorY -= upcomingTextSize + 8;
+        return;
+      }
       page.drawText(line, {
         x: cell.x + padding,
         y: cursorY - upcomingTextSize,
@@ -847,6 +851,15 @@ export function EventDetailPage() {
         const eventsRes = await api.listEvents();
         if (eventsRes.ok) {
           const now = Date.now();
+          const formatUpcoming = (date: Date) => {
+            const dateLine = date.toLocaleDateString(undefined, {
+              weekday: 'short',
+              month: 'short',
+              day: 'numeric'
+            });
+            const startTime = date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+            return { dateLine: `${dateLine}`, timeLine: `${startTime}` };
+          };
           upcomingLines = eventsRes.data
             .filter(
               (candidate) =>
@@ -856,7 +869,12 @@ export function EventDetailPage() {
             )
             .sort((a, b) => a.starts_at.localeCompare(b.starts_at))
             .slice(0, 2)
-            .map((candidate) => `${candidate.event_type} • ${new Date(candidate.starts_at).toLocaleString()}`);
+            .flatMap((candidate, index) => {
+              const start = new Date(candidate.starts_at);
+              const lines = formatUpcoming(start);
+              const block = [candidate.event_type, `${lines.dateLine} ${lines.timeLine}`];
+              return index === 0 ? block.concat(['']) : block;
+            });
         }
       }
       let qrDataUrl: string | undefined;
@@ -870,7 +888,7 @@ export function EventDetailPage() {
       }
       let logoBytes: Uint8Array | undefined;
       try {
-        const logoRes = await fetch(logoDark);
+        const logoRes = await fetch(logoLight);
         if (logoRes.ok) {
           const buffer = await logoRes.arrayBuffer();
           logoBytes = new Uint8Array(buffer);
