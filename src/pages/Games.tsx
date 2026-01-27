@@ -18,6 +18,7 @@ export function GamesPage() {
   const [locations, setLocations] = useState<Location[]>([]);
   const [gameTypes, setGameTypes] = useState<GameType[]>([]);
   const [gameId, setGameId] = useState('');
+  const [gameTypeFilterId, setGameTypeFilterId] = useState('');
   const [status, setStatus] = useState('');
   const [tag, setTag] = useState('');
   const [locationId, setLocationId] = useState('');
@@ -35,8 +36,10 @@ export function GamesPage() {
   const createMode = params.get('create') === '1';
 
   const activeFilterCount = useMemo(() => {
-    return [gameId, status, tag, locationId, search].filter((value) => value && value.trim().length > 0).length;
-  }, [gameId, status, tag, locationId, search]);
+    return [gameId, gameTypeFilterId, status, tag, locationId, search]
+      .filter((value) => value && value.trim().length > 0)
+      .length;
+  }, [gameId, gameTypeFilterId, status, tag, locationId, search]);
 
   const updateCreateParam = (next: boolean) => {
     const nextParams = new URLSearchParams(location.search);
@@ -111,11 +114,16 @@ export function GamesPage() {
     return map;
   }, [editions]);
 
+  const filteredGames = useMemo(() => {
+    if (!gameTypeFilterId) return games;
+    return games.filter((game) => game.game_type_id === gameTypeFilterId);
+  }, [games, gameTypeFilterId]);
+
   const visibleGameIds = useMemo(() => {
-    return games
+    return filteredGames
       .filter((game) => (editionsByGame.get(game.id) ?? []).length > 0)
       .map((game) => game.id);
-  }, [games, editionsByGame]);
+  }, [filteredGames, editionsByGame]);
 
   useEffect(() => {
     setOpenGames((prev) => {
@@ -193,6 +201,7 @@ export function GamesPage() {
                   type="button"
                   onClick={() => {
                     setGameId('');
+                    setGameTypeFilterId('');
                     setStatus('');
                     setTag('');
                     setLocationId('');
@@ -207,7 +216,7 @@ export function GamesPage() {
             )}
             {editions.length > 0 && (
               <div className="divide-y divide-border">
-                {games.map((game) => {
+                {filteredGames.map((game) => {
                   const gameEditions = editionsByGame.get(game.id) ?? [];
                   if (gameEditions.length === 0) return null;
                   const isOpen = Boolean(openGames[game.id]);
@@ -399,6 +408,21 @@ export function GamesPage() {
                   </select>
                 </label>
                 <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+                  Game type
+                  <select
+                    className="h-10 px-3"
+                    value={gameTypeFilterId}
+                    onChange={(event) => setGameTypeFilterId(event.target.value)}
+                  >
+                    <option value="">All</option>
+                    {gameTypes.map((type) => (
+                      <option key={type.id} value={type.id}>
+                        {type.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
                   Status
                   <select className="h-10 px-3" value={status} onChange={(event) => setStatus(event.target.value)}>
                     <option value="">All</option>
@@ -428,6 +452,7 @@ export function GamesPage() {
                     type="button"
                     onClick={() => {
                       setGameId('');
+                      setGameTypeFilterId('');
                       setStatus('');
                       setTag('');
                       setLocationId('');
