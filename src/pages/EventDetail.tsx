@@ -35,8 +35,7 @@ const safeFileName = (value: string, fallback: string) => {
 };
 
 const roundTitle = (round: EventRound) => {
-  const title = round.scoresheet_title?.trim() || round.label;
-  return title ? `Round ${round.round_number} ${title}` : `Round ${round.round_number}`;
+  return `${round.round_number}.`;
 };
 
 const answerLabel = (items: EditionItem[], key: 'a' | 'b') => {
@@ -857,6 +856,9 @@ export function EventDetailPage() {
                           onChange={(event) =>
                             setScoresheetTitles((prev) => ({ ...prev, [round.id]: event.target.value }))
                           }
+                          onKeyDown={(event) => {
+                            event.stopPropagation();
+                          }}
                         />
                         <SecondaryButton
                           className="px-3 py-2 text-xs"
