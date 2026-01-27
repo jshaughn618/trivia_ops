@@ -31,6 +31,8 @@ const defaultMusicAnswerParts: AnswerPart[] = [
   { label: 'Song', answer: '' },
   { label: 'Artist', answer: '' }
 ];
+const MUSIC_AI_PARSE_LIMIT = 60;
+const MUSIC_AI_INSTRUCTION_LIMIT = 600;
 
 const parseChoices = (choicesJson: string | null) => {
   if (!choicesJson) return ['', '', '', ''];
@@ -139,6 +141,7 @@ export function EditionDetailPage() {
   const [musicBulkError, setMusicBulkError] = useState<string | null>(null);
   const [musicBulkResult, setMusicBulkResult] = useState<string | null>(null);
   const [musicBulkStatus, setMusicBulkStatus] = useState<string | null>(null);
+  const [musicBulkInstructions, setMusicBulkInstructions] = useState('');
   const [activeItemId, setActiveItemId] = useState<string | null>(null);
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [itemMenuId, setItemMenuId] = useState<string | null>(null);
@@ -834,6 +837,46 @@ export function EditionDetailPage() {
     load();
   };
 
+  const parseAiJsonArray = (text: string) => {
+    const trimmed = text.trim().replace(/^```json/i, '').replace(/^```/i, '').replace(/```$/, '').trim();
+    const start = trimmed.indexOf('[');
+    const end = trimmed.lastIndexOf(']');
+    const jsonText = start >= 0 && end >= 0 ? trimmed.slice(start, end + 1) : trimmed;
+    const parsed = JSON.parse(jsonText);
+    if (Array.isArray(parsed)) return parsed;
+    if (parsed && typeof parsed === 'object' && Array.isArray((parsed as { items?: unknown[] }).items)) {
+      return (parsed as { items: unknown[] }).items;
+    }
+    return [];
+  };
+
+  const parseAiAnswerPartsResponse = (text: string, validOrdinals: Set<number>) => {
+    let parsed: unknown[] = [];
+    try {
+      parsed = parseAiJsonArray(text);
+    } catch {
+      return new Map<number, AnswerPart[]>();
+    }
+    const map = new Map<number, AnswerPart[]>();
+    for (const entry of parsed) {
+      if (!entry || typeof entry !== 'object') continue;
+      const ordinal = Number((entry as { ordinal?: unknown }).ordinal);
+      if (!Number.isFinite(ordinal) || !validOrdinals.has(ordinal)) continue;
+      const rawParts = (entry as { parts?: unknown }).parts;
+      if (!Array.isArray(rawParts)) continue;
+      const parts = sanitizeAnswerParts(
+        rawParts.map((part) => {
+          if (!part || typeof part !== 'object') return { label: '', answer: '' };
+          const label = typeof (part as { label?: unknown }).label === 'string' ? (part as { label: string }).label : '';
+          const answer = typeof (part as { answer?: unknown }).answer === 'string' ? (part as { answer: string }).answer : '';
+          return { label, answer };
+        })
+      );
+      if (parts.length > 0) map.set(ordinal, parts);
+    }
+    return map;
+  };
+
   const parseMusicFilename = (file: File) => {
     const name = file.name.replace(/\.[^/.]+$/, '').trim();
     const match = /^([Aa])?(\d{1,3})\s*[-_ ]?\s*(.*)$/.exec(name);
@@ -854,6 +897,7 @@ export function EditionDetailPage() {
 
     const groups = new Map<number, { question?: File; answer?: File; title?: string }>();
     const errors: string[] = [];
+    const warnings: string[] = [];
     if (files.length === 0) {
       setMusicBulkError('No files selected.');
       setMusicBulkLoading(false);
@@ -901,8 +945,52 @@ export function EditionDetailPage() {
 
     const sorted = [...groups.entries()].sort((a, b) => a[0] - b[0]);
     const totalGroups = sorted.length;
+    const instructionsRaw = musicBulkInstructions.trim();
+    const instructions = instructionsRaw.slice(0, MUSIC_AI_INSTRUCTION_LIMIT);
+    const validOrdinals = new Set(sorted.map(([ordinal]) => ordinal));
+    let aiAnswerPartsByOrdinal = new Map<number, AnswerPart[]>();
     let processedCount = 0;
     setMusicBulkStatus(`Processing ${processedCount} of ${totalGroups}`);
+
+    if (instructions) {
+      if (instructionsRaw.length > instructions.length) {
+        warnings.push(`Instructions truncated to ${MUSIC_AI_INSTRUCTION_LIMIT} characters.`);
+      }
+      if (totalGroups > MUSIC_AI_PARSE_LIMIT) {
+        warnings.push(`AI parsing skipped for more than ${MUSIC_AI_PARSE_LIMIT} items.`);
+      } else {
+        setMusicBulkStatus(`Processing ${processedCount} of ${totalGroups} (parsing answers...)`);
+        const aiItems = sorted.map(([ordinal, entry]) => ({
+          ordinal,
+          title: entry.title ?? '',
+          question_filename: entry.question?.name ?? '',
+          answer_filename: entry.answer?.name ?? null
+        }));
+        const aiPrompt = [
+          'Parse music trivia filenames into labeled answer parts.',
+          `Instructions:\n${instructions}`,
+          'Return ONLY valid JSON array in this format:',
+          '[{"ordinal":1,"parts":[{"label":"Song","answer":"..."},{"label":"Artist","answer":"..."}]}]',
+          'Rules:',
+          '- Use only the provided ordinals.',
+          '- Each part must include both label and answer.',
+          '- If unsure, return one part: {"label":"Answer","answer":"<title>"} using the title field.',
+          `Items:\n${JSON.stringify(aiItems, null, 2)}`
+        ].join('\n\n');
+        const aiMaxTokens = Math.min(1200, 200 + totalGroups * 40);
+        const aiRes = await api.aiGenerate({ prompt: aiPrompt, max_output_tokens: aiMaxTokens });
+        if (!aiRes.ok) {
+          warnings.push(`AI parsing failed: ${aiRes.error.message.slice(0, 160)}`);
+        } else {
+          aiAnswerPartsByOrdinal = parseAiAnswerPartsResponse(aiRes.data.text, validOrdinals);
+          if (aiAnswerPartsByOrdinal.size === 0) {
+            warnings.push('AI parsing returned no valid answer parts. Using filename titles.');
+          }
+        }
+        setMusicBulkStatus(`Processing ${processedCount} of ${totalGroups}`);
+      }
+    }
+
     for (const [ordinal, entry] of sorted) {
       try {
         if (!entry.question) {
@@ -932,11 +1020,13 @@ export function EditionDetailPage() {
         }
 
         const existing = itemsByOrdinal.get(ordinal);
-        const answerParts = [{ label: 'Answer', answer: entry.title }];
+        const aiParts = aiAnswerPartsByOrdinal.get(ordinal);
+        const answerParts = aiParts && aiParts.length > 0 ? aiParts : [{ label: 'Answer', answer: entry.title }];
+        const answerValue = answerParts.map((part) => part.answer).join(' / ');
         if (existing) {
           const res = await api.updateEditionItem(existing.id, {
             prompt: existing.prompt ?? '',
-            answer: entry.title,
+            answer: answerValue,
             answer_parts_json: answerParts,
             media_type: 'audio',
             media_key: questionKey,
@@ -946,7 +1036,7 @@ export function EditionDetailPage() {
         } else {
           const res = await api.createEditionItem(editionId, {
             prompt: '',
-            answer: entry.title,
+            answer: answerValue,
             answer_parts_json: answerParts,
             media_type: 'audio',
             media_key: questionKey,
@@ -961,8 +1051,9 @@ export function EditionDetailPage() {
       }
     }
 
-    if (errors.length > 0) {
-      setMusicBulkError(errors.join(' • '));
+    const messages = [...warnings, ...errors];
+    if (messages.length > 0) {
+      setMusicBulkError(messages.join(' • '));
     }
     if (created || updated) {
       setMusicBulkResult(`Created ${created} • Updated ${updated}`);
@@ -1106,6 +1197,18 @@ export function EditionDetailPage() {
               <div className="mt-2 text-[10px] uppercase tracking-[0.2em] text-muted">
                 Upload MP3s named like “01 - Song Name.mp3” and “A01 - Song Name.mp3”.
               </div>
+              <label className="mt-3 flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+                Parse instructions (optional)
+                <textarea
+                  className="min-h-[84px] px-3 py-2"
+                  value={musicBulkInstructions}
+                  onChange={(event) => setMusicBulkInstructions(event.target.value)}
+                  placeholder="Example: Titles look like 'Song - Artist - Movie'. Create answer parts Song, Artist, Movie."
+                />
+                <span className="text-[10px] normal-case tracking-[0.2em] text-muted">
+                  If provided, AI will parse answer parts before processing uploads.
+                </span>
+              </label>
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <input
                   ref={musicUploadRef}
