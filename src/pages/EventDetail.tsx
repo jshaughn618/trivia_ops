@@ -35,7 +35,8 @@ const safeFileName = (value: string, fallback: string) => {
 };
 
 const roundTitle = (round: EventRound) => {
-  return `${round.round_number}.`;
+  const title = round.scoresheet_title?.trim();
+  return title ? `${round.round_number}. ${title}` : `${round.round_number}.`;
 };
 
 const answerLabel = (items: EditionItem[], key: 'a' | 'b') => {
