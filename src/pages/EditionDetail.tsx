@@ -855,26 +855,89 @@ export function EditionDetailPage() {
     try {
       parsed = parseAiJsonArray(text);
     } catch {
-      return new Map<number, AnswerPart[]>();
+      return { partsByOrdinal: new Map<number, AnswerPart[]>(), factByOrdinal: new Map<number, string>() };
     }
-    const map = new Map<number, AnswerPart[]>();
+    const partsByOrdinal = new Map<number, AnswerPart[]>();
+    const factByOrdinal = new Map<number, string>();
+    const reservedKeys = new Set([
+      'ordinal',
+      'id',
+      'parts',
+      'answer_parts',
+      'answer_parts_json',
+      'answers',
+      'title',
+      'question_filename',
+      'answer_filename',
+      'song',
+      'track',
+      'factoid',
+      'fun_fact',
+      'fact'
+    ]);
+    const normalizeLabel = (value: string) =>
+      value
+        .replace(/[_-]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .replace(/\b\w/g, (char) => char.toUpperCase());
+    const partsFromUnknown = (raw: unknown): AnswerPart[] => {
+      if (Array.isArray(raw)) {
+        return sanitizeAnswerParts(
+          raw.map((part, index) => {
+            if (typeof part === 'string') {
+              return { label: `Answer ${index + 1}`, answer: part };
+            }
+            if (!part || typeof part !== 'object') return { label: '', answer: '' };
+            const label = typeof (part as { label?: unknown }).label === 'string' ? (part as { label: string }).label : '';
+            const answer =
+              typeof (part as { answer?: unknown }).answer === 'string' ? (part as { answer: string }).answer : '';
+            if (label && answer) return { label, answer };
+            const entries = Object.entries(part as Record<string, unknown>).filter(([, value]) => typeof value === 'string');
+            if (entries.length === 1) {
+              const [key, value] = entries[0];
+              return { label: normalizeLabel(key), answer: String(value) };
+            }
+            return { label: '', answer: '' };
+          })
+        );
+      }
+      if (raw && typeof raw === 'object') {
+        const entries = Object.entries(raw as Record<string, unknown>).filter(([, value]) => typeof value === 'string');
+        return sanitizeAnswerParts(entries.map(([key, value]) => ({ label: normalizeLabel(key), answer: String(value) })));
+      }
+      return [];
+    };
     for (const entry of parsed) {
       if (!entry || typeof entry !== 'object') continue;
       const ordinal = Number((entry as { ordinal?: unknown }).ordinal);
       if (!Number.isFinite(ordinal) || !validOrdinals.has(ordinal)) continue;
-      const rawParts = (entry as { parts?: unknown }).parts;
-      if (!Array.isArray(rawParts)) continue;
-      const parts = sanitizeAnswerParts(
-        rawParts.map((part) => {
-          if (!part || typeof part !== 'object') return { label: '', answer: '' };
-          const label = typeof (part as { label?: unknown }).label === 'string' ? (part as { label: string }).label : '';
-          const answer = typeof (part as { answer?: unknown }).answer === 'string' ? (part as { answer: string }).answer : '';
-          return { label, answer };
-        })
-      );
-      if (parts.length > 0) map.set(ordinal, parts);
+      const rawEntry = entry as Record<string, unknown>;
+      const rawParts =
+        rawEntry.parts ??
+        rawEntry.answer_parts ??
+        rawEntry.answer_parts_json ??
+        rawEntry.answers;
+      let parts = partsFromUnknown(rawParts);
+      if (parts.length === 0) {
+        const inferredParts = Object.entries(rawEntry)
+          .filter(([key, value]) => !reservedKeys.has(key) && typeof value === 'string')
+          .map(([key, value]) => ({ label: normalizeLabel(key), answer: String(value) }));
+        parts = sanitizeAnswerParts(inferredParts);
+      }
+      if (parts.length > 0) partsByOrdinal.set(ordinal, parts);
+      const factoidCandidate =
+        (typeof rawEntry.factoid === 'string' && rawEntry.factoid) ||
+        (typeof rawEntry.fun_fact === 'string' && rawEntry.fun_fact) ||
+        (typeof rawEntry.fact === 'string' && rawEntry.fact) ||
+        (typeof rawEntry.song === 'string' && rawEntry.song) ||
+        (typeof rawEntry.track === 'string' && rawEntry.track);
+      if (factoidCandidate) {
+        const factoid = factoidCandidate.trim();
+        if (factoid) factByOrdinal.set(ordinal, factoid);
+      }
     }
-    return map;
+    return { partsByOrdinal, factByOrdinal };
   };
 
   const parseMusicFilename = (file: File) => {
@@ -949,6 +1012,7 @@ export function EditionDetailPage() {
     const instructions = instructionsRaw.slice(0, MUSIC_AI_INSTRUCTION_LIMIT);
     const validOrdinals = new Set(sorted.map(([ordinal]) => ordinal));
     let aiAnswerPartsByOrdinal = new Map<number, AnswerPart[]>();
+    let aiFunFactsByOrdinal = new Map<number, string>();
     let processedCount = 0;
     setMusicBulkStatus(`Processing ${processedCount} of ${totalGroups}`);
 
@@ -982,7 +1046,9 @@ export function EditionDetailPage() {
         if (!aiRes.ok) {
           warnings.push(`AI parsing failed: ${aiRes.error.message.slice(0, 160)}`);
         } else {
-          aiAnswerPartsByOrdinal = parseAiAnswerPartsResponse(aiRes.data.text, validOrdinals);
+          const parsedAi = parseAiAnswerPartsResponse(aiRes.data.text, validOrdinals);
+          aiAnswerPartsByOrdinal = parsedAi.partsByOrdinal;
+          aiFunFactsByOrdinal = parsedAi.factByOrdinal;
           if (aiAnswerPartsByOrdinal.size === 0) {
             warnings.push('AI parsing returned no valid answer parts. Using filename titles.');
           }
@@ -1023,18 +1089,21 @@ export function EditionDetailPage() {
         const aiParts = aiAnswerPartsByOrdinal.get(ordinal);
         const answerParts = aiParts && aiParts.length > 0 ? aiParts : [{ label: 'Answer', answer: entry.title }];
         const answerValue = answerParts.map((part) => part.answer).join(' / ');
+        const aiFact = aiFunFactsByOrdinal.get(ordinal);
         if (existing) {
-          const res = await api.updateEditionItem(existing.id, {
+          const payload: Parameters<typeof api.updateEditionItem>[1] = {
             prompt: existing.prompt ?? '',
             answer: answerValue,
             answer_parts_json: answerParts,
             media_type: 'audio',
             media_key: questionKey,
             audio_answer_key: answerKey
-          });
+          };
+          if (aiFact) payload.fun_fact = aiFact;
+          const res = await api.updateEditionItem(existing.id, payload);
           if (res.ok) updated += 1;
         } else {
-          const res = await api.createEditionItem(editionId, {
+          const payload: Parameters<typeof api.createEditionItem>[1] = {
             prompt: '',
             answer: answerValue,
             answer_parts_json: answerParts,
@@ -1042,7 +1111,9 @@ export function EditionDetailPage() {
             media_key: questionKey,
             audio_answer_key: answerKey,
             ordinal
-          });
+          };
+          if (aiFact) payload.fun_fact = aiFact;
+          const res = await api.createEditionItem(editionId, payload);
           if (res.ok) created += 1;
         }
       } finally {
