@@ -301,7 +301,14 @@ const renderExtrasBlock = (
       width: logoWidth,
       height: logoHeight
     });
-    cursorY -= logoHeight + 8;
+    cursorY -= logoHeight + 6;
+    page.drawText('triviaops.com', {
+      x: cell.x + padding,
+      y: cursorY - 8,
+      size: 8.5,
+      font: fonts.regular
+    });
+    cursorY -= 14;
   }
 
   const codeText = extras.eventCode ? `Event Code: ${extras.eventCode}` : 'Event Code: —';
