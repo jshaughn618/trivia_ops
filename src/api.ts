@@ -111,6 +111,37 @@ export const api = {
   updateLocation: (id: string, payload: Partial<Location>) =>
     apiFetch<Location>(`/api/locations/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
   deleteLocation: (id: string) => apiFetch<{ ok: true }>(`/api/locations/${id}`, { method: 'DELETE' }),
+  uploadLocationLogo: async (locationId: string, file: File) => {
+    const requestId = createRequestId();
+    const start = performance.now();
+    const res = await fetch(`/api/locations/${locationId}/logo`, {
+      method: 'POST',
+      body: await file.arrayBuffer(),
+      credentials: 'include',
+      headers: {
+        'x-request-id': requestId,
+        'x-logo-filename': file.name || 'logo',
+        'Content-Type': file.type || 'application/octet-stream'
+      }
+    });
+    const text = await res.text();
+    let json: unknown = null;
+    if (text) {
+      try {
+        json = JSON.parse(text);
+      } catch {
+        logWarn('location_logo_upload_non_json', { requestId, status: res.status, body_snippet: text.slice(0, 200) });
+      }
+    }
+    const durationMs = Math.round(performance.now() - start);
+    logInfo('location_logo_upload_end', { requestId, status: res.status, ok: res.ok, durationMs });
+    if (!res.ok) {
+      logError('location_logo_upload_failed', { requestId, status: res.status, body_snippet: text.slice(0, 200) });
+    }
+    return json as ApiEnvelope<Location>;
+  },
+  deleteLocationLogo: (locationId: string) =>
+    apiFetch<Location>(`/api/locations/${locationId}/logo`, { method: 'DELETE' }),
 
   listGames: () => apiFetch<Game[]>('/api/games'),
   createGame: (payload: Partial<Game>) =>

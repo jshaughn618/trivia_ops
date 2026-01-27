@@ -255,17 +255,99 @@ const renderRoundBlock = (
   }
 };
 
+const dataUrlToBytes = (dataUrl: string) => {
+  const match = /^data:.*?;base64,(.+)$/.exec(dataUrl);
+  if (!match) return new Uint8Array();
+  const binary = atob(match[1]);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+};
+
+const renderExtrasBlock = (
+  page: any,
+  cell: { x: number; y: number; width: number; height: number },
+  fonts: { regular: any; bold: any },
+  extras: { qrImage?: any; eventCode?: string; upcomingLines?: string[] }
+) => {
+  const padding = CELL_PADDING;
+  const titleSize = 10;
+  const textSize = 8.5;
+  const titleY = cell.y + cell.height - padding - titleSize;
+  page.drawText('Event info', {
+    x: cell.x + padding,
+    y: titleY,
+    size: titleSize,
+    font: fonts.bold
+  });
+
+  let cursorY = titleY - 14;
+  const codeText = extras.eventCode ? `Code: ${extras.eventCode}` : 'Code: —';
+  page.drawText(codeText, {
+    x: cell.x + padding,
+    y: cursorY,
+    size: textSize,
+    font: fonts.regular
+  });
+
+  const qrSize = 90;
+  if (extras.qrImage) {
+    page.drawImage(extras.qrImage, {
+      x: cell.x + padding,
+      y: cell.y + padding + 10,
+      width: qrSize,
+      height: qrSize
+    });
+  }
+
+  const upcoming = extras.upcomingLines ?? [];
+  if (upcoming.length > 0) {
+    const listX = cell.x + padding + qrSize + 12;
+    let listY = cursorY;
+    page.drawText('Upcoming', {
+      x: listX,
+      y: listY,
+      size: textSize,
+      font: fonts.bold
+    });
+    listY -= 12;
+    upcoming.forEach((line) => {
+      page.drawText(line, {
+        x: listX,
+        y: listY,
+        size: textSize,
+        font: fonts.regular
+      });
+      listY -= 11;
+    });
+  }
+};
+
 const buildPdf = async (
   event: Event,
   locationName: string,
   rounds: RoundBundle[],
-  mode: 'scoresheet' | 'answersheet'
+  mode: 'scoresheet' | 'answersheet',
+  extras?: { qrDataUrl?: string; eventCode?: string; upcomingLines?: string[] }
 ) => {
   const pdfDoc = await PDFDocument.create();
   const fonts = {
     regular: await pdfDoc.embedFont(StandardFonts.Helvetica),
     bold: await pdfDoc.embedFont(StandardFonts.HelveticaBold)
   };
+  let qrImage: any | null = null;
+  if (mode === 'scoresheet' && extras?.qrDataUrl) {
+    const qrBytes = dataUrlToBytes(extras.qrDataUrl);
+    if (qrBytes.length > 0) {
+      try {
+        qrImage = await pdfDoc.embedPng(qrBytes);
+      } catch {
+        qrImage = null;
+      }
+    }
+  }
   const gridTop = PAGE_HEIGHT - PAGE_MARGIN - HEADER_HEIGHT;
   const gridBottom = PAGE_MARGIN;
   const gridHeight = gridTop - gridBottom;
@@ -291,6 +373,22 @@ const buildPdf = async (
       { x: cellX, y: cellY, width: cellWidth, height: cellHeight },
       fonts,
       mode
+    );
+  }
+
+  if (mode === 'scoresheet' && extras && pdfDoc.getPages().length >= 2) {
+    const page = pdfDoc.getPages()[1];
+    const cellX = PAGE_MARGIN + cellWidth;
+    const cellY = gridBottom;
+    renderExtrasBlock(
+      page,
+      { x: cellX, y: cellY, width: cellWidth, height: cellHeight },
+      fonts,
+      {
+        qrImage: qrImage ?? undefined,
+        eventCode: extras.eventCode,
+        upcomingLines: extras.upcomingLines
+      }
     );
   }
 
@@ -705,7 +803,37 @@ export function EventDetailPage() {
       }
 
       const locationName = locations.find((location) => location.id === event.location_id)?.name ?? '';
-      const scoresheetBytes = await buildPdf(event, locationName, bundles, 'scoresheet');
+      let upcomingLines: string[] = [];
+      if (event.location_id) {
+        const eventsRes = await api.listEvents();
+        if (eventsRes.ok) {
+          const now = Date.now();
+          upcomingLines = eventsRes.data
+            .filter(
+              (candidate) =>
+                candidate.location_id === event.location_id &&
+                candidate.id !== event.id &&
+                new Date(candidate.starts_at).getTime() > now
+            )
+            .sort((a, b) => a.starts_at.localeCompare(b.starts_at))
+            .slice(0, 2)
+            .map((candidate) => `${candidate.event_type} • ${new Date(candidate.starts_at).toLocaleString()}`);
+        }
+      }
+      let qrDataUrl: string | undefined;
+      if (event.public_code) {
+        const qrTarget = publicUrl || `https://triviaops.com/play/${event.public_code}`;
+        try {
+          qrDataUrl = await QRCode.toDataURL(qrTarget, { margin: 1, width: 240 });
+        } catch {
+          qrDataUrl = undefined;
+        }
+      }
+      const scoresheetBytes = await buildPdf(event, locationName, bundles, 'scoresheet', {
+        qrDataUrl,
+        eventCode: event.public_code ?? undefined,
+        upcomingLines
+      });
       const answersheetBytes = await buildPdf(event, locationName, bundles, 'answersheet');
       const baseName = safeFileName(event.title, `event-${event.id.slice(0, 8)}`);
       const scoresheetFile = new File([scoresheetBytes], `${baseName}-scoresheet.pdf`, {

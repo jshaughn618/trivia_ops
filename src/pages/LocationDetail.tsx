@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api';
 import { AppShell } from '../components/AppShell';
@@ -15,6 +15,9 @@ export function LocationDetailPage() {
   const [city, setCity] = useState('');
   const [state, setState] = useState('');
   const [notes, setNotes] = useState('');
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [logoError, setLogoError] = useState<string | null>(null);
+  const logoInputId = useId();
 
   useEffect(() => {
     const load = async () => {
@@ -50,6 +53,36 @@ export function LocationDetailPage() {
     navigate('/locations');
   };
 
+  const handleLogoUpload = async (file: File) => {
+    if (!locationId) return;
+    if (file.type && !file.type.startsWith('image/')) {
+      setLogoError('Image files only.');
+      return;
+    }
+    setLogoUploading(true);
+    setLogoError(null);
+    const res = await api.uploadLocationLogo(locationId, file);
+    if (res.ok) {
+      setLocation(res.data);
+    } else {
+      setLogoError(res.error.message ?? 'Upload failed.');
+    }
+    setLogoUploading(false);
+  };
+
+  const handleLogoRemove = async () => {
+    if (!locationId) return;
+    setLogoUploading(true);
+    setLogoError(null);
+    const res = await api.deleteLocationLogo(locationId);
+    if (res.ok) {
+      setLocation(res.data);
+    } else {
+      setLogoError(res.error.message ?? 'Remove failed.');
+    }
+    setLogoUploading(false);
+  };
+
   if (!location) {
     return (
       <AppShell title="Location Detail">
@@ -62,6 +95,54 @@ export function LocationDetailPage() {
     <AppShell title="Location Detail">
       <Panel title="Location">
         <div className="flex flex-col gap-4 max-w-xl">
+          <div className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+            Logo
+            <div className="flex flex-wrap items-center gap-4 rounded-md border border-border bg-panel p-3">
+              <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-md border border-border bg-bg">
+                {location.logo_key ? (
+                  <img
+                    src={api.mediaUrl(location.logo_key)}
+                    alt={`${location.name} logo`}
+                    className="h-full w-full object-contain"
+                  />
+                ) : (
+                  <span className="text-[10px] uppercase tracking-[0.2em] text-muted">No logo</span>
+                )}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <label
+                  htmlFor={logoInputId}
+                  className="inline-flex items-center justify-center rounded-md border border-border bg-panel px-3 py-2 text-xs font-medium text-text transition-colors hover:bg-panel2 focus-within:outline-none focus-within:ring-2 focus-within:ring-accent-ink focus-within:ring-offset-2 focus-within:ring-offset-bg"
+                >
+                  {location.logo_key ? 'Replace logo' : 'Upload logo'}
+                </label>
+                <input
+                  id={logoInputId}
+                  type="file"
+                  accept="image/*"
+                  className="sr-only"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file) handleLogoUpload(file);
+                    event.currentTarget.value = '';
+                  }}
+                  disabled={logoUploading}
+                />
+                {location.logo_key && (
+                  <SecondaryButton onClick={handleLogoRemove} disabled={logoUploading}>
+                    Remove
+                  </SecondaryButton>
+                )}
+                {logoUploading && <span className="text-[10px] uppercase tracking-[0.2em] text-muted">Updating…</span>}
+              </div>
+              {location.logo_name && (
+                <div className="w-full text-[10px] uppercase tracking-[0.2em] text-muted">
+                  {location.logo_name}
+                </div>
+              )}
+            </div>
+            {logoError && <div className="text-[10px] uppercase tracking-[0.2em] text-danger-ink">{logoError}</div>}
+          </div>
           <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
             Name
             <input className="h-10 px-3" value={name} onChange={(event) => setName(event.target.value)} />

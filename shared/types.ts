@@ -33,6 +33,8 @@ export type Location = {
   city: string | null;
   state: string | null;
   notes: string | null;
+  logo_key: string | null;
+  logo_name: string | null;
   created_at: string;
 };
 
