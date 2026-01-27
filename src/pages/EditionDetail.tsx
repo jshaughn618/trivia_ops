@@ -1045,6 +1045,10 @@ export function EditionDetailPage() {
 
     const sorted = [...groups.entries()].sort((a, b) => a[0] - b[0]);
     const totalGroups = sorted.length;
+    const heuristicMatches = sorted.reduce((count, [, entry]) => {
+      if (!entry.title) return count;
+      return parseArtistPairTitle(entry.title) ? count + 1 : count;
+    }, 0);
     const instructionsRaw = musicBulkInstructions.trim();
     const instructions = instructionsRaw.slice(0, MUSIC_AI_INSTRUCTION_LIMIT);
     const validOrdinals = new Set(sorted.map(([ordinal]) => ordinal));
@@ -1086,8 +1090,8 @@ export function EditionDetailPage() {
           const parsedAi = parseAiAnswerPartsResponse(aiRes.data.text, validOrdinals);
           aiAnswerPartsByOrdinal = parsedAi.partsByOrdinal;
           aiFunFactsByOrdinal = parsedAi.factByOrdinal;
-          if (aiAnswerPartsByOrdinal.size === 0) {
-            warnings.push('AI parsing returned no valid answer parts. Using filename titles/heuristics.');
+          if (aiAnswerPartsByOrdinal.size === 0 && heuristicMatches === 0) {
+            warnings.push('AI parsing returned no valid answer parts. Using filename titles.');
           }
         }
         setMusicBulkStatus(`Processing ${processedCount} of ${totalGroups}`);
@@ -1163,13 +1167,18 @@ export function EditionDetailPage() {
       }
     }
 
-    const messages = [...warnings, ...errors];
-    if (messages.length > 0) {
-      setMusicBulkError(messages.join(' • '));
+    if (errors.length > 0) {
+      setMusicBulkError(errors.join(' • '));
+    } else {
+      setMusicBulkError(null);
     }
+    const warningText = warnings.length > 0 ? warnings.join(' • ') : '';
     if (created || updated) {
-      setMusicBulkResult(`Created ${created} • Updated ${updated}`);
+      const baseResult = `Created ${created} • Updated ${updated}`;
+      setMusicBulkResult(warningText ? `${baseResult} • ${warningText}` : baseResult);
       load();
+    } else if (warningText) {
+      setMusicBulkResult(warningText);
     }
     setMusicBulkStatus(null);
     setMusicBulkLoading(false);
