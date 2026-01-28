@@ -2464,6 +2464,9 @@ export function EditionDetailPage() {
                                 className="h-16 w-16 border-2 border-border object-cover"
                               />
                             )}
+                            {gameTypeId === 'audio' && itemDraft.media_key && (
+                              <audio className="w-full" controls src={api.mediaUrl(itemDraft.media_key)} />
+                            )}
                           </div>
                           {gameTypeId === 'audio' && (
                             <span className="text-[10px] tracking-[0.2em] text-muted">MP3 only for audio rounds.</span>
@@ -2928,6 +2931,9 @@ export function EditionDetailPage() {
                         alt="Uploaded"
                         className="h-16 w-16 border-2 border-border object-cover"
                       />
+                    )}
+                    {gameTypeId === 'audio' && itemDraft.media_key && (
+                      <audio className="w-full" controls src={api.mediaUrl(itemDraft.media_key)} />
                     )}
                   </div>
                   {gameTypeId === 'audio' && (
