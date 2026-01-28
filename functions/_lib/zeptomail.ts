@@ -27,8 +27,16 @@ export async function sendInviteEmail(env: Env, { to, inviteUrl }: InviteEmail) 
       }
     ],
     subject: 'You are invited to Trivia Ops',
-    textbody: `You have been invited to Trivia Ops.\n\nCreate your account:\n${inviteUrl}\n\nThis invite expires in 30 days.`,
-    htmlbody: `<p>You have been invited to Trivia Ops.</p><p><a href="${inviteUrl}">Create your account</a></p><p>This invite expires in 30 days.</p>`
+    textbody: `You have been invited to host for Trivia Ops.\n\nCreate your account:\n${inviteUrl}\n\nThis invite expires in 30 days.\n\nJacob\nFounder, triviaops.com`,
+    htmlbody: `<div style="font-family: Arial, sans-serif; color: #111;">
+      <div style="margin-bottom: 16px;">
+        <img src="https://triviaops.com/assets/trivia_ops_logo_light.png" alt="Trivia Ops" style="height: 48px;" />
+      </div>
+      <p>You have been invited to host for Trivia Ops.</p>
+      <p><a href="${inviteUrl}">Create your account</a></p>
+      <p>This invite expires in 30 days.</p>
+      <p style="margin-top: 24px;">Jacob<br/>Founder, triviaops.com</p>
+    </div>`
   };
 
   const res = await fetch(env.ZEPTO_API_URL ?? DEFAULT_ZEPTO_URL, {
