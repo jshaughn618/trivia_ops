@@ -12,4 +12,3 @@ bucket_name = "trivia-ops-media"
 
 [vars]
 SESSION_TTL_HOURS = "24"
-AI_DEFAULT_MODEL = "gpt-5-mini"
