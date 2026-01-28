@@ -1890,7 +1890,7 @@ export function EditionDetailPage() {
               {itemDeleteError}
             </div>
           )}
-          {(gameTypeId === 'music' || gameTypeId === 'audio') && (
+          {gameTypeId === 'music' && (
             <div className="mb-4 border-2 border-border bg-panel2 p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">
