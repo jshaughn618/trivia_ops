@@ -136,6 +136,7 @@ export function EditionDetailPage() {
   const [mediaUploading, setMediaUploading] = useState(false);
   const [mediaError, setMediaError] = useState<string | null>(null);
   const [itemValidationError, setItemValidationError] = useState<string | null>(null);
+  const [itemDeleteError, setItemDeleteError] = useState<string | null>(null);
   const [aiOpen, setAiOpen] = useState(false);
   const [aiMode, setAiMode] = useState<'bulk' | 'answer' | 'mcq'>('bulk');
   const [aiText, setAiText] = useState('');
@@ -656,6 +657,19 @@ export function EditionDetailPage() {
       audio_answer_key: ''
     }));
     load();
+  };
+
+  const handleDeleteItem = async (itemId: string) => {
+    const previous = items;
+    setItemDeleteError(null);
+    setItems((prev) => prev.filter((item) => item.id !== itemId));
+    setItemMenuId(null);
+    if (activeItemId === itemId) setActiveItemId(null);
+    const res = await api.deleteEditionItem(itemId);
+    if (!res.ok) {
+      setItems(previous);
+      setItemDeleteError(res.error.message ?? 'Failed to delete item.');
+    }
   };
 
   const startNewItem = () => {
@@ -1871,6 +1885,11 @@ export function EditionDetailPage() {
               {aiResult && <div className="mt-2 text-xs uppercase tracking-[0.2em] text-muted">{aiResult}</div>}
             </div>
           )}
+          {itemDeleteError && (
+            <div className="mb-3 border-2 border-danger bg-panel2 px-3 py-2 text-xs uppercase tracking-[0.2em] text-danger">
+              {itemDeleteError}
+            </div>
+          )}
           {(gameTypeId === 'music' || gameTypeId === 'audio') && (
             <div className="mb-4 border-2 border-border bg-panel2 p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -2089,8 +2108,7 @@ export function EditionDetailPage() {
                             type="button"
                             onClick={(event) => {
                               event.stopPropagation();
-                              setItemMenuId(null);
-                              api.deleteEditionItem(item.id).then(load);
+                              handleDeleteItem(item.id);
                             }}
                             className="w-full rounded-md border border-danger bg-panel2 px-3 py-2 text-xs font-medium text-danger-ink"
                           >
