@@ -20,6 +20,10 @@ export function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [form, setForm] = useState({ ...emptyForm });
   const [error, setError] = useState<string | null>(null);
+  const [inviteText, setInviteText] = useState('');
+  const [inviteSending, setInviteSending] = useState(false);
+  const [inviteResult, setInviteResult] = useState<string | null>(null);
+  const [inviteError, setInviteError] = useState<string | null>(null);
 
   const load = async () => {
     const res = await api.listUsers();
@@ -57,6 +61,32 @@ export function UsersPage() {
   const handleDelete = async (id: string) => {
     await api.deleteUser(id);
     load();
+  };
+
+  const parseInviteEmails = (value: string) => {
+    return value
+      .split(/[\n,;\s]+/)
+      .map((email) => email.trim())
+      .filter(Boolean);
+  };
+
+  const handleInvite = async () => {
+    const emails = parseInviteEmails(inviteText);
+    if (emails.length === 0) return;
+    setInviteSending(true);
+    setInviteError(null);
+    setInviteResult(null);
+    const res = await api.createInvites({ emails, role: 'host' });
+    setInviteSending(false);
+    if (!res.ok) {
+      setInviteError(res.error.message ?? 'Failed to send invites.');
+      return;
+    }
+    const sent = res.data.results.filter((item) => item.status === 'sent').length;
+    const skipped = res.data.results.filter((item) => item.status === 'skipped').length;
+    const failed = res.data.results.filter((item) => item.status === 'failed').length;
+    setInviteResult(`Sent ${sent} • Skipped ${skipped} • Failed ${failed}`);
+    setInviteText('');
   };
 
   if (auth.user?.user_type !== 'admin') {
@@ -166,6 +196,35 @@ export function UsersPage() {
               <PrimaryButton onClick={handleCreate}>Create User</PrimaryButton>
               <SecondaryButton onClick={() => setForm({ ...emptyForm })}>Clear</SecondaryButton>
             </div>
+          </div>
+        </Panel>
+        <Panel title="Invite Hosts">
+          <div className="flex flex-col gap-3">
+            <div className="text-xs uppercase tracking-[0.2em] text-muted">
+              Send one-time invites (expires in 30 days).
+            </div>
+            <textarea
+              className="min-h-[120px] px-3 py-2"
+              value={inviteText}
+              onChange={(event) => setInviteText(event.target.value)}
+              placeholder="Emails separated by comma, space, or new line"
+            />
+            <div className="flex items-center gap-2">
+              <PrimaryButton onClick={handleInvite} disabled={inviteSending}>
+                {inviteSending ? 'Sending…' : 'Send invites'}
+              </PrimaryButton>
+              <SecondaryButton onClick={() => setInviteText('')}>Clear</SecondaryButton>
+            </div>
+            {inviteError && (
+              <div className="border-2 border-danger bg-panel2 px-3 py-2 text-xs uppercase tracking-[0.2em] text-danger">
+                {inviteError}
+              </div>
+            )}
+            {inviteResult && (
+              <div className="border-2 border-border bg-panel2 px-3 py-2 text-xs uppercase tracking-[0.2em] text-muted">
+                {inviteResult}
+              </div>
+            )}
           </div>
         </Panel>
       </div>

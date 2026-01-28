@@ -104,6 +104,21 @@ export const api = {
   aiImageAnswer: (payload: { media_key: string; prompt?: string }) =>
     apiFetch<{ answer: string }>('/api/ai/image-answer', { method: 'POST', body: JSON.stringify(payload) }),
 
+  createInvites: (payload: { emails: string[]; role?: 'admin' | 'host' | 'player' }) =>
+    apiFetch<{ results: { email: string; status: 'sent' | 'skipped' | 'failed'; reason?: string }[] }>(
+      '/api/invites',
+      { method: 'POST', body: JSON.stringify(payload) }
+    ),
+  getPublicInvite: (token: string) =>
+    apiFetch<{ email: string; role: 'admin' | 'host' | 'player'; expires_at: string }>(
+      `/api/public/invite/${token}`
+    ),
+  acceptInvite: (
+    token: string,
+    payload: { password: string; username?: string; first_name?: string; last_name?: string }
+  ) =>
+    apiFetch<User>(`/api/public/invite/${token}/accept`, { method: 'POST', body: JSON.stringify(payload) }),
+
   listLocations: () => apiFetch<Location[]>('/api/locations'),
   createLocation: (payload: Partial<Location>) =>
     apiFetch<Location>('/api/locations', { method: 'POST', body: JSON.stringify(payload) }),

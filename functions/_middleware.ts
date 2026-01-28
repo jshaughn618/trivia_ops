@@ -13,7 +13,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   context.data.requestId = requestId;
 
   const publicRoutes = ['/login', '/api/login'];
-  const publicPrefixes = ['/play', '/api/public'];
+  const publicPrefixes = ['/play', '/api/public', '/invite'];
   const isStatic = !path.startsWith('/api/') && (path.startsWith('/assets/') || /\.[a-zA-Z0-9]+$/.test(path));
   const loggable = path.startsWith('/api') || path.startsWith('/play') || path === '/login';
 

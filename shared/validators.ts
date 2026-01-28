@@ -209,6 +209,18 @@ export const imageAnswerSchema = z.object({
   prompt: z.string().min(1).optional()
 });
 
+export const inviteCreateSchema = z.object({
+  emails: z.array(emailSchema).min(1),
+  role: userTypeSchema.optional()
+});
+
+export const inviteAcceptSchema = z.object({
+  password: passwordSchema,
+  username: z.string().min(1).optional(),
+  first_name: z.string().min(1).optional(),
+  last_name: z.string().min(1).optional()
+});
+
 export const userCreateSchema = z.object({
   email: emailSchema,
   password: passwordSchema,

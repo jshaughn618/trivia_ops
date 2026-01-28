@@ -22,6 +22,7 @@ const LocationsPage = lazy(() => import('./pages/Locations').then((mod) => ({ de
 const LocationDetailPage = lazy(() =>
   import('./pages/LocationDetail').then((mod) => ({ default: mod.LocationDetailPage }))
 );
+const InviteAcceptPage = lazy(() => import('./pages/InviteAccept').then((mod) => ({ default: mod.InviteAcceptPage })));
 const SettingsPage = lazy(() => import('./pages/Settings').then((mod) => ({ default: mod.SettingsPage })));
 const UsersPage = lazy(() => import('./pages/Users').then((mod) => ({ default: mod.UsersPage })));
 const PlayEventPage = lazy(() => import('./pages/PlayEvent').then((mod) => ({ default: mod.PlayEventPage })));
@@ -40,6 +41,7 @@ export function App() {
       <Routes>
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/invite/:token" element={<InviteAcceptPage />} />
         <Route path="/play/:code" element={<PlayEventPage />} />
         <Route path="/play/:code/leaderboard" element={<PlayLeaderboardPage />} />
         <Route
