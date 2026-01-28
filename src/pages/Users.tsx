@@ -24,6 +24,7 @@ export function UsersPage() {
   const [inviteSending, setInviteSending] = useState(false);
   const [inviteResult, setInviteResult] = useState<string | null>(null);
   const [inviteError, setInviteError] = useState<string | null>(null);
+  const [inviteFailures, setInviteFailures] = useState<string[]>([]);
 
   const load = async () => {
     const res = await api.listUsers();
@@ -76,6 +77,7 @@ export function UsersPage() {
     setInviteSending(true);
     setInviteError(null);
     setInviteResult(null);
+    setInviteFailures([]);
     const res = await api.createInvites({ emails, role: 'host' });
     setInviteSending(false);
     if (!res.ok) {
@@ -84,8 +86,14 @@ export function UsersPage() {
     }
     const sent = res.data.results.filter((item) => item.status === 'sent').length;
     const skipped = res.data.results.filter((item) => item.status === 'skipped').length;
-    const failed = res.data.results.filter((item) => item.status === 'failed').length;
+    const failedEntries = res.data.results.filter((item) => item.status === 'failed');
+    const failed = failedEntries.length;
     setInviteResult(`Sent ${sent} • Skipped ${skipped} • Failed ${failed}`);
+    if (failedEntries.length > 0) {
+      setInviteFailures(
+        failedEntries.map((entry) => `${entry.email} — ${entry.reason || 'No reason provided'}`)
+      );
+    }
     setInviteText('');
   };
 
@@ -223,6 +231,13 @@ export function UsersPage() {
             {inviteResult && (
               <div className="border-2 border-border bg-panel2 px-3 py-2 text-xs uppercase tracking-[0.2em] text-muted">
                 {inviteResult}
+              </div>
+            )}
+            {inviteFailures.length > 0 && (
+              <div className="border-2 border-danger bg-panel2 px-3 py-2 text-xs uppercase tracking-[0.2em] text-danger">
+                {inviteFailures.map((line) => (
+                  <div key={line}>{line}</div>
+                ))}
               </div>
             )}
           </div>

@@ -50,8 +50,21 @@ export async function sendInviteEmail(env: Env, { to, inviteUrl }: InviteEmail) 
 
   if (!res.ok) {
     const text = await res.text();
+    let message = text;
+    try {
+      const parsed = JSON.parse(text);
+      message =
+        parsed?.message ||
+        parsed?.error?.message ||
+        parsed?.error?.details ||
+        parsed?.error?.code ||
+        text;
+    } catch {
+      message = text;
+    }
+    const errorText = `ZeptoMail ${res.status}: ${message || res.statusText || 'Failed to send invite.'}`;
     logWarn(env, 'zepto_send_failed', { status: res.status, body: text.slice(0, 200) });
-    return { ok: false, error: text || 'Failed to send invite.' };
+    return { ok: false, error: errorText };
   }
 
   return { ok: true };
