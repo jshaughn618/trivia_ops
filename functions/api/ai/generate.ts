@@ -5,7 +5,6 @@ import { aiGenerateSchema } from '../../../shared/validators';
 import { generateText } from '../../openai';
 import { getRequestId, logInfo } from '../../_lib/log';
 
-const DEFAULT_MODEL = 'gpt-5-mini';
 const LOG_LIMIT = 4000;
 
 const truncate = (value: string) => {
@@ -22,7 +21,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
 
   try {
     const requestId = getRequestId(request);
-    const model = parsed.data.model ?? DEFAULT_MODEL;
+    const model = parsed.data.model ?? env.AI_DEFAULT_MODEL ?? 'gpt-5-mini';
     const promptLog = truncate(parsed.data.prompt);
     logInfo(env, 'ai_generate_request', {
       requestId,

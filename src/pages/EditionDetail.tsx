@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../api';
+import { QUESTION_AI_MODEL } from '../lib/ai';
 import { AppShell } from '../components/AppShell';
 import { Panel } from '../components/Panel';
 import { PrimaryButton, SecondaryButton, DangerButton } from '../components/Buttons';
@@ -135,11 +136,12 @@ export function EditionDetailPage() {
   const [mediaUploading, setMediaUploading] = useState(false);
   const [mediaError, setMediaError] = useState<string | null>(null);
   const [itemValidationError, setItemValidationError] = useState<string | null>(null);
-  const [bulkOpen, setBulkOpen] = useState(false);
-  const [bulkText, setBulkText] = useState('');
-  const [bulkLoading, setBulkLoading] = useState(false);
-  const [bulkError, setBulkError] = useState<string | null>(null);
-  const [bulkResult, setBulkResult] = useState<string | null>(null);
+  const [aiOpen, setAiOpen] = useState(false);
+  const [aiMode, setAiMode] = useState<'bulk' | 'answer' | 'mcq'>('bulk');
+  const [aiText, setAiText] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [aiResult, setAiResult] = useState<string | null>(null);
   const [musicBulkLoading, setMusicBulkLoading] = useState(false);
   const [musicBulkError, setMusicBulkError] = useState<string | null>(null);
   const [musicBulkResult, setMusicBulkResult] = useState<string | null>(null);
@@ -738,18 +740,54 @@ export function EditionDetailPage() {
     if (tagsLine) setTags(tagsLine.replace(/^[^:]*:/, '').trim());
   };
 
-  const generateAnswer = async () => {
-    if (!itemDraft.prompt.trim()) return;
-    setAnswerLoading(true);
-    setAnswerError(null);
-    const prompt = `Provide a concise, correct pub-trivia answer for the question below. Respond with only the answer.\n\nQuestion: ${itemDraft.prompt.trim()}`;
-    const res = await api.aiGenerate({ prompt, max_output_tokens: 80 });
-    setAnswerLoading(false);
+  const generateAnswer = async (overridePrompt?: string) => {
+    const sourcePrompt = overridePrompt ?? itemDraft.prompt;
+    if (!sourcePrompt.trim()) return;
+    if (overridePrompt) {
+      setAiLoading(true);
+      setAiError(null);
+      setAiResult(null);
+    } else {
+      setAnswerLoading(true);
+      setAnswerError(null);
+    }
+    const prompt = `Provide a concise, correct pub-trivia answer for the question below. Respond with only the answer.\n\nQuestion: ${sourcePrompt.trim()}`;
+    const res = await api.aiGenerate({
+      prompt,
+      max_output_tokens: 80,
+      model: overridePrompt ? QUESTION_AI_MODEL : undefined
+    });
+    if (overridePrompt) {
+      setAiLoading(false);
+    } else {
+      setAnswerLoading(false);
+    }
     if (!res.ok) {
-      setAnswerError(res.error.message);
+      if (overridePrompt) {
+        setAiError(res.error.message);
+      } else {
+        setAnswerError(res.error.message);
+      }
       return;
     }
     const line = res.data.text.split('\n')[0] ?? '';
+    if (overridePrompt) {
+      const answerText = line.trim();
+      if (!answerText) {
+        setAiError('No answer returned.');
+        return;
+      }
+      await api.createEditionItem(editionId!, {
+        prompt: sourcePrompt.trim(),
+        answer: answerText,
+        ordinal: nextOrdinal
+      });
+      setAiResult('Added 1 item');
+      setAiText('');
+      setAiOpen(false);
+      load();
+      return;
+    }
     setItemDraft((draft) => ({ ...draft, answer: line.trim() }));
   };
 
@@ -802,21 +840,50 @@ export function EditionDetailPage() {
     }>;
   };
 
+  const clampNumber = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
+
+  const getMcqCount = (prompt: string, fallback: number) => {
+    const match = prompt.match(/(?:count|questions?)\s*[:=]\s*(\d{1,3})/i);
+    if (match) {
+      const parsed = Number(match[1]);
+      if (Number.isFinite(parsed)) return clampNumber(parsed, 1, 20);
+    }
+    return clampNumber(fallback, 1, 20);
+  };
+
+  const resolveMcqAnswerIndex = (answerRaw: string, choices: string[]) => {
+    const trimmed = answerRaw.trim();
+    if (!trimmed) return -1;
+    const letterMatch = trimmed.match(/^[A-Da-d]\b/);
+    if (letterMatch) {
+      const index = letterMatch[0].toUpperCase().charCodeAt(0) - 65;
+      if (index >= 0 && index < choices.length) return index;
+    }
+    const stripped = trimmed.replace(/^[A-Da-d][\).:\-]\s*/, '');
+    const normalized = stripped.trim().toLowerCase();
+    if (normalized) {
+      const index = choices.findIndex((choice) => choice.trim().toLowerCase() === normalized);
+      if (index >= 0) return index;
+    }
+    const index = choices.findIndex((choice) => choice.trim().toLowerCase() === trimmed.toLowerCase());
+    return index >= 0 ? index : -1;
+  };
+
   const handleBulkGenerate = async () => {
-    if (!bulkText.trim()) return;
-    setBulkLoading(true);
-    setBulkError(null);
-    setBulkResult(null);
+    if (!aiText.trim()) return;
+    setAiLoading(true);
+    setAiError(null);
+    setAiResult(null);
     setActiveItemId(null);
     const formatNote =
       gameTypeId === 'audio'
         ? 'Each item must include answer_a and answer_b. If labels are provided, include answer_a_label and answer_b_label.'
         : 'Each item must include answer.';
-    const prompt = `Parse the following text into trivia items without altering any question or answer text. Do not rewrite or correct. Return ONLY valid JSON array. ${formatNote}\n\nOutput format:\n[{\n  \"prompt\": \"...\",\n  \"answer\": \"...\",\n  \"answer_a\": \"...\",\n  \"answer_b\": \"...\",\n  \"answer_a_label\": \"...\",\n  \"answer_b_label\": \"...\"\n}]\n\nInput:\n${bulkText.trim()}`;
-    const res = await api.aiGenerate({ prompt, max_output_tokens: 900 });
-    setBulkLoading(false);
+    const prompt = `Parse the following text into trivia items without altering any question or answer text. Do not rewrite or correct. Return ONLY valid JSON array. ${formatNote}\n\nOutput format:\n[{\n  \"prompt\": \"...\",\n  \"answer\": \"...\",\n  \"answer_a\": \"...\",\n  \"answer_b\": \"...\",\n  \"answer_a_label\": \"...\",\n  \"answer_b_label\": \"...\"\n}]\n\nInput:\n${aiText.trim()}`;
+    const res = await api.aiGenerate({ prompt, max_output_tokens: 900, model: QUESTION_AI_MODEL });
+    setAiLoading(false);
     if (!res.ok) {
-      setBulkError(res.error.message);
+      setAiError(res.error.message);
       return;
     }
 
@@ -824,12 +891,12 @@ export function EditionDetailPage() {
     try {
       parsed = parseBulkJson(res.data.text);
     } catch (error) {
-      setBulkError('Could not parse the AI response. Try a simpler input block.');
+      setAiError('Could not parse the AI response. Try a simpler input block.');
       return;
     }
 
     if (!Array.isArray(parsed) || parsed.length === 0) {
-      setBulkError('No items were parsed.');
+      setAiError('No items were parsed.');
       return;
     }
 
@@ -862,9 +929,98 @@ export function EditionDetailPage() {
       });
       added += 1;
     }
-    setBulkResult(`Added ${added} items`);
-    setBulkText('');
-    setBulkOpen(false);
+    setAiResult(`Added ${added} items`);
+    setAiText('');
+    setAiOpen(false);
+    load();
+  };
+
+  const handleMcqGenerate = async () => {
+    if (!aiText.trim()) return;
+    setAiLoading(true);
+    setAiError(null);
+    setAiResult(null);
+    setActiveItemId(null);
+
+    const desiredCount = getMcqCount(aiText, 10);
+    const prompt = [
+      `Generate ${desiredCount} multiple choice trivia questions.`,
+      'Return ONLY valid JSON array.',
+      'Each item must include:',
+      '- prompt (string)',
+      '- choices (array of 4 strings, no letter prefixes)',
+      '- answer (letter A, B, C, or D)',
+      '',
+      'Output format:',
+      '[{"prompt":"...","choices":["...","...","...","..."],"answer":"A"}]',
+      '',
+      `Topic/Instructions: ${aiText.trim()}`
+    ].join('\n');
+
+    const res = await api.aiGenerate({ prompt, max_output_tokens: 900, model: QUESTION_AI_MODEL });
+    setAiLoading(false);
+    if (!res.ok) {
+      setAiError(res.error.message);
+      return;
+    }
+
+    let parsed: unknown[] = [];
+    try {
+      parsed = parseAiJsonArray(res.data.text);
+    } catch (error) {
+      setAiError('Could not parse the AI response. Try a simpler prompt.');
+      return;
+    }
+
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      setAiError('No questions were parsed.');
+      return;
+    }
+
+    const baseOrdinal = nextOrdinal;
+    let added = 0;
+    let skipped = 0;
+    for (let index = 0; index < parsed.length; index += 1) {
+      const entry = parsed[index] as {
+        prompt?: unknown;
+        choices?: unknown;
+        answer?: unknown;
+      };
+      const promptText = typeof entry.prompt === 'string' ? entry.prompt.trim() : '';
+      const choicesRaw = Array.isArray(entry.choices) ? entry.choices : [];
+      const choices = choicesRaw
+        .filter((choice) => typeof choice === 'string')
+        .map((choice) => choice.trim())
+        .filter(Boolean)
+        .slice(0, 4);
+      const answerRaw = typeof entry.answer === 'string' ? entry.answer : '';
+      if (!promptText || choices.length !== 4 || !answerRaw) {
+        skipped += 1;
+        continue;
+      }
+      const answerIndex = resolveMcqAnswerIndex(answerRaw, choices);
+      if (answerIndex < 0) {
+        skipped += 1;
+        continue;
+      }
+      const correctAnswer = choices[answerIndex];
+      await api.createEditionItem(editionId!, {
+        question_type: 'multiple_choice',
+        choices_json: choices,
+        prompt: promptText,
+        answer: correctAnswer,
+        ordinal: baseOrdinal + added
+      });
+      added += 1;
+    }
+
+    if (added === 0) {
+      setAiError('No valid multiple choice questions were added.');
+      return;
+    }
+    setAiResult(skipped > 0 ? `Added ${added} questions • Skipped ${skipped}` : `Added ${added} questions`);
+    setAiText('');
+    setAiOpen(false);
     load();
   };
 
@@ -1635,35 +1791,83 @@ export function EditionDetailPage() {
         <Panel
           title="Items"
           action={
-            <SecondaryButton onClick={() => setBulkOpen((prev) => !prev)}>
-              {bulkOpen ? 'Close Import' : 'Bulk Add'}
+            <SecondaryButton onClick={() => setAiOpen((prev) => !prev)}>
+              {aiOpen ? 'Close AI' : 'AI Tools'}
             </SecondaryButton>
           }
         >
-          {bulkOpen && (
+          {aiOpen && (
             <div className="mb-4 border-2 border-border bg-panel2 p-3">
-              <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">Bulk Import</div>
+              <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">AI Tools</div>
               <div className="mt-2 text-[10px] uppercase tracking-[0.2em] text-muted">
-                Paste question/answer blocks. AI will parse without rewriting.
+                Choose a mode and provide input. Default is Bulk Import.
+              </div>
+              <div className="mt-3 flex flex-wrap gap-4 text-[10px] font-display uppercase tracking-[0.2em] text-muted">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="aiMode"
+                    value="bulk"
+                    checked={aiMode === 'bulk'}
+                    onChange={() => setAiMode('bulk')}
+                  />
+                  Bulk import
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="aiMode"
+                    value="answer"
+                    checked={aiMode === 'answer'}
+                    onChange={() => setAiMode('answer')}
+                  />
+                  Single answer
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="aiMode"
+                    value="mcq"
+                    checked={aiMode === 'mcq'}
+                    onChange={() => setAiMode('mcq')}
+                  />
+                  Multiple choice
+                </label>
+              </div>
+              <div className="mt-3 text-[10px] uppercase tracking-[0.2em] text-muted">
+                {aiMode === 'bulk'
+                  ? 'Paste question/answer blocks. AI will parse without rewriting.'
+                  : aiMode === 'answer'
+                    ? 'Provide a single question. AI will return the best concise answer.'
+                    : 'Provide a prompt. Use “count: N” to override the default 10 questions.'}
               </div>
               <textarea
                 className="mt-3 min-h-[140px] w-full px-3 py-2"
-                value={bulkText}
-                onChange={(event) => setBulkText(event.target.value)}
-                placeholder="Q: ... A: ... (or one per line)"
+                value={aiText}
+                onChange={(event) => setAiText(event.target.value)}
+                placeholder={
+                  aiMode === 'bulk'
+                    ? 'Q: ... A: ... (or one per line)'
+                    : aiMode === 'answer'
+                      ? 'Question: ...'
+                      : 'e.g., Easy general knowledge questions about 90s music'
+                }
               />
               <div className="mt-3 flex flex-wrap gap-2">
-                <PrimaryButton onClick={handleBulkGenerate} disabled={bulkLoading}>
-                  {bulkLoading ? 'Generating' : 'Generate'}
+                <PrimaryButton
+                  onClick={() => {
+                    if (aiMode === 'bulk') handleBulkGenerate();
+                    if (aiMode === 'answer') generateAnswer(aiText);
+                    if (aiMode === 'mcq') handleMcqGenerate();
+                  }}
+                  disabled={aiLoading}
+                >
+                  {aiLoading ? 'Generating' : 'Generate'}
                 </PrimaryButton>
-                <SecondaryButton onClick={() => setBulkOpen(false)}>Cancel</SecondaryButton>
+                <SecondaryButton onClick={() => setAiOpen(false)}>Cancel</SecondaryButton>
               </div>
-              {bulkError && (
-                <div className="mt-2 text-xs uppercase tracking-[0.2em] text-danger">{bulkError}</div>
-              )}
-              {bulkResult && (
-                <div className="mt-2 text-xs uppercase tracking-[0.2em] text-muted">{bulkResult}</div>
-              )}
+              {aiError && <div className="mt-2 text-xs uppercase tracking-[0.2em] text-danger">{aiError}</div>}
+              {aiResult && <div className="mt-2 text-xs uppercase tracking-[0.2em] text-muted">{aiResult}</div>}
             </div>
           )}
           {(gameTypeId === 'music' || gameTypeId === 'audio') && (
