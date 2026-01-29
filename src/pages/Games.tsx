@@ -353,12 +353,10 @@ export function GamesPage() {
                                       : edition.edition_number
                                         ? `${edition.edition_number} - ${baseTitle}`
                                         : baseTitle;
-                                    const secondary = edition.tags_csv ? `Tags: ${edition.tags_csv}` : '';
                                     return (
                                       <ListRow key={edition.id} to={`/editions/${edition.id}`} className="py-3 pl-8">
                                         <div className="flex-1">
                                           <div className="text-sm text-text">{primaryTitle}</div>
-                                          {secondary && <div className="mt-1 text-xs text-muted">{secondary}</div>}
                                         </div>
                                         <StatusPill status={edition.status} label={edition.status} />
                                       </ListRow>
