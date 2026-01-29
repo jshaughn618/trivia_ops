@@ -518,6 +518,27 @@ export function EventDetailPage() {
     if (teamsRes.ok) setTeams(teamsRes.data);
   };
 
+  const loadBootstrap = async (isActive: () => boolean = () => true) => {
+    if (!eventId) return false;
+    const res = await api.getEventBootstrap(eventId);
+    if (!isActive()) return false;
+    if (!res.ok) return false;
+    setEvent(res.data.event);
+    setStatus(res.data.event.status);
+    setEventType(res.data.event.event_type ?? 'Pub Trivia');
+    setNotes(res.data.event.notes ?? '');
+    setLocationId(res.data.event.location_id ?? '');
+    setHostUserId(res.data.event.host_user_id ?? '');
+    setRounds(res.data.rounds.sort((a, b) => a.round_number - b.round_number));
+    setTeams(res.data.teams);
+    setEditions(res.data.editions);
+    setLocations(res.data.locations);
+    setGames(res.data.games);
+    setHosts(res.data.hosts);
+    setGameTypes(res.data.game_types);
+    return true;
+  };
+
   const loadReferences = async (isActive: () => boolean = () => true) => {
     if (!eventId) return;
     const [editionsRes, locationsRes, gamesRes, hostsRes, gameTypesRes] = await Promise.all([
@@ -537,15 +558,14 @@ export function EventDetailPage() {
 
   useEffect(() => {
     let active = true;
-    loadCore(() => active);
-    return () => {
-      active = false;
+    const isActive = () => active;
+    const run = async () => {
+      const loaded = await loadBootstrap(isActive);
+      if (!loaded && isActive()) {
+        await Promise.all([loadCore(isActive), loadReferences(isActive)]);
+      }
     };
-  }, [eventId]);
-
-  useEffect(() => {
-    let active = true;
-    loadReferences(() => active);
+    run();
     return () => {
       active = false;
     };

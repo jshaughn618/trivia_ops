@@ -2,6 +2,7 @@ import type {
   ApiEnvelope,
   EditionItem,
   Event,
+  EventBootstrap,
   EventLiveState,
   EventRound,
   EventRoundScore,
@@ -237,6 +238,7 @@ export const api = {
   deleteEventDocument: (eventId: string, type: 'scoresheet' | 'answersheet') =>
     apiFetch<Event>(`/api/events/${eventId}/documents?type=${type}`, { method: 'DELETE' }),
 
+  getEventBootstrap: (eventId: string) => apiFetch<EventBootstrap>(`/api/events/${eventId}/bootstrap`),
   listEventRounds: (eventId: string) => apiFetch<EventRound[]>(`/api/events/${eventId}/rounds`),
   createEventRound: (eventId: string, payload: Partial<EventRound>) =>
     apiFetch<EventRound>(`/api/events/${eventId}/rounds`, {

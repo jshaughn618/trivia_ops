@@ -162,6 +162,17 @@ export type Team = {
   created_at: string;
 };
 
+export type EventBootstrap = {
+  event: Event;
+  rounds: EventRound[];
+  teams: Team[];
+  editions: GameEdition[];
+  locations: Location[];
+  games: Game[];
+  hosts: User[];
+  game_types: GameType[];
+};
+
 export type Session = {
   id: Id;
   user_id: Id;
