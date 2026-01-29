@@ -42,6 +42,7 @@ export type Game = {
   id: Id;
   name: string;
   game_type_id: Id;
+  game_code: string | null;
   description: string | null;
   subtype: string | null;
   default_settings_json: string | null;

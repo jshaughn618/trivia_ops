@@ -34,6 +34,8 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
   if (!name) {
     return jsonError({ code: 'validation_error', message: 'Game name is required.' }, 400);
   }
+  const gameCodeRaw = typeof merged.game_code === 'string' ? merged.game_code.trim().toUpperCase() : '';
+  const gameCode = gameCodeRaw.length === 3 ? gameCodeRaw : null;
   const duplicate = await queryFirst<{ id: string }>(
     env,
     'SELECT id FROM games WHERE lower(name) = lower(?) AND COALESCE(deleted, 0) = 0 AND id != ?',
@@ -45,9 +47,10 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
   const showThemeValue = merged.show_theme === undefined || merged.show_theme === null ? 1 : merged.show_theme ? 1 : 0;
   await execute(
     env,
-    `UPDATE games SET name = ?, game_type_id = ?, description = ?, subtype = ?, default_settings_json = ?, show_theme = ? WHERE id = ?`,
+    `UPDATE games SET name = ?, game_code = ?, game_type_id = ?, description = ?, subtype = ?, default_settings_json = ?, show_theme = ? WHERE id = ?`,
     [
       name,
+      gameCode,
       merged.game_type_id,
       merged.description ?? null,
       merged.subtype ?? null,

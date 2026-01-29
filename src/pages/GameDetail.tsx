@@ -19,6 +19,7 @@ export function GameDetailPage() {
   const [editions, setEditions] = useState<GameEdition[]>([]);
   const [gameTypes, setGameTypes] = useState<GameType[]>([]);
   const [name, setName] = useState('');
+  const [gameCode, setGameCode] = useState('');
   const [gameTypeId, setGameTypeId] = useState('');
   const [subtype, setSubtype] = useState('');
   const [description, setDescription] = useState('');
@@ -38,6 +39,7 @@ export function GameDetailPage() {
       if (gameRes.ok) {
         setGame(gameRes.data);
         setName(gameRes.data.name);
+        setGameCode(gameRes.data.game_code ?? '');
         setGameTypeId(gameRes.data.game_type_id);
         setDescription(gameRes.data.description ?? '');
         setSubtype(gameRes.data.subtype ?? '');
@@ -54,6 +56,7 @@ export function GameDetailPage() {
     setUpdateError(null);
     const res = await api.updateGame(gameId, {
       name,
+      game_code: gameCode.trim() || null,
       description,
       game_type_id: gameTypeId,
       subtype: subtype.trim() || null,
@@ -111,6 +114,15 @@ export function GameDetailPage() {
             <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
               Name
               <input className="h-10 px-3" value={name} onChange={(event) => setName(event.target.value)} />
+            </label>
+            <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+              Game code (3 characters)
+              <input
+                className="h-10 px-3 uppercase"
+                maxLength={3}
+                value={gameCode}
+                onChange={(event) => setGameCode(event.target.value.toUpperCase())}
+              />
             </label>
             <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
               Game Type

@@ -18,6 +18,7 @@ export const locationUpdateSchema = locationCreateSchema.partial();
 export const gameCreateSchema = z.object({
   name: z.string().min(1),
   game_type_id: idSchema,
+  game_code: z.string().regex(/^[A-Za-z0-9]{3}$/).nullable().optional(),
   description: z.string().nullable().optional(),
   subtype: z.string().nullable().optional(),
   default_settings_json: z.string().nullable().optional(),
@@ -27,6 +28,7 @@ export const gameCreateSchema = z.object({
 export const gameUpdateSchema = z.object({
   name: z.string().min(1).optional(),
   game_type_id: idSchema.optional(),
+  game_code: z.string().regex(/^[A-Za-z0-9]{3}$/).nullable().optional(),
   description: z.string().nullable().optional(),
   subtype: z.string().nullable().optional(),
   default_settings_json: z.string().nullable().optional(),

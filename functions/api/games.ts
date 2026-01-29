@@ -25,6 +25,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, data }) 
   const createdAt = nowIso();
   const payloadData = parsed.data;
   const name = payloadData.name.trim();
+  const gameCodeRaw = typeof payloadData.game_code === 'string' ? payloadData.game_code.trim().toUpperCase() : '';
+  const gameCode = gameCodeRaw.length === 3 ? gameCodeRaw : null;
 
   const duplicate = await queryFirst<{ id: string }>(
     env,
@@ -46,11 +48,12 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, data }) 
   const showThemeValue = payloadData.show_theme === undefined ? 1 : payloadData.show_theme ? 1 : 0;
   await execute(
     env,
-    `INSERT INTO games (id, name, game_type_id, description, subtype, default_settings_json, show_theme, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO games (id, name, game_code, game_type_id, description, subtype, default_settings_json, show_theme, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id,
       name,
+      gameCode,
       payloadData.game_type_id,
       payloadData.description ?? null,
       payloadData.subtype ?? null,

@@ -33,6 +33,7 @@ export function GamesPage() {
   const [openGames, setOpenGames] = useState<Record<string, boolean>>({});
   const [gameMenuId, setGameMenuId] = useState<string | null>(null);
   const [name, setName] = useState('');
+  const [gameCode, setGameCode] = useState('');
   const [gameTypeId, setGameTypeId] = useState('');
   const [subtype, setSubtype] = useState('');
   const [description, setDescription] = useState('');
@@ -147,6 +148,7 @@ export function GamesPage() {
     setCreateError(null);
     const res = await api.createGame({
       name,
+      game_code: gameCode.trim() || null,
       description,
       game_type_id: gameTypeId,
       subtype: subtype.trim() || null,
@@ -155,6 +157,7 @@ export function GamesPage() {
     setLoading(false);
     if (res.ok) {
       setName('');
+      setGameCode('');
       setDescription('');
       setGameTypeId('');
       setSubtype('');
@@ -342,9 +345,14 @@ export function GamesPage() {
                                   )}
                                   {sortedEditions.map((edition) => {
                                     const baseTitle = edition.theme ?? edition.title ?? 'Untitled edition';
-                                    const primaryTitle = edition.edition_number
-                                      ? `${edition.edition_number} - ${baseTitle}`
-                                      : baseTitle;
+                                    const key = game.game_code && typeof edition.edition_number === 'number'
+                                      ? `${game.game_code}${String(edition.edition_number).padStart(3, '0')}`
+                                      : null;
+                                    const primaryTitle = key
+                                      ? `${key} - ${baseTitle}`
+                                      : edition.edition_number
+                                        ? `${edition.edition_number} - ${baseTitle}`
+                                        : baseTitle;
                                     const secondary = edition.tags_csv ? `Tags: ${edition.tags_csv}` : '';
                                     return (
                                       <ListRow key={edition.id} to={`/editions/${edition.id}`} className="py-3 pl-8">
@@ -386,6 +394,15 @@ export function GamesPage() {
                   <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
                     Name
                     <input className="h-10 px-3" value={name} onChange={(event) => setName(event.target.value)} />
+                  </label>
+                  <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+                    Game code (3 characters)
+                    <input
+                      className="h-10 px-3 uppercase"
+                      maxLength={3}
+                      value={gameCode}
+                      onChange={(event) => setGameCode(event.target.value.toUpperCase())}
+                    />
                   </label>
                   <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
                     Game type
@@ -442,6 +459,7 @@ export function GamesPage() {
                     <SecondaryButton
                       onClick={() => {
                         setName('');
+                        setGameCode('');
                         setDescription('');
                         setGameTypeId('');
                         setSubtype('');
