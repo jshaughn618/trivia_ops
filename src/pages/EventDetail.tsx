@@ -498,18 +498,14 @@ export function EventDetailPage() {
   const scoresheetInputId = useId();
   const answersheetInputId = useId();
 
-  const load = async () => {
+  const loadCore = async (isActive: () => boolean = () => true) => {
     if (!eventId) return;
-    const [eventRes, roundsRes, teamsRes, editionsRes, locationsRes, gamesRes, hostsRes, gameTypesRes] = await Promise.all([
+    const [eventRes, roundsRes, teamsRes] = await Promise.all([
       api.getEvent(eventId),
       api.listEventRounds(eventId),
-      api.listTeams(eventId),
-      api.listEditions(),
-      api.listLocations(),
-      api.listGames(),
-      api.listHosts(),
-      api.listGameTypes()
+      api.listTeams(eventId)
     ]);
+    if (!isActive()) return;
     if (eventRes.ok) {
       setEvent(eventRes.data);
       setStatus(eventRes.data.status);
@@ -520,6 +516,18 @@ export function EventDetailPage() {
     }
     if (roundsRes.ok) setRounds(roundsRes.data.sort((a, b) => a.round_number - b.round_number));
     if (teamsRes.ok) setTeams(teamsRes.data);
+  };
+
+  const loadReferences = async (isActive: () => boolean = () => true) => {
+    if (!eventId) return;
+    const [editionsRes, locationsRes, gamesRes, hostsRes, gameTypesRes] = await Promise.all([
+      api.listEditions(),
+      api.listLocations(),
+      api.listGames(),
+      api.listHosts(),
+      api.listGameTypes()
+    ]);
+    if (!isActive()) return;
     if (editionsRes.ok) setEditions(editionsRes.data);
     if (locationsRes.ok) setLocations(locationsRes.data);
     if (gamesRes.ok) setGames(gamesRes.data);
@@ -528,7 +536,19 @@ export function EventDetailPage() {
   };
 
   useEffect(() => {
-    load();
+    let active = true;
+    loadCore(() => active);
+    return () => {
+      active = false;
+    };
+  }, [eventId]);
+
+  useEffect(() => {
+    let active = true;
+    loadReferences(() => active);
+    return () => {
+      active = false;
+    };
   }, [eventId]);
 
   useEffect(() => {
@@ -711,7 +731,7 @@ export function EventDetailPage() {
     });
     setRoundGameId('');
     setRoundEditionId('');
-    load();
+    loadCore();
   };
 
   const saveScoresheetTitle = async (round: EventRound) => {
@@ -749,7 +769,7 @@ export function EventDetailPage() {
       setTeamName('');
       setTeamTable('');
       setTeamError(null);
-      load();
+      loadCore();
     } else {
       setTeamError(res.error.message ?? 'Unable to create team.');
     }
@@ -757,7 +777,7 @@ export function EventDetailPage() {
 
   const deleteRound = async (roundId: string) => {
     await api.deleteEventRound(roundId);
-    load();
+    loadCore();
   };
 
   const deleteEvent = async () => {
@@ -770,7 +790,7 @@ export function EventDetailPage() {
 
   const deleteTeam = async (teamId: string) => {
     await api.deleteTeam(teamId);
-    load();
+    loadCore();
   };
 
   const loadScores = async (roundId: string) => {
