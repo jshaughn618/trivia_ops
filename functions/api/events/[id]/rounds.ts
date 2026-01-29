@@ -38,8 +38,9 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request, 
   const scoresheetTitle = payloadData.scoresheet_title ?? payloadData.label;
   await execute(
     env,
-    `INSERT INTO event_rounds (id, event_id, round_number, label, scoresheet_title, edition_id, status, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO event_rounds
+     (id, event_id, round_number, label, scoresheet_title, audio_key, audio_name, edition_id, status, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ,
     [
       id,
@@ -47,6 +48,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request, 
       payloadData.round_number,
       payloadData.label,
       scoresheetTitle,
+      payloadData.audio_key ?? null,
+      payloadData.audio_name ?? null,
       payloadData.edition_id,
       payloadData.status,
       createdAt

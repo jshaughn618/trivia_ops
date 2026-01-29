@@ -172,6 +172,8 @@ export const eventRoundCreateSchema = z.object({
   round_number: z.number().int().min(1),
   label: z.string().min(1),
   scoresheet_title: z.string().min(1).optional(),
+  audio_key: z.string().nullable().optional(),
+  audio_name: z.string().nullable().optional(),
   edition_id: idSchema,
   status: eventRoundStatusSchema.default('planned')
 });
@@ -180,6 +182,8 @@ export const eventRoundUpdateSchema = z.object({
   round_number: z.number().int().min(1).optional(),
   label: z.string().min(1).optional(),
   scoresheet_title: z.string().min(1).optional(),
+  audio_key: z.string().nullable().optional(),
+  audio_name: z.string().nullable().optional(),
   edition_id: idSchema.optional(),
   status: eventRoundStatusSchema.optional()
 });

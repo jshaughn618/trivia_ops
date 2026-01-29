@@ -29,8 +29,19 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
   };
   await execute(
     env,
-    `UPDATE event_rounds SET round_number = ?, label = ?, scoresheet_title = ?, edition_id = ?, status = ? WHERE id = ?`,
-    [merged.round_number, merged.label, merged.scoresheet_title, merged.edition_id, merged.status, params.roundId]
+    `UPDATE event_rounds
+     SET round_number = ?, label = ?, scoresheet_title = ?, edition_id = ?, status = ?, audio_key = ?, audio_name = ?
+     WHERE id = ?`,
+    [
+      merged.round_number,
+      merged.label,
+      merged.scoresheet_title,
+      merged.edition_id,
+      merged.status,
+      merged.audio_key ?? null,
+      merged.audio_name ?? null,
+      params.roundId
+    ]
   );
 
   const isCompleting = (existing.status !== 'completed' && existing.status !== 'locked') &&

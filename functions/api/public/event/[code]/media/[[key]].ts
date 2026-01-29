@@ -40,30 +40,33 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params, request, d
     return jsonError({ code: 'not_live', message: 'Event is not live' }, 403);
   }
 
-  const activeRound = await queryFirst<{ status: string }>(
+  const activeRound = await queryFirst<{ status: string; audio_key: string | null }>(
     env,
-    'SELECT status FROM event_rounds WHERE id = ? AND event_id = ? AND COALESCE(deleted, 0) = 0',
+    'SELECT status, audio_key FROM event_rounds WHERE id = ? AND event_id = ? AND COALESCE(deleted, 0) = 0',
     [live.active_round_id, event.id]
   );
   if (!activeRound || activeRound.status !== 'live') {
     return jsonError({ code: 'not_live', message: 'Event is not live' }, 403);
   }
 
-  const mediaMatch = await queryFirst<{ media_key: string }>(
-    env,
-    `SELECT ei.media_key
-     FROM event_round_items eri
-     JOIN edition_items ei ON ei.id = eri.edition_item_id
-     WHERE eri.event_round_id = ?
-       AND ei.media_key = ?
-       AND COALESCE(eri.deleted, 0) = 0
-       AND COALESCE(ei.deleted, 0) = 0
-     LIMIT 1`,
-    [live.active_round_id, key]
-  );
+  const isRoundAudio = activeRound.audio_key && activeRound.audio_key === key;
+  if (!isRoundAudio) {
+    const mediaMatch = await queryFirst<{ media_key: string }>(
+      env,
+      `SELECT ei.media_key
+       FROM event_round_items eri
+       JOIN edition_items ei ON ei.id = eri.edition_item_id
+       WHERE eri.event_round_id = ?
+         AND ei.media_key = ?
+         AND COALESCE(eri.deleted, 0) = 0
+         AND COALESCE(ei.deleted, 0) = 0
+       LIMIT 1`,
+      [live.active_round_id, key]
+    );
 
-  if (!mediaMatch) {
-    return jsonError({ code: 'forbidden', message: 'Media not available' }, 403);
+    if (!mediaMatch) {
+      return jsonError({ code: 'forbidden', message: 'Media not available' }, 403);
+    }
   }
 
   const rangeHeader = request.headers.get('range');

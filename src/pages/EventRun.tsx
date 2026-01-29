@@ -178,7 +178,12 @@ export function EventRunPage() {
 
   const activeRound = useMemo(() => rounds.find((round) => round.id === roundId) ?? null, [rounds, roundId]);
   const item = items[index];
+  const isAudioItem = item?.media_type === 'audio';
   const isImageItem = item?.media_type === 'image';
+  const roundAudioKey = activeRound?.audio_key ?? null;
+  const roundAudioName = activeRound?.audio_name ?? null;
+  const effectiveAudioKey = isAudioItem ? item?.media_key ?? roundAudioKey : null;
+  const usesRoundAudio = isAudioItem && !item?.media_key && Boolean(roundAudioKey);
   const questionLabel = item?.prompt?.trim()
     ? item.prompt
     : item?.media_type === 'audio'
@@ -191,7 +196,7 @@ export function EventRunPage() {
 
   useEffect(() => {
     setAudioError(null);
-  }, [item?.id]);
+  }, [item?.id, effectiveAudioKey]);
 
   useEffect(() => {
     let cancelled = false;
@@ -201,18 +206,18 @@ export function EventRunPage() {
     }
     setAudioError(null);
     setAudioRequestId(null);
-    if (!item || item.media_type !== 'audio' || !item.media_key) {
+    if (!isAudioItem || !effectiveAudioKey) {
       setAudioLoading(false);
       return () => {};
     }
     setAudioLoading(true);
-    api.fetchMedia(item.media_key).then((res) => {
+    api.fetchMedia(effectiveAudioKey).then((res) => {
       if (cancelled) return;
       setAudioLoading(false);
       if (res.ok) {
         let blob = res.data.blob;
         if (!blob.type || blob.type === 'application/octet-stream') {
-          const ext = item.media_key.split('.').pop()?.toLowerCase();
+          const ext = effectiveAudioKey.split('.').pop()?.toLowerCase();
           const typeMap: Record<string, string> = {
             mp3: 'audio/mpeg',
             wav: 'audio/wav',
@@ -233,7 +238,7 @@ export function EventRunPage() {
     return () => {
       cancelled = true;
     };
-  }, [item?.id, item?.media_key, item?.media_type, audioRetryToken]);
+  }, [effectiveAudioKey, isAudioItem, audioRetryToken]);
 
   useEffect(() => {
     return () => {
@@ -246,7 +251,9 @@ export function EventRunPage() {
     logInfo('audio_event', {
       event,
       itemId: item?.id ?? null,
-      mediaKey: item?.media_key ?? null,
+      roundId: activeRound?.id ?? null,
+      mediaKey: effectiveAudioKey ?? null,
+      source: usesRoundAudio ? 'round' : 'item',
       requestId: audioRequestId,
       errorCode: error?.code ?? null,
       errorMessage: error?.message ?? null
@@ -257,7 +264,9 @@ export function EventRunPage() {
     const error = audioRef.current?.error;
     logError('audio_error', {
       itemId: item?.id ?? null,
-      mediaKey: item?.media_key ?? null,
+      roundId: activeRound?.id ?? null,
+      mediaKey: effectiveAudioKey ?? null,
+      source: usesRoundAudio ? 'round' : 'item',
       requestId: audioRequestId,
       errorCode: error?.code ?? null,
       errorMessage: error?.message ?? null
@@ -551,8 +560,13 @@ export function EventRunPage() {
                       />
                     </div>
                   )}
-                  {item.media_type === 'audio' && item.media_key && (
+                  {item.media_type === 'audio' && effectiveAudioKey && (
                     <div className="mt-4 flex flex-col gap-2">
+                      {usesRoundAudio && (
+                        <div className="text-xs uppercase tracking-[0.2em] text-muted">
+                          Round clip{roundAudioName ? ` • ${roundAudioName}` : ''}
+                        </div>
+                      )}
                       {audioLoading && (
                         <div className="text-xs uppercase tracking-[0.2em] text-muted">Loading audio…</div>
                       )}
@@ -578,6 +592,11 @@ export function EventRunPage() {
                           Retry Audio
                         </SecondaryButton>
                       )}
+                    </div>
+                  )}
+                  {item.media_type === 'audio' && !effectiveAudioKey && (
+                    <div className="mt-4 border-2 border-danger bg-panel px-3 py-2 text-xs uppercase tracking-[0.2em] text-danger">
+                      No audio clip attached to this round.
                     </div>
                   )}
                   {!isImageItem && (
