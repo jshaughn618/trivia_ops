@@ -5,6 +5,11 @@ import { editionUpdateSchema } from '../../../../shared/validators';
 import { execute, nowIso, queryFirst } from '../../../db';
 import { requireAdmin } from '../../../access';
 
+const isEditionNumberConflict = (error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes('UNIQUE constraint failed: editions.game_id, editions.edition_number');
+};
+
 export const onRequestGet: PagesFunction<Env> = async ({ env, params, data }) => {
   const guard = requireAdmin(data.user ?? null);
   if (guard) return guard;
@@ -31,22 +36,29 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
 
   const merged = { ...existing, ...parsed.data };
   const title = parsed.data.title ?? parsed.data.theme ?? merged.title;
-  await execute(
-    env,
-    `UPDATE editions SET game_id = ?, edition_number = ?, title = ?, description = ?, status = ?, tags_csv = ?, theme = ?, timer_seconds = ?, updated_at = ? WHERE id = ?`,
-    [
-      merged.game_id,
-      merged.edition_number ?? null,
-      title,
-      merged.description ?? null,
-      merged.status,
-      merged.tags_csv ?? null,
-      merged.theme ?? null,
-      merged.timer_seconds ?? 15,
-      nowIso(),
-      params.id
-    ]
-  );
+  try {
+    await execute(
+      env,
+      `UPDATE editions SET game_id = ?, edition_number = ?, title = ?, description = ?, status = ?, tags_csv = ?, theme = ?, timer_seconds = ?, updated_at = ? WHERE id = ?`,
+      [
+        merged.game_id,
+        merged.edition_number ?? null,
+        title,
+        merged.description ?? null,
+        merged.status,
+        merged.tags_csv ?? null,
+        merged.theme ?? null,
+        merged.timer_seconds ?? 15,
+        nowIso(),
+        params.id
+      ]
+    );
+  } catch (error) {
+    if (isEditionNumberConflict(error)) {
+      return jsonError({ code: 'conflict', message: 'Edition number already exists for this game.' }, 409);
+    }
+    throw error;
+  }
 
   const row = await queryFirst(env, 'SELECT * FROM editions WHERE id = ? AND COALESCE(deleted, 0) = 0', [params.id]);
   return jsonOk(row);

@@ -1,5 +1,14 @@
 # Trivia Ops
 
+## Architecture Summary
+- Hosting: Cloudflare Pages with Functions.
+- Frontend: React + Vite + Tailwind (`src/pages`, `src/components`, styling in `src/index.css`).
+- Backend: REST-style API routes in `functions/api/**`.
+- Data: Cloudflare D1 with schema/migrations in `migrations/*.sql`.
+- Storage: Cloudflare R2 for media uploads (audio/image).
+- Auth: Signed cookie + sessions table, enforced by middleware on all routes.
+- Shared: Types in `shared/types.ts`, validators in `shared/validators.ts`.
+
 ## Development
 - Install deps: `npm install`
 - Run dev server: `npm run dev`

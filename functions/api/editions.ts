@@ -6,6 +6,11 @@ import { execute, nowIso, queryAll } from '../db';
 import { logError } from '../_lib/log';
 import { requireAdmin } from '../access';
 
+const isEditionNumberConflict = (error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes('UNIQUE constraint failed: editions.game_id, editions.edition_number');
+};
+
 export const onRequestGet: PagesFunction<Env> = async ({ env, request, data }) => {
   const guard = requireAdmin(data.user ?? null);
   if (guard) return guard;
@@ -88,25 +93,32 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, data }) 
   const payloadData = parsed.data;
   const title = payloadData.title ?? payloadData.theme ?? 'Untitled Edition';
 
-  await execute(
-    env,
-    `INSERT INTO editions (id, game_id, edition_number, title, description, status, tags_csv, theme, timer_seconds, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ,
-    [
-      id,
-      payloadData.game_id,
-      payloadData.edition_number ?? null,
-      title,
-      payloadData.description ?? null,
-      payloadData.status,
-      payloadData.tags_csv ?? null,
-      payloadData.theme ?? null,
-      payloadData.timer_seconds ?? 15,
-      createdAt,
-      createdAt
-    ]
-  );
+  try {
+    await execute(
+      env,
+      `INSERT INTO editions (id, game_id, edition_number, title, description, status, tags_csv, theme, timer_seconds, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ,
+      [
+        id,
+        payloadData.game_id,
+        payloadData.edition_number ?? null,
+        title,
+        payloadData.description ?? null,
+        payloadData.status,
+        payloadData.tags_csv ?? null,
+        payloadData.theme ?? null,
+        payloadData.timer_seconds ?? 15,
+        createdAt,
+        createdAt
+      ]
+    );
+  } catch (error) {
+    if (isEditionNumberConflict(error)) {
+      return jsonError({ code: 'conflict', message: 'Edition number already exists for this game.' }, 409);
+    }
+    throw error;
+  }
 
   const rows = await queryAll(env, 'SELECT * FROM editions WHERE id = ? AND COALESCE(deleted, 0) = 0', [id]);
   return jsonOk(rows[0]);
