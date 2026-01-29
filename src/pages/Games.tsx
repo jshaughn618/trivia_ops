@@ -171,9 +171,10 @@ export function GamesPage() {
   const selectedType = typeById[gameTypeId] ?? null;
   const isMusicType = selectedType?.code === 'music';
   const groupedGames = useMemo(() => {
+    const sortedGames = [...filteredGames].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
     const music: Game[] = [];
     const pub: Game[] = [];
-    filteredGames.forEach((game) => {
+    sortedGames.forEach((game) => {
       const type = typeById[game.game_type_id];
       if (type?.code === 'music') {
         music.push(game);
@@ -254,6 +255,14 @@ export function GamesPage() {
                       <div className="mt-2 divide-y divide-border">
                         {group.games.map((game) => {
                           const gameEditions = editionsByGame.get(game.id) ?? [];
+                          const sortedEditions = [...gameEditions].sort((a, b) => {
+                            const aNum = typeof a.edition_number === 'number' ? a.edition_number : Number.POSITIVE_INFINITY;
+                            const bNum = typeof b.edition_number === 'number' ? b.edition_number : Number.POSITIVE_INFINITY;
+                            if (aNum !== bNum) return aNum - bNum;
+                            const aTheme = (a.theme ?? a.title ?? '').toLowerCase();
+                            const bTheme = (b.theme ?? b.title ?? '').toLowerCase();
+                            return aTheme.localeCompare(bTheme, undefined, { sensitivity: 'base' });
+                          });
                           const isOpen = Boolean(openGames[game.id]);
                           const editionListId = `editions-${game.id}`;
                           return (
@@ -331,7 +340,7 @@ export function GamesPage() {
                                       No editions yet.
                                     </div>
                                   )}
-                                  {gameEditions.map((edition) => {
+                                  {sortedEditions.map((edition) => {
                                     const baseTitle = edition.theme ?? edition.title ?? 'Untitled edition';
                                     const primaryTitle = edition.edition_number
                                       ? `${edition.edition_number} - ${baseTitle}`
