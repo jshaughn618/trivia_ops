@@ -54,11 +54,11 @@ export async function verifySessionCookie(cookieValue: string, secret: string) {
 
 export function buildSessionCookie(value: string, expiresAt: string) {
   const expires = new Date(expiresAt).toUTCString();
-  return `triviaops_session=${encodeURIComponent(value)}; Path=/; HttpOnly; SameSite=Strict; Expires=${expires}`;
+  return `triviaops_session=${encodeURIComponent(value)}; Path=/; HttpOnly; SameSite=Strict; Secure; Expires=${expires}`;
 }
 
 export function clearSessionCookie() {
-  return 'triviaops_session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0';
+  return 'triviaops_session=; Path=/; HttpOnly; SameSite=Strict; Secure; Max-Age=0';
 }
 
 export async function createSession(env: Env, userId: string, req: Request) {

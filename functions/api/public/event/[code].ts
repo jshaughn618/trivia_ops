@@ -91,9 +91,33 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
     [event.id]
   );
 
-  let currentItem = null;
+  type PublicItem = {
+    id: string;
+    question_type: string | null;
+    choices_json: string | null;
+    prompt: string;
+    media_type: string | null;
+    media_key: string | null;
+    media_caption?: string | null;
+    ordinal: number;
+    answer?: string;
+    answer_a?: string | null;
+    answer_b?: string | null;
+    answer_a_label?: string | null;
+    answer_b_label?: string | null;
+    answer_parts_json?: string | null;
+    audio_answer_key?: string | null;
+    fun_fact?: string | null;
+  };
+
+  let currentItem: PublicItem | null = null;
   let visualRound = false;
-  let visualItems: Array<{
+  let visualItems: PublicItem[] = [];
+  let responseCounts: { total: number; counts: number[] } | null = null;
+  const canRevealAnswer = Boolean(live?.reveal_answer);
+  const canRevealFunFact = Boolean(live?.reveal_fun_fact);
+
+  const sanitizeItem = (item: {
     id: string;
     question_type: string | null;
     choices_json: string | null;
@@ -108,9 +132,34 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
     media_type: string | null;
     media_key: string | null;
     audio_answer_key: string | null;
+    media_caption?: string | null;
     ordinal: number;
-  }> = [];
-  let responseCounts: { total: number; counts: number[] } | null = null;
+  }): PublicItem => {
+    const base: PublicItem = {
+      id: item.id,
+      question_type: item.question_type,
+      choices_json: item.choices_json,
+      prompt: item.prompt,
+      media_type: item.media_type,
+      media_key: item.media_key,
+      media_caption: item.media_caption ?? null,
+      ordinal: item.ordinal
+    };
+
+    if (canRevealAnswer) {
+      base.answer = item.answer;
+      base.answer_a = item.answer_a;
+      base.answer_b = item.answer_b;
+      base.answer_a_label = item.answer_a_label;
+      base.answer_b_label = item.answer_b_label;
+      base.answer_parts_json = item.answer_parts_json;
+      base.audio_answer_key = item.audio_answer_key;
+    }
+    if (canRevealFunFact) {
+      base.fun_fact = item.fun_fact ?? null;
+    }
+    return base;
+  };
 
   if (live?.active_round_id) {
     const roundStatus = await queryFirst<{ status: string }>(
@@ -162,12 +211,12 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
       const imageItems = roundItems.filter((item) => item.media_type === 'image' && item.media_key);
       if (roundItems.length > 0 && imageItems.length === roundItems.length) {
         visualRound = true;
-        visualItems = imageItems;
+        visualItems = imageItems.map((item) => sanitizeItem(item));
       }
     }
   }
   if (live?.active_round_id && live.current_item_ordinal) {
-    currentItem = await queryFirst(
+    const rawItem = await queryFirst(
       env,
       `SELECT
         ei.id,
@@ -192,6 +241,9 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
        LIMIT 1`,
       [live.active_round_id, live.current_item_ordinal]
     );
+    if (rawItem) {
+      currentItem = sanitizeItem(rawItem);
+    }
   }
 
   if (currentItem?.choices_json && live?.active_round_id) {
