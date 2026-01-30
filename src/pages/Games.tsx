@@ -223,13 +223,14 @@ export function GamesPage() {
     return (music ?? categoryGroups[0])?.id ?? '';
   }, [categoryGroups]);
 
+  const hasCategories = categoryGroups.length > 0;
   const resolvedCategory = useMemo(() => {
-    if (categoryGroups.length === 0) return '';
+    if (!hasCategories) return '';
     if (activeCategory && categoryGroups.some((group) => group.id === activeCategory)) {
       return activeCategory;
     }
     return defaultCategory;
-  }, [activeCategory, categoryGroups, defaultCategory]);
+  }, [activeCategory, categoryGroups, defaultCategory, hasCategories]);
 
   useEffect(() => {
     if (!resolvedCategory) return;
@@ -253,7 +254,10 @@ export function GamesPage() {
     setGameMenuId(null);
   }, [resolvedCategory]);
 
-  const categoryGames = useMemo(() => filteredCategoryMap[resolvedCategory] ?? [], [filteredCategoryMap, resolvedCategory]);
+  const categoryGames = useMemo(() => {
+    if (!hasCategories) return sortedFilteredGames;
+    return filteredCategoryMap[resolvedCategory] ?? [];
+  }, [filteredCategoryMap, resolvedCategory, hasCategories, sortedFilteredGames]);
 
   return (
     <AppShell title="Games" showTitle={false}>
@@ -282,7 +286,7 @@ export function GamesPage() {
         )}
         <div className="grid gap-4 lg:grid-cols-[1fr,320px]">
           <Section title="Edition library">
-            {categoryGroups.length > 0 && (
+            {hasCategories && (
               <div className="mb-3 flex flex-wrap items-center gap-2">
                 <div className="inline-flex rounded-full border border-border bg-panel2/70 p-1">
                   {categoryGroups.map((group) => {
@@ -330,7 +334,7 @@ export function GamesPage() {
                     setSearch('');
                     setOpenGames({});
                     setGameMenuId(null);
-                    if (defaultCategory) setActiveCategory(defaultCategory);
+                    if (hasCategories && defaultCategory) setActiveCategory(defaultCategory);
                   }}
                   className="text-left text-xs uppercase tracking-[0.2em] text-accent-ink"
                 >
@@ -338,7 +342,7 @@ export function GamesPage() {
                 </button>
               </div>
             )}
-            {filteredGames.length > 0 && categoryGames.length === 0 && (
+            {hasCategories && filteredGames.length > 0 && categoryGames.length === 0 && (
               <div className="mb-2 text-xs uppercase tracking-[0.2em] text-muted">
                 No games match your filters in this category.
               </div>
