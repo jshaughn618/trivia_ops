@@ -1369,7 +1369,7 @@ export function EditionDetailPage() {
       .filter(Boolean);
     const entries: Array<{ ordinal: number; parts: AnswerPart[] }> = [];
     for (const line of lines) {
-      const match = /^(\d{1,3})\s*[-:\|,]\s*(.+)$/.exec(line);
+      const match = /^(\d{1,3})\s*(?:-|:|\||,)\s*(.+)$/.exec(line);
       if (!match) continue;
       const ordinal = Number(match[1]);
       if (!Number.isFinite(ordinal)) continue;
