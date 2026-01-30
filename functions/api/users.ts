@@ -4,10 +4,10 @@ import { parseJson } from '../request';
 import { userCreateSchema } from '../../shared/validators';
 import { execute, nowIso, queryAll, queryFirst } from '../db';
 import { hashPassword } from '../auth';
-import { requireAdmin } from '../users';
+import { requireAdmin } from '../access';
 
 export const onRequestGet: PagesFunction<Env> = async ({ env, data }) => {
-  const guard = requireAdmin(env, data.user);
+  const guard = requireAdmin(data.user ?? null);
   if (guard) return guard;
 
   const rows = await queryAll(
@@ -18,7 +18,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, data }) => {
 };
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env, data }) => {
-  const guard = requireAdmin(env, data.user);
+  const guard = requireAdmin(data.user ?? null);
   if (guard) return guard;
 
   const payload = await parseJson(request);

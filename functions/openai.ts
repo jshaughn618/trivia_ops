@@ -1,6 +1,6 @@
 import type { Env } from './types';
 
-const DEFAULT_MODEL = 'gpt-4.1-mini';
+const DEFAULT_MODEL = 'gpt-5-mini';
 
 export async function generateText(env: Env, input: { prompt: string; model?: string; max_output_tokens?: number }) {
   if (!env.OPENAI_API_KEY) {

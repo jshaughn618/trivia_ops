@@ -4,12 +4,30 @@ import { parseJson } from '../../../../request';
 import { publicJoinSchema } from '../../../../../shared/validators';
 import { normalizeCode } from '../../../../public';
 import { execute, nowIso, queryAll, queryFirst } from '../../../../db';
+import { checkRateLimit, recordRateLimitHit } from '../../../../rate-limit';
+
+const PUBLIC_JOIN_RATE_LIMIT = {
+  maxAttempts: 12,
+  windowSeconds: 2 * 60,
+  blockSeconds: 5 * 60
+};
 
 export const onRequestPost: PagesFunction<Env> = async ({ env, params, request }) => {
+  const ip = request.headers.get('cf-connecting-ip') ?? 'unknown';
+  const limitKey = `public-join:${ip}`;
+  const status = await checkRateLimit(env, limitKey, PUBLIC_JOIN_RATE_LIMIT);
+  if (!status.allowed) {
+    return jsonError(
+      { code: 'rate_limited', message: 'Too many attempts. Please try again later.', details: { retry_after: status.retryAfterSeconds } },
+      429
+    );
+  }
+  const recordFailure = async () => recordRateLimitHit(env, limitKey, PUBLIC_JOIN_RATE_LIMIT);
   const code = normalizeCode(params.code as string);
   const payload = await parseJson(request);
   const parsed = publicJoinSchema.safeParse(payload);
   if (!parsed.success) {
+    await recordFailure();
     return jsonError({ code: 'validation_error', message: 'Invalid join request', details: parsed.error.flatten() }, 400);
   }
 
@@ -20,9 +38,11 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request }
   );
 
   if (!event) {
+    await recordFailure();
     return jsonError({ code: 'not_found', message: 'Event not found' }, 404);
   }
   if (event.status === 'completed' || event.status === 'canceled') {
+    await recordFailure();
     return jsonError({ code: 'event_closed', message: 'Event is closed' }, 403);
   }
 

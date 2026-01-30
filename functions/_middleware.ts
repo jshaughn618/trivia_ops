@@ -8,6 +8,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const { request, env } = context;
   const url = new URL(request.url);
   const path = url.pathname;
+  const method = request.method.toUpperCase();
   const requestId = getRequestId(request);
   (env as { __requestId?: string }).__requestId = requestId;
   context.data.requestId = requestId;
@@ -19,10 +20,22 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
   try {
     if (publicRoutes.includes(path) || publicPrefixes.some((prefix) => path.startsWith(prefix)) || isStatic) {
+      if (isStateChanging(method)) {
+        const csrfResult = validateCsrf(request, env, url);
+        if (!csrfResult.ok) {
+          const response = path.startsWith('/api')
+            ? jsonError(
+              { code: 'csrf_failed', message: 'CSRF validation failed', details: { reason: csrfResult.reason } },
+              403
+            )
+            : new Response('Forbidden', { status: 403 });
+          return withRequestId(response, requestId);
+        }
+      }
       if (loggable) {
         logInfo(env, 'request_start', {
           requestId,
-          method: request.method,
+          method,
           path,
           userId: null
         });
@@ -31,13 +44,26 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       if (loggable) {
         logInfo(env, 'request_end', {
           requestId,
-          method: request.method,
+          method,
           path,
           status: response.status,
           userId: null
         });
       }
       return withRequestId(response, requestId);
+    }
+
+    if (isStateChanging(method)) {
+      const csrfResult = validateCsrf(request, env, url);
+      if (!csrfResult.ok) {
+        const response = path.startsWith('/api')
+          ? jsonError(
+            { code: 'csrf_failed', message: 'CSRF validation failed', details: { reason: csrfResult.reason } },
+            403
+          )
+          : new Response('Forbidden', { status: 403 });
+        return withRequestId(response, requestId);
+      }
     }
 
     const cookies = parseCookies(request.headers.get('cookie'));
@@ -75,29 +101,29 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     }
 
     context.data.user = user;
-    if (loggable) {
-      logInfo(env, 'request_start', {
-        requestId,
-        method: request.method,
-        path,
-        userId: user.id
-      });
-    }
-    const response = await context.next();
-    if (loggable) {
-      logInfo(env, 'request_end', {
-        requestId,
-        method: request.method,
-        path,
-        status: response.status,
-        userId: user.id
-      });
-    }
+      if (loggable) {
+        logInfo(env, 'request_start', {
+          requestId,
+          method,
+          path,
+          userId: user.id
+        });
+      }
+      const response = await context.next();
+      if (loggable) {
+        logInfo(env, 'request_end', {
+          requestId,
+          method,
+          path,
+          status: response.status,
+          userId: user.id
+        });
+      }
     return withRequestId(response, requestId);
   } catch (error) {
     logError(env, 'request_error', {
       requestId,
-      method: request.method,
+      method,
       path,
       message: error instanceof Error ? error.message : 'unknown_error',
       stack: error instanceof Error ? error.stack : undefined
@@ -108,6 +134,39 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     return withRequestId(response, requestId);
   }
 };
+
+function isStateChanging(method: string) {
+  return method === 'POST' || method === 'PUT' || method === 'PATCH' || method === 'DELETE';
+}
+
+function validateCsrf(request: Request, env: Env, url: URL) {
+  const origin = request.headers.get('origin');
+  const referer = request.headers.get('referer');
+  const originFromReferer = referer ? safeOrigin(referer) : null;
+  const requestOrigin = url.origin;
+  const appOrigin = env.APP_BASE_URL ? safeOrigin(env.APP_BASE_URL) : null;
+  const allowedOrigins = new Set([requestOrigin, appOrigin].filter(Boolean) as string[]);
+
+  if (origin) {
+    return allowedOrigins.has(origin)
+      ? { ok: true as const }
+      : { ok: false as const, reason: `origin_not_allowed:${origin}` };
+  }
+  if (originFromReferer) {
+    return allowedOrigins.has(originFromReferer)
+      ? { ok: true as const }
+      : { ok: false as const, reason: `referer_not_allowed:${originFromReferer}` };
+  }
+  return { ok: true as const };
+}
+
+function safeOrigin(value: string) {
+  try {
+    return new URL(value).origin;
+  } catch {
+    return null;
+  }
+}
 
 function unauthorized(path: string, requestId: string) {
   if (path.startsWith('/api')) {

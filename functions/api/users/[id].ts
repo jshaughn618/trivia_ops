@@ -4,10 +4,10 @@ import { parseJson } from '../../request';
 import { userUpdateSchema } from '../../../shared/validators';
 import { execute, nowIso, queryFirst } from '../../db';
 import { hashPassword } from '../../auth';
-import { requireAdmin } from '../../users';
+import { requireAdmin } from '../../access';
 
 export const onRequestGet: PagesFunction<Env> = async ({ env, params, data }) => {
-  const guard = requireAdmin(env, data.user);
+  const guard = requireAdmin(data.user ?? null);
   if (guard) return guard;
 
   const row = await queryFirst(
@@ -22,7 +22,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params, data }) =>
 };
 
 export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, data }) => {
-  const guard = requireAdmin(env, data.user);
+  const guard = requireAdmin(data.user ?? null);
   if (guard) return guard;
 
   const payload = await parseJson(request);
@@ -64,7 +64,7 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
 };
 
 export const onRequestDelete: PagesFunction<Env> = async ({ env, params, data }) => {
-  const guard = requireAdmin(env, data.user);
+  const guard = requireAdmin(data.user ?? null);
   if (guard) return guard;
 
   const existing = await queryFirst(env, 'SELECT id FROM users WHERE id = ? AND COALESCE(deleted, 0) = 0', [params.id]);

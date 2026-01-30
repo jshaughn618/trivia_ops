@@ -280,7 +280,10 @@ export const api = {
   updateTeam: (teamId: string, payload: Partial<Team>) =>
     apiFetch<Team>(`/api/teams/${teamId}`, { method: 'PUT', body: JSON.stringify(payload) }),
   deleteTeam: (teamId: string) => apiFetch<{ ok: true }>(`/api/teams/${teamId}`, { method: 'DELETE' }),
-  publicEvent: (code: string) => apiFetch<any>(`/api/public/event/${code}`, { cache: 'no-store' }),
+  publicEvent: (code: string, view?: 'play' | 'leaderboard') => {
+    const query = view ? `?view=${encodeURIComponent(view)}` : '';
+    return apiFetch<any>(`/api/public/event/${code}${query}`, { cache: 'no-store' });
+  },
   publicJoin: (code: string, payload: { team_id?: string; team_name?: string }) =>
     apiFetch<{ team: { id: string; name: string } }>(`/api/public/event/${code}/join`, {
       method: 'POST',

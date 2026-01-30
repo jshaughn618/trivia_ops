@@ -3,7 +3,10 @@ import { jsonError, jsonOk } from '../../responses';
 import { parseJson } from '../../request';
 import { mediaUploadSchema } from '../../../shared/validators';
 
-export const onRequestPost: PagesFunction<Env> = async ({ request }) => {
+export const onRequestPost: PagesFunction<Env> = async ({ request, data }) => {
+  if (!data.user) {
+    return jsonError({ code: 'unauthorized', message: 'Authentication required' }, 401);
+  }
   const payload = await parseJson(request);
   const parsed = mediaUploadSchema.safeParse(payload);
   if (!parsed.success) {

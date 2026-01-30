@@ -1,5 +1,6 @@
 import type { Env } from '../../types';
 import { jsonError, jsonOk } from '../../responses';
+import { queryFirst } from '../../db';
 import { logError, logInfo, logWarn } from '../../_lib/log';
 
 export const onRequestGet: PagesFunction<Env> = async ({ env, params, data, request }) => {
@@ -12,6 +13,16 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params, data, requ
 
   if (!data.user) {
     return jsonError({ code: 'unauthorized', message: 'Authentication required' }, 401);
+  }
+
+  if (data.user.user_type !== 'admin') {
+    const ownedPrefix = `user/${data.user.id}/`;
+    if (!key.startsWith(ownedPrefix)) {
+      const hasAccess = await hasHostMediaAccess(env, data.user.id, key);
+      if (!hasAccess) {
+        return jsonError({ code: 'forbidden', message: 'Access denied' }, 403);
+      }
+    }
   }
 
   const rangeHeader = request.headers.get('range');
@@ -187,3 +198,63 @@ export const onRequestDelete: PagesFunction<Env> = async ({ env, params, data, r
     return jsonError({ code: 'server_error', message: 'Media delete failed' }, 500);
   }
 };
+
+async function hasHostMediaAccess(env: Env, userId: string, key: string) {
+  const byEventDocs = await queryFirst<{ ok: number }>(
+    env,
+    `SELECT 1 AS ok
+     FROM events e
+     WHERE e.host_user_id = ?
+       AND COALESCE(e.deleted, 0) = 0
+       AND (e.scoresheet_key = ? OR e.answersheet_key = ?)
+     LIMIT 1`,
+    [userId, key, key]
+  );
+  if (byEventDocs) return true;
+
+  const byRoundAudio = await queryFirst<{ ok: number }>(
+    env,
+    `SELECT 1 AS ok
+     FROM event_rounds er
+     JOIN events e ON e.id = er.event_id
+     WHERE e.host_user_id = ?
+       AND COALESCE(e.deleted, 0) = 0
+       AND COALESCE(er.deleted, 0) = 0
+       AND er.audio_key = ?
+     LIMIT 1`,
+    [userId, key]
+  );
+  if (byRoundAudio) return true;
+
+  const byRoundItems = await queryFirst<{ ok: number }>(
+    env,
+    `SELECT 1 AS ok
+     FROM event_round_items eri
+     JOIN event_rounds er ON er.id = eri.event_round_id
+     JOIN events e ON e.id = er.event_id
+     JOIN edition_items ei ON ei.id = eri.edition_item_id
+     WHERE e.host_user_id = ?
+       AND COALESCE(e.deleted, 0) = 0
+       AND COALESCE(er.deleted, 0) = 0
+       AND COALESCE(eri.deleted, 0) = 0
+       AND COALESCE(ei.deleted, 0) = 0
+       AND (ei.media_key = ? OR ei.audio_answer_key = ?)
+     LIMIT 1`,
+    [userId, key, key]
+  );
+  if (byRoundItems) return true;
+
+  const byLocationLogo = await queryFirst<{ ok: number }>(
+    env,
+    `SELECT 1 AS ok
+     FROM events e
+     JOIN locations l ON l.id = e.location_id
+     WHERE e.host_user_id = ?
+       AND COALESCE(e.deleted, 0) = 0
+       AND COALESCE(l.deleted, 0) = 0
+       AND l.logo_key = ?
+     LIMIT 1`,
+    [userId, key]
+  );
+  return Boolean(byLocationLogo);
+}
