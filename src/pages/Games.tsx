@@ -37,7 +37,11 @@ export function GamesPage() {
   const [gameMenuId, setGameMenuId] = useState<string | null>(null);
   const [activeCategory, setActiveCategory] = useState(() => {
     if (typeof window === 'undefined') return '';
-    return window.localStorage.getItem(CATEGORY_STORAGE_KEY) ?? '';
+    try {
+      return window.localStorage.getItem(CATEGORY_STORAGE_KEY) ?? '';
+    } catch {
+      return '';
+    }
   });
   const [name, setName] = useState('');
   const [gameCode, setGameCode] = useState('');
@@ -219,29 +223,37 @@ export function GamesPage() {
     return (music ?? categoryGroups[0])?.id ?? '';
   }, [categoryGroups]);
 
-  useEffect(() => {
-    if (categoryGroups.length === 0) return;
-    if (!activeCategory || !categoryGroups.some((group) => group.id === activeCategory)) {
-      setActiveCategory(defaultCategory);
+  const resolvedCategory = useMemo(() => {
+    if (categoryGroups.length === 0) return '';
+    if (activeCategory && categoryGroups.some((group) => group.id === activeCategory)) {
+      return activeCategory;
     }
+    return defaultCategory;
   }, [activeCategory, categoryGroups, defaultCategory]);
 
   useEffect(() => {
-    if (!activeCategory) return;
+    if (!resolvedCategory) return;
+    if (resolvedCategory !== activeCategory) {
+      setActiveCategory(resolvedCategory);
+    }
+  }, [resolvedCategory, activeCategory]);
+
+  useEffect(() => {
+    if (!resolvedCategory) return;
     try {
-      window.localStorage.setItem(CATEGORY_STORAGE_KEY, activeCategory);
+      window.localStorage.setItem(CATEGORY_STORAGE_KEY, resolvedCategory);
     } catch {
       // ignore
     }
-  }, [activeCategory]);
+  }, [resolvedCategory]);
 
   useEffect(() => {
-    if (!activeCategory) return;
+    if (!resolvedCategory) return;
     setOpenGames({});
     setGameMenuId(null);
-  }, [activeCategory]);
+  }, [resolvedCategory]);
 
-  const categoryGames = useMemo(() => filteredCategoryMap[activeCategory] ?? [], [filteredCategoryMap, activeCategory]);
+  const categoryGames = useMemo(() => filteredCategoryMap[resolvedCategory] ?? [], [filteredCategoryMap, resolvedCategory]);
 
   return (
     <AppShell title="Games" showTitle={false}>
@@ -274,7 +286,7 @@ export function GamesPage() {
               <div className="mb-3 flex flex-wrap items-center gap-2">
                 <div className="inline-flex rounded-full border border-border bg-panel2/70 p-1">
                   {categoryGroups.map((group) => {
-                    const isActive = group.id === activeCategory;
+                    const isActive = group.id === resolvedCategory;
                     return (
                       <button
                         key={group.id}
