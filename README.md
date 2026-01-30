@@ -10,8 +10,8 @@
 - Shared: Types in `shared/types.ts`, validators in `shared/validators.ts`.
 
 ## Development
-- Install deps: `npm install`
-- Run dev server: `npm run dev`
+- Install deps: `pnpm install`
+- Run dev server: `pnpm run dev`
 
 ## Database Migrations (D1)
 - Apply locally: `npx wrangler d1 migrations apply trivia_ops --local`

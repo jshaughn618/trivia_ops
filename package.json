@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "packageManager": "pnpm@10.28.2",
   "scripts": {
     "release:patch": "npm version patch && git push --follow-tags",
     "dev": "vite",
@@ -30,5 +31,12 @@
     "typescript": "^5.5.4",
     "vite": "^5.4.0",
     "wrangler": "^4.59.2"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "sharp",
+      "workerd"
+    ]
   }
 }
