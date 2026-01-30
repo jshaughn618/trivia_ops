@@ -3,6 +3,7 @@ import { jsonError, jsonOk } from '../../responses';
 import { parseJson } from '../../request';
 import { aiGenerateSchema } from '../../../shared/validators';
 import { generateText } from '../../openai';
+import { requireAdmin } from '../../access';
 import { getRequestId, logInfo } from '../../_lib/log';
 
 const LOG_LIMIT = 4000;
@@ -12,7 +13,12 @@ const truncate = (value: string) => {
   return { text: value.slice(0, LOG_LIMIT), truncated: true };
 };
 
-export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
+export const onRequestPost: PagesFunction<Env> = async ({ request, env, data }) => {
+  if (!data.user) {
+    return jsonError({ code: 'unauthorized', message: 'Authentication required' }, 401);
+  }
+  const guard = requireAdmin(data.user ?? null);
+  if (guard) return guard;
   const payload = await parseJson(request);
   const parsed = aiGenerateSchema.safeParse(payload);
   if (!parsed.success) {

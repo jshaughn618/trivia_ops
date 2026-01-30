@@ -2,8 +2,24 @@ import type { Env } from '../../../types';
 import { jsonError, jsonOk } from '../../../responses';
 import { normalizeCode } from '../../../public';
 import { queryAll, queryFirst } from '../../../db';
+import { checkRateLimit, recordRateLimitHit } from '../../../rate-limit';
 
-export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
+const PUBLIC_EVENT_RATE_LIMIT = {
+  maxAttempts: 30,
+  windowSeconds: 5 * 60,
+  blockSeconds: 10 * 60
+};
+
+export const onRequestGet: PagesFunction<Env> = async ({ env, params, request }) => {
+  const ip = request.headers.get('cf-connecting-ip') ?? 'unknown';
+  const limitKey = `public-event:${ip}`;
+  const status = await checkRateLimit(env, limitKey, PUBLIC_EVENT_RATE_LIMIT);
+  if (!status.allowed) {
+    return jsonError(
+      { code: 'rate_limited', message: 'Too many attempts. Please try again later.', details: { retry_after: status.retryAfterSeconds } },
+      429
+    );
+  }
   const code = normalizeCode(params.code as string);
   const event = await queryFirst<{
     id: string;
@@ -22,6 +38,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params }) => {
   );
 
   if (!event) {
+    await recordRateLimitHit(env, limitKey, PUBLIC_EVENT_RATE_LIMIT);
     return jsonError({ code: 'not_found', message: 'Event not found' }, 404);
   }
 

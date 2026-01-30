@@ -3,14 +3,32 @@ import { jsonError, jsonOk } from '../../../../responses';
 import { normalizeCode } from '../../../../public';
 import { parseJson } from '../../../../request';
 import { execute, nowIso, queryFirst } from '../../../../db';
+import { checkRateLimit, recordRateLimitHit } from '../../../../rate-limit';
+
+const PUBLIC_RESPONSE_RATE_LIMIT = {
+  maxAttempts: 20,
+  windowSeconds: 2 * 60,
+  blockSeconds: 5 * 60
+};
 
 export const onRequestPost: PagesFunction<Env> = async ({ env, params, request }) => {
+  const ip = request.headers.get('cf-connecting-ip') ?? 'unknown';
+  const limitKey = `public-response:${ip}`;
+  const status = await checkRateLimit(env, limitKey, PUBLIC_RESPONSE_RATE_LIMIT);
+  if (!status.allowed) {
+    return jsonError(
+      { code: 'rate_limited', message: 'Too many attempts. Please try again later.', details: { retry_after: status.retryAfterSeconds } },
+      429
+    );
+  }
+  const recordFailure = async () => recordRateLimitHit(env, limitKey, PUBLIC_RESPONSE_RATE_LIMIT);
   const payload = await parseJson(request);
   const teamId = payload?.team_id;
   const itemId = payload?.item_id;
   const choiceIndex = payload?.choice_index;
 
   if (!teamId || !itemId || typeof choiceIndex !== 'number') {
+    await recordFailure();
     return jsonError({ code: 'validation_error', message: 'team_id, item_id, and choice_index are required.' }, 400);
   }
 
@@ -21,6 +39,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request }
     [code]
   );
   if (!event) {
+    await recordFailure();
     return jsonError({ code: 'not_found', message: 'Event not found' }, 404);
   }
 
@@ -30,6 +49,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request }
     [teamId, event.id]
   );
   if (!team) {
+    await recordFailure();
     return jsonError({ code: 'not_found', message: 'Team not found' }, 404);
   }
 
@@ -46,16 +66,19 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request }
   );
 
   if (!live?.active_round_id || !live.current_item_ordinal) {
+    await recordFailure();
     return jsonError({ code: 'not_live', message: 'No active question.' }, 400);
   }
 
   if (!live.timer_started_at || !live.timer_duration_seconds) {
+    await recordFailure();
     return jsonError({ code: 'timer_not_started', message: 'Timer has not started.' }, 400);
   }
 
   const expiresAt = new Date(live.timer_started_at).getTime() + live.timer_duration_seconds * 1000;
   const graceMs = 10000;
   if (Number.isNaN(expiresAt) || Date.now() > expiresAt + graceMs) {
+    await recordFailure();
     return jsonError({ code: 'timer_expired', message: 'Timer expired.' }, 400);
   }
 
@@ -73,10 +96,12 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request }
   );
 
   if (!current || current.edition_item_id !== itemId) {
+    await recordFailure();
     return jsonError({ code: 'not_current', message: 'Item is not active.' }, 400);
   }
 
   if (current.question_type !== 'multiple_choice') {
+    await recordFailure();
     return jsonError({ code: 'invalid_type', message: 'Item is not multiple choice.' }, 400);
   }
 
@@ -93,6 +118,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request }
   }
 
   if (choiceIndex < 0 || choiceIndex >= choices.length) {
+    await recordFailure();
     return jsonError({ code: 'invalid_choice', message: 'Choice is out of range.' }, 400);
   }
 
