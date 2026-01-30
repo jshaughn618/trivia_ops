@@ -16,80 +16,90 @@ const nowSeconds = () => Math.floor(Date.now() / 1000);
 
 export async function checkRateLimit(env: Env, key: string, config: RateLimitConfig): Promise<RateLimitResult> {
   const now = nowSeconds();
-  const row = await queryFirst<{
-    key: string;
-    count: number;
-    first_seen: number;
-    last_seen: number;
-    blocked_until: number | null;
-  }>(env, 'SELECT key, count, first_seen, last_seen, blocked_until FROM rate_limits WHERE key = ?', [key]);
 
-  if (!row) {
-    return { allowed: true, retryAfterSeconds: null };
+  // Perform check-and-record atomically within a transaction to avoid races between
+  // separate "check" and "record" calls for the same key.
+  await execute(env, 'BEGIN IMMEDIATE', []);
+  try {
+    const row = await queryFirst<{
+      key: string;
+      count: number;
+      first_seen: number;
+      last_seen: number;
+      blocked_until: number | null;
+    }>(env, 'SELECT key, count, first_seen, last_seen, blocked_until FROM rate_limits WHERE key = ?', [key]);
+
+    let allowed: boolean;
+    let retryAfterSeconds: number | null = null;
+
+    if (!row) {
+      // First hit: start a new window with count = 1.
+      await execute(
+        env,
+        'INSERT INTO rate_limits (key, count, first_seen, last_seen, blocked_until) VALUES (?, ?, ?, ?, NULL)',
+        [key, 1, now, now]
+      );
+      allowed = true;
+    } else {
+      // Existing record: apply window and blocking logic.
+      const elapsed = now - row.first_seen;
+      let nextCount: number;
+      let firstSeen = row.first_seen;
+      let blockedUntil = row.blocked_until;
+
+      if (blockedUntil && blockedUntil > now) {
+        // Still blocked; do not increment count in the blocked period.
+        allowed = false;
+        retryAfterSeconds = blockedUntil - now;
+      } else {
+        // Window expired: reset.
+        if (elapsed > config.windowSeconds) {
+          nextCount = 1;
+          firstSeen = now;
+          blockedUntil = null;
+        } else {
+          nextCount = row.count + 1;
+        }
+
+        if (nextCount >= config.maxAttempts) {
+          blockedUntil = now + config.blockSeconds;
+          allowed = false;
+          retryAfterSeconds = config.blockSeconds;
+        } else {
+          allowed = true;
+          retryAfterSeconds = null;
+        }
+
+        await execute(
+          env,
+          'UPDATE rate_limits SET count = ?, first_seen = ?, last_seen = ?, blocked_until = ? WHERE key = ?',
+          [nextCount, firstSeen, now, blockedUntil ?? null, key]
+        );
+      }
+    }
+
+    await execute(env, 'COMMIT', []);
+    return { allowed, retryAfterSeconds };
+  } catch (err) {
+    // Best-effort rollback; rethrow the original error.
+    try {
+      await execute(env, 'ROLLBACK', []);
+    } catch {
+      // ignore rollback errors
+    }
+    throw err;
   }
-
-  if (row.blocked_until && row.blocked_until > now) {
-    return { allowed: false, retryAfterSeconds: row.blocked_until - now };
-  }
-
-  const elapsed = now - row.first_seen;
-  if (elapsed > config.windowSeconds) {
-    return { allowed: true, retryAfterSeconds: null };
-  }
-
-  if (row.count >= config.maxAttempts) {
-    const blockedUntil = now + config.blockSeconds;
-    await execute(
-      env,
-      'UPDATE rate_limits SET blocked_until = ?, last_seen = ? WHERE key = ?',
-      [blockedUntil, now, key]
-    );
-    return { allowed: false, retryAfterSeconds: config.blockSeconds };
-  }
-
-  return { allowed: true, retryAfterSeconds: null };
 }
 
-export async function recordRateLimitHit(env: Env, key: string, config: RateLimitConfig) {
-  const now = nowSeconds();
-  const row = await queryFirst<{
-    key: string;
-    count: number;
-    first_seen: number;
-    last_seen: number;
-    blocked_until: number | null;
-  }>(env, 'SELECT key, count, first_seen, last_seen, blocked_until FROM rate_limits WHERE key = ?', [key]);
-
-  if (!row) {
-    await execute(
-      env,
-      'INSERT INTO rate_limits (key, count, first_seen, last_seen, blocked_until) VALUES (?, ?, ?, ?, NULL)',
-      [key, 1, now, now]
-    );
-    return;
-  }
-
-  const elapsed = now - row.first_seen;
-  if (elapsed > config.windowSeconds) {
-    await execute(
-      env,
-      'UPDATE rate_limits SET count = ?, first_seen = ?, last_seen = ?, blocked_until = NULL WHERE key = ?',
-      [1, now, now, key]
-    );
-    return;
-  }
-
-  const nextCount = row.count + 1;
-  let blockedUntil = row.blocked_until;
-  if (nextCount >= config.maxAttempts) {
-    blockedUntil = now + config.blockSeconds;
-  }
-
-  await execute(
-    env,
-    'UPDATE rate_limits SET count = ?, last_seen = ?, blocked_until = ? WHERE key = ?',
-    [nextCount, now, blockedUntil ?? null, key]
-  );
+export async function recordRateLimitHit(env: Env, key: string, _config: RateLimitConfig) {
+  // No-op shim retained for backwards compatibility.
+  //
+  // The rate limit is now fully enforced and recorded by `checkRateLimit`,
+  // which performs an atomic check-and-record inside a transaction.
+  // Callers should stop invoking `recordRateLimitHit` after `checkRateLimit`,
+  // as that pattern is no longer necessary and `recordRateLimitHit` does nothing.
+  void env;
+  void key;
 }
 
 export async function clearRateLimit(env: Env, key: string) {
