@@ -17,7 +17,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, data }) 
   if (!data.user) {
     return jsonError({ code: 'unauthorized', message: 'Authentication required' }, 401);
   }
-  const guard = requireAdmin(data.user ?? null);
+  const guard = requireAdmin(data.user);
   if (guard) return guard;
   const payload = await parseJson(request);
   const parsed = aiGenerateSchema.safeParse(payload);
