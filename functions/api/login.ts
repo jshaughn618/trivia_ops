@@ -5,6 +5,7 @@ import { loginSchema } from '../../shared/validators';
 import { queryFirst } from '../db';
 import { createSession, buildSessionCookie, verifyPassword } from '../auth';
 import { checkRateLimit, clearRateLimit, recordRateLimitHit } from '../rate-limit';
+import { logError } from '../_lib/log';
 
 const LOGIN_RATE_LIMIT = {
   maxAttempts: 5,
@@ -22,12 +23,21 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
 
   const email = parsed.data.email.trim().toLowerCase();
   const key = `login:${ip}:${email}`;
-  const status = await checkRateLimit(env, key, LOGIN_RATE_LIMIT);
-  if (!status.allowed) {
-    return jsonError(
-      { code: 'rate_limited', message: 'Too many attempts. Please try again later.', details: { retry_after: status.retryAfterSeconds } },
-      429
-    );
+  try {
+    const status = await checkRateLimit(env, key, LOGIN_RATE_LIMIT);
+    if (!status.allowed) {
+      return jsonError(
+        { code: 'rate_limited', message: 'Too many attempts. Please try again later.', details: { retry_after: status.retryAfterSeconds } },
+        429
+      );
+    }
+  } catch (error) {
+    logError(env, 'login_rate_limit_error', {
+      ip,
+      email,
+      message: error instanceof Error ? error.message : 'unknown_error'
+    });
+    // Allow login to proceed if rate limiting fails.
   }
 
   const user = await queryFirst<{
@@ -46,17 +56,41 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   );
 
   if (!user) {
-    await recordRateLimitHit(env, key, LOGIN_RATE_LIMIT);
+    try {
+      await recordRateLimitHit(env, key, LOGIN_RATE_LIMIT);
+    } catch (error) {
+      logError(env, 'login_rate_limit_record_error', {
+        ip,
+        email,
+        message: error instanceof Error ? error.message : 'unknown_error'
+      });
+    }
     return jsonError({ code: 'invalid_credentials', message: 'Invalid email or password' }, 401);
   }
 
   const isValid = await verifyPassword(parsed.data.password, user.password_hash);
   if (!isValid) {
-    await recordRateLimitHit(env, key, LOGIN_RATE_LIMIT);
+    try {
+      await recordRateLimitHit(env, key, LOGIN_RATE_LIMIT);
+    } catch (error) {
+      logError(env, 'login_rate_limit_record_error', {
+        ip,
+        email,
+        message: error instanceof Error ? error.message : 'unknown_error'
+      });
+    }
     return jsonError({ code: 'invalid_credentials', message: 'Invalid email or password' }, 401);
   }
 
-  await clearRateLimit(env, key);
+  try {
+    await clearRateLimit(env, key);
+  } catch (error) {
+    logError(env, 'login_rate_limit_clear_error', {
+      ip,
+      email,
+      message: error instanceof Error ? error.message : 'unknown_error'
+    });
+  }
   const session = await createSession(env, user.id, request);
   return jsonOk(
     {
