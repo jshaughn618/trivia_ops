@@ -10,6 +10,9 @@ import { ButtonLink, PrimaryButton, SecondaryButton } from '../components/Button
 import { logError } from '../lib/log';
 import type { Game, GameEdition, GameType, Location } from '../types';
 
+const CATEGORY_STORAGE_KEY = 'trivia_ops_editions_category';
+const sortByName = (a: Game, b: Game) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+
 export function GamesPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -32,6 +35,10 @@ export function GamesPage() {
   const [error, setError] = useState<string | null>(null);
   const [openGames, setOpenGames] = useState<Record<string, boolean>>({});
   const [gameMenuId, setGameMenuId] = useState<string | null>(null);
+  const [activeCategory, setActiveCategory] = useState(() => {
+    if (typeof window === 'undefined') return '';
+    return window.localStorage.getItem(CATEGORY_STORAGE_KEY) ?? '';
+  });
   const [name, setName] = useState('');
   const [gameCode, setGameCode] = useState('');
   const [gameTypeId, setGameTypeId] = useState('');
@@ -128,8 +135,8 @@ export function GamesPage() {
   }, [games, gameTypeFilterId]);
 
   const visibleGameIds = useMemo(() => {
-    return filteredGames.map((game) => game.id);
-  }, [filteredGames, editionsByGame]);
+    return categoryGames.map((game) => game.id);
+  }, [categoryGames]);
 
   useEffect(() => {
     setOpenGames((prev) => {
@@ -173,8 +180,9 @@ export function GamesPage() {
   const typeById = useMemo(() => Object.fromEntries(gameTypes.map((type) => [type.id, type])), [gameTypes]);
   const selectedType = typeById[gameTypeId] ?? null;
   const isMusicType = selectedType?.code === 'music';
-  const groupedGames = useMemo(() => {
-    const sortedGames = [...filteredGames].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+  const sortedGames = useMemo(() => [...games].sort(sortByName), [games]);
+  const sortedFilteredGames = useMemo(() => [...filteredGames].sort(sortByName), [filteredGames]);
+  const categoryGroups = useMemo(() => {
     const music: Game[] = [];
     const pub: Game[] = [];
     sortedGames.forEach((game) => {
@@ -185,11 +193,55 @@ export function GamesPage() {
         pub.push(game);
       }
     });
-    return [
-      { id: 'music', label: 'Music Trivia', games: music },
-      { id: 'pub', label: 'Pub Trivia', games: pub }
-    ];
-  }, [filteredGames, typeById]);
+    const groups: Array<{ id: string; label: string; games: Game[] }> = [];
+    if (music.length > 0) groups.push({ id: 'music', label: 'Music trivia', games: music });
+    if (pub.length > 0) groups.push({ id: 'pub', label: 'Pub trivia', games: pub });
+    return groups;
+  }, [sortedGames, typeById]);
+
+  const filteredCategoryMap = useMemo(() => {
+    const map: Record<string, Game[]> = {};
+    categoryGroups.forEach((group) => {
+      map[group.id] = [];
+    });
+    sortedFilteredGames.forEach((game) => {
+      const type = typeById[game.game_type_id];
+      const categoryId = type?.code === 'music' ? 'music' : 'pub';
+      if (!map[categoryId]) map[categoryId] = [];
+      map[categoryId].push(game);
+    });
+    return map;
+  }, [categoryGroups, sortedFilteredGames, typeById]);
+
+  const defaultCategory = useMemo(() => {
+    if (categoryGroups.length === 0) return '';
+    const music = categoryGroups.find((group) => group.id === 'music');
+    return (music ?? categoryGroups[0])?.id ?? '';
+  }, [categoryGroups]);
+
+  useEffect(() => {
+    if (categoryGroups.length === 0) return;
+    if (!activeCategory || !categoryGroups.some((group) => group.id === activeCategory)) {
+      setActiveCategory(defaultCategory);
+    }
+  }, [activeCategory, categoryGroups, defaultCategory]);
+
+  useEffect(() => {
+    if (!activeCategory) return;
+    try {
+      window.localStorage.setItem(CATEGORY_STORAGE_KEY, activeCategory);
+    } catch {
+      // ignore
+    }
+  }, [activeCategory]);
+
+  useEffect(() => {
+    if (!activeCategory) return;
+    setOpenGames({});
+    setGameMenuId(null);
+  }, [activeCategory]);
+
+  const categoryGames = useMemo(() => filteredCategoryMap[activeCategory] ?? [], [filteredCategoryMap, activeCategory]);
 
   return (
     <AppShell title="Games" showTitle={false}>
@@ -218,12 +270,36 @@ export function GamesPage() {
         )}
         <div className="grid gap-4 lg:grid-cols-[1fr,320px]">
           <Section title="Edition library">
-            {filteredGames.length > 0 && (
+            {categoryGroups.length > 0 && (
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <div className="inline-flex rounded-full border border-border bg-panel2/70 p-1">
+                  {categoryGroups.map((group) => {
+                    const isActive = group.id === activeCategory;
+                    return (
+                      <button
+                        key={group.id}
+                        type="button"
+                        aria-pressed={isActive}
+                        onClick={() => setActiveCategory(group.id)}
+                        className={`rounded-full px-3 py-1.5 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg ${
+                          isActive
+                            ? 'bg-accent-soft text-accent-ink'
+                            : 'text-muted hover:text-text'
+                        }`}
+                      >
+                        {group.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            {categoryGames.length > 0 && (
               <div className="mb-2 text-xs uppercase tracking-[0.2em] text-muted">
                 Select a game to view editions.
               </div>
             )}
-            {filteredGames.length > 0 && editions.length === 0 && (
+            {categoryGames.length > 0 && editions.length === 0 && (
               <div className="mb-2 text-xs uppercase tracking-[0.2em] text-muted">
                 No editions match your filters.
               </div>
@@ -241,6 +317,8 @@ export function GamesPage() {
                     setLocationId('');
                     setSearch('');
                     setOpenGames({});
+                    setGameMenuId(null);
+                    if (defaultCategory) setActiveCategory(defaultCategory);
                   }}
                   className="text-left text-xs uppercase tracking-[0.2em] text-accent-ink"
                 >
@@ -248,129 +326,126 @@ export function GamesPage() {
                 </button>
               </div>
             )}
-            {filteredGames.length > 0 && (
+            {filteredGames.length > 0 && categoryGames.length === 0 && (
+              <div className="mb-2 text-xs uppercase tracking-[0.2em] text-muted">
+                No games match your filters in this category.
+              </div>
+            )}
+            {categoryGames.length > 0 && (
               <div className="space-y-4">
-                {groupedGames.map((group) => {
-                  if (group.games.length === 0) return null;
-                  return (
-                    <div key={group.id}>
-                      <div className="px-4 text-[10px] uppercase tracking-[0.3em] text-muted">{group.label}</div>
-                      <div className="mt-2 divide-y divide-border">
-                        {group.games.map((game) => {
-                          const gameEditions = editionsByGame.get(game.id) ?? [];
-                          const sortedEditions = [...gameEditions].sort((a, b) => {
-                            const aNum = typeof a.edition_number === 'number' ? a.edition_number : Number.POSITIVE_INFINITY;
-                            const bNum = typeof b.edition_number === 'number' ? b.edition_number : Number.POSITIVE_INFINITY;
-                            if (aNum !== bNum) return aNum - bNum;
-                            const aTheme = (a.theme ?? a.title ?? '').toLowerCase();
-                            const bTheme = (b.theme ?? b.title ?? '').toLowerCase();
-                            return aTheme.localeCompare(bTheme, undefined, { sensitivity: 'base' });
-                          });
-                          const isOpen = Boolean(openGames[game.id]);
-                          const editionListId = `editions-${game.id}`;
-                          return (
-                            <div key={game.id} className="py-2">
+                <div className="divide-y divide-border">
+                  {categoryGames.map((game) => {
+                    const gameEditions = editionsByGame.get(game.id) ?? [];
+                    const sortedEditions = [...gameEditions].sort((a, b) => {
+                      const aNum = typeof a.edition_number === 'number' ? a.edition_number : Number.POSITIVE_INFINITY;
+                      const bNum = typeof b.edition_number === 'number' ? b.edition_number : Number.POSITIVE_INFINITY;
+                      if (aNum !== bNum) return aNum - bNum;
+                      const aTheme = (a.theme ?? a.title ?? '').toLowerCase();
+                      const bTheme = (b.theme ?? b.title ?? '').toLowerCase();
+                      return aTheme.localeCompare(bTheme, undefined, { sensitivity: 'base' });
+                    });
+                    const isOpen = Boolean(openGames[game.id]);
+                    const editionListId = `editions-${game.id}`;
+                    return (
+                      <div key={game.id} className="py-2">
+                        <button
+                          type="button"
+                          aria-expanded={isOpen}
+                          aria-controls={editionListId}
+                          onClick={() => {
+                            setGameMenuId(null);
+                            setOpenGames((prev) => ({ ...prev, [game.id]: !isOpen }));
+                          }}
+                          className="flex w-full items-center justify-between gap-3 rounded-md px-4 py-3 text-left transition hover:bg-panel2/50"
+                        >
+                          <div className="flex items-center gap-3">
+                            <span
+                              className={`text-sm text-muted transition-transform ${isOpen ? 'rotate-90' : ''}`}
+                              aria-hidden="true"
+                            >
+                              ▶
+                            </span>
+                            <span className="text-base font-semibold text-accent-ink">{game.name}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-muted">
+                              {gameEditions.length} {gameEditions.length === 1 ? 'Edition' : 'Editions'}
+                            </span>
+                            <button
+                              type="button"
+                              aria-label={`Add edition to ${game.name}`}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                navigate(`/editions/new?game_id=${game.id}`);
+                              }}
+                              className="flex h-8 w-8 items-center justify-center rounded-md border border-border text-sm text-muted transition hover:border-accent-ink hover:text-accent-ink"
+                            >
+                              +
+                            </button>
+                            <div className="relative">
                               <button
                                 type="button"
-                                aria-expanded={isOpen}
-                                aria-controls={editionListId}
-                                onClick={() => {
-                                  setGameMenuId(null);
-                                  setOpenGames((prev) => ({ ...prev, [game.id]: !isOpen }));
+                                aria-label={`Game actions for ${game.name}`}
+                                aria-haspopup="menu"
+                                aria-expanded={gameMenuId === game.id}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setGameMenuId((current) => (current === game.id ? null : game.id));
                                 }}
-                                className="flex w-full items-center justify-between gap-3 rounded-md px-4 py-3 text-left transition hover:bg-panel2/50"
+                                className="flex h-8 w-8 items-center justify-center rounded-md border border-border text-sm text-muted transition hover:border-accent-ink hover:text-accent-ink"
                               >
-                                <div className="flex items-center gap-3">
-                                  <span
-                                    className={`text-sm text-muted transition-transform ${isOpen ? 'rotate-90' : ''}`}
-                                    aria-hidden="true"
-                                  >
-                                    ▶
-                                  </span>
-                                  <span className="text-base font-semibold text-accent-ink">{game.name}</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <span className="text-xs text-muted">
-                                    {gameEditions.length} {gameEditions.length === 1 ? 'Edition' : 'Editions'}
-                                  </span>
+                                ⋯
+                              </button>
+                              {gameMenuId === game.id && (
+                                <div className="absolute right-0 z-20 mt-2 min-w-[140px] rounded-md border border-border bg-panel p-2 text-left shadow-sm">
                                   <button
                                     type="button"
-                                    aria-label={`Add edition to ${game.name}`}
                                     onClick={(event) => {
                                       event.stopPropagation();
-                                      navigate(`/editions/new?game_id=${game.id}`);
+                                      setGameMenuId(null);
+                                      navigate(`/games/${game.id}`);
                                     }}
-                                    className="flex h-8 w-8 items-center justify-center rounded-md border border-border text-sm text-muted transition hover:border-accent-ink hover:text-accent-ink"
+                                    className="w-full rounded-md border border-border bg-panel2 px-3 py-2 text-xs font-medium text-text"
                                   >
-                                    +
+                                    Edit game
                                   </button>
-                                  <div className="relative">
-                                    <button
-                                      type="button"
-                                      aria-label={`Game actions for ${game.name}`}
-                                      aria-haspopup="menu"
-                                      aria-expanded={gameMenuId === game.id}
-                                      onClick={(event) => {
-                                        event.stopPropagation();
-                                        setGameMenuId((current) => (current === game.id ? null : game.id));
-                                      }}
-                                      className="flex h-8 w-8 items-center justify-center rounded-md border border-border text-sm text-muted transition hover:border-accent-ink hover:text-accent-ink"
-                                    >
-                                      ⋯
-                                    </button>
-                                    {gameMenuId === game.id && (
-                                      <div className="absolute right-0 z-20 mt-2 min-w-[140px] rounded-md border border-border bg-panel p-2 text-left shadow-sm">
-                                        <button
-                                          type="button"
-                                          onClick={(event) => {
-                                            event.stopPropagation();
-                                            setGameMenuId(null);
-                                            navigate(`/games/${game.id}`);
-                                          }}
-                                          className="w-full rounded-md border border-border bg-panel2 px-3 py-2 text-xs font-medium text-text"
-                                        >
-                                          Edit game
-                                        </button>
-                                      </div>
-                                    )}
-                                  </div>
                                 </div>
-                              </button>
-                              {isOpen && (
-                                <List id={editionListId} className="mt-1">
-                                  {gameEditions.length === 0 && (
-                                    <div className="px-6 py-3 text-xs uppercase tracking-[0.2em] text-muted">
-                                      No editions yet.
-                                    </div>
-                                  )}
-                                  {sortedEditions.map((edition) => {
-                                    const baseTitle = edition.theme ?? edition.title ?? 'Untitled edition';
-                                    const key = game.game_code && typeof edition.edition_number === 'number'
-                                      ? `${game.game_code}${String(edition.edition_number).padStart(3, '0')}`
-                                      : null;
-                                    const primaryTitle = key
-                                      ? `${key} - ${baseTitle}`
-                                      : edition.edition_number
-                                        ? `${edition.edition_number} - ${baseTitle}`
-                                        : baseTitle;
-                                    return (
-                                      <ListRow key={edition.id} to={`/editions/${edition.id}`} className="py-3 pl-8">
-                                        <div className="flex-1">
-                                          <div className="text-sm text-text">{primaryTitle}</div>
-                                        </div>
-                                        <StatusPill status={edition.status} label={edition.status} />
-                                      </ListRow>
-                                    );
-                                  })}
-                                </List>
                               )}
                             </div>
-                          );
-                        })}
+                          </div>
+                        </button>
+                        {isOpen && (
+                          <List id={editionListId} className="mt-1">
+                            {gameEditions.length === 0 && (
+                              <div className="px-6 py-3 text-xs uppercase tracking-[0.2em] text-muted">
+                                No editions yet.
+                              </div>
+                            )}
+                            {sortedEditions.map((edition) => {
+                              const baseTitle = edition.theme ?? edition.title ?? 'Untitled edition';
+                              const key = game.game_code && typeof edition.edition_number === 'number'
+                                ? `${game.game_code}${String(edition.edition_number).padStart(3, '0')}`
+                                : null;
+                              const primaryTitle = key
+                                ? `${key} - ${baseTitle}`
+                                : edition.edition_number
+                                  ? `${edition.edition_number} - ${baseTitle}`
+                                  : baseTitle;
+                              return (
+                                <ListRow key={edition.id} to={`/editions/${edition.id}`} className="py-3 pl-8">
+                                  <div className="flex-1">
+                                    <div className="text-sm text-text">{primaryTitle}</div>
+                                  </div>
+                                  <StatusPill status={edition.status} label={edition.status} />
+                                </ListRow>
+                              );
+                            })}
+                          </List>
+                        )}
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
             )}
           </Section>
