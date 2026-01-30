@@ -161,7 +161,7 @@ export const onRequestDelete: PagesFunction<Env> = async ({ env, params, data, r
     return jsonError({ code: 'unauthorized', message: 'Authentication required' }, 401);
   }
 
-  if (!key.startsWith(`user/${data.user.id}/`)) {
+  if (data.user.user_type !== 'admin' && !key.startsWith(`user/${data.user.id}/`)) {
     return jsonError({ code: 'forbidden', message: 'Access denied' }, 403);
   }
 

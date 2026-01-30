@@ -3,18 +3,40 @@ import { jsonError, jsonOk } from '../../../responses';
 import { parseJson } from '../../../request';
 import { eventRoundUpdateSchema } from '../../../../shared/validators';
 import { execute, nowIso, queryAll, queryFirst } from '../../../db';
-import { requireAdmin } from '../../../access';
+import { requireAdmin, requireHostOrAdmin, requireRoundAccess } from '../../../access';
 
 const normalizeAnswer = (value: string | null | undefined) =>
   (value ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
 
 export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, data }) => {
-  const guard = requireAdmin(data.user ?? null);
+  const isAdmin = data.user?.user_type === 'admin';
+  const guard = isAdmin ? null : requireHostOrAdmin(data.user ?? null);
   if (guard) return guard;
+  if (!isAdmin) {
+    const access = await requireRoundAccess(env, data.user ?? null, params.roundId as string);
+    if (access.response) return access.response;
+  }
   const payload = await parseJson(request);
   const parsed = eventRoundUpdateSchema.safeParse(payload);
   if (!parsed.success) {
     return jsonError({ code: 'validation_error', message: 'Invalid round update', details: parsed.error.flatten() }, 400);
+  }
+  if (!isAdmin) {
+    const forbiddenFields: Array<keyof typeof parsed.data> = [
+      'round_number',
+      'label',
+      'scoresheet_title',
+      'edition_id',
+      'audio_key',
+      'audio_name'
+    ];
+    if (parsed.data.status === undefined) {
+      return jsonError({ code: 'forbidden', message: 'Hosts can only update round status.' }, 403);
+    }
+    const hasForbidden = forbiddenFields.some((field) => parsed.data[field] !== undefined);
+    if (hasForbidden) {
+      return jsonError({ code: 'forbidden', message: 'Hosts can only update round status.' }, 403);
+    }
   }
 
   const existing = await queryFirst(env, 'SELECT * FROM event_rounds WHERE id = ? AND COALESCE(deleted, 0) = 0', [params.roundId]);

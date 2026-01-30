@@ -562,16 +562,20 @@ export function EventDetailPage() {
     let active = true;
     const isActive = () => active;
     const run = async () => {
-      const loaded = await loadBootstrap(isActive);
-      if (!loaded && isActive()) {
-        await Promise.all([loadCore(isActive), loadReferences(isActive)]);
+      if (isAdmin) {
+        const loaded = await loadBootstrap(isActive);
+        if (!loaded && isActive()) {
+          await Promise.all([loadCore(isActive), loadReferences(isActive)]);
+        }
+        return;
       }
+      await loadCore(isActive);
     };
     run();
     return () => {
       active = false;
     };
-  }, [eventId]);
+  }, [eventId, isAdmin]);
 
   useEffect(() => {
     if (!scoreRoundId && rounds.length > 0) {
@@ -1035,6 +1039,53 @@ export function EventDetailPage() {
     return (
       <AppShell title="Event Detail">
         <div className="text-xs uppercase tracking-[0.2em] text-muted">Loading...</div>
+      </AppShell>
+    );
+  }
+
+  if (!isAdmin) {
+    return (
+      <AppShell title="Event Detail" showTitle={false}>
+        <div className="space-y-4">
+          <Section
+            title={event.title}
+            actions={
+              <ButtonLink to={`/events/${event.id}/run`} variant="primary">
+                Open runner
+              </ButtonLink>
+            }
+          >
+            <div className="flex flex-wrap items-center gap-3 text-xs text-muted">
+              <span>{new Date(event.starts_at).toLocaleString()}</span>
+              <StatusPill status={event.status} label={event.status} />
+            </div>
+            {event.notes && <div className="mt-3 text-sm text-text">{event.notes}</div>}
+          </Section>
+          <Section title="Rounds">
+            {rounds.length === 0 && (
+              <div className="text-xs uppercase tracking-[0.2em] text-muted">No rounds yet.</div>
+            )}
+            {rounds.length > 0 && (
+              <List>
+                {rounds.map((round) => (
+                  <ListRow
+                    key={round.id}
+                    to={`/events/${event.id}/run?round=${round.id}`}
+                    className="items-center"
+                  >
+                    <div className="flex-1">
+                      <div className="text-sm font-display tracking-[0.12em]">Round {round.round_number}</div>
+                      <div className="mt-1 text-xs text-muted">
+                        {round.scoresheet_title?.trim() || round.label}
+                      </div>
+                    </div>
+                    <StatusPill status={round.status} label={round.status} />
+                  </ListRow>
+                ))}
+              </List>
+            )}
+          </Section>
+        </div>
       </AppShell>
     );
   }

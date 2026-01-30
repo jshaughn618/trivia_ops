@@ -1,6 +1,6 @@
 import { Suspense, lazy } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { RequireAdmin, RequireAuth } from './auth';
+import { RequireAdmin, RequireAuth, useAuth } from './auth';
 
 const LoginPage = lazy(() => import('./pages/Login').then((mod) => ({ default: mod.LoginPage })));
 const DashboardPage = lazy(() => import('./pages/Dashboard').then((mod) => ({ default: mod.DashboardPage })));
@@ -35,11 +35,18 @@ const fallback = (
   </div>
 );
 
+function HomeRedirect() {
+  const { user, loading } = useAuth();
+  if (loading) return fallback;
+  if (!user) return <Navigate to="/login" replace />;
+  return <Navigate to={user.user_type === 'admin' ? '/dashboard' : '/events'} replace />;
+}
+
 export function App() {
   return (
     <Suspense fallback={fallback}>
       <Routes>
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/" element={<HomeRedirect />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/invite/:token" element={<InviteAcceptPage />} />
         <Route path="/play/:code" element={<PlayEventPage />} />
@@ -111,9 +118,9 @@ export function App() {
         <Route
           path="/events/:eventId"
           element={
-            <RequireAdmin>
+            <RequireAuth>
               <EventDetailPage />
-            </RequireAdmin>
+            </RequireAuth>
           }
         />
         <Route
@@ -164,7 +171,7 @@ export function App() {
             </RequireAdmin>
           }
         />
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        <Route path="*" element={<HomeRedirect />} />
       </Routes>
     </Suspense>
   );

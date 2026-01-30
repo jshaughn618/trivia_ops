@@ -19,6 +19,7 @@ export function HeaderBar() {
   const isAdmin = auth.user?.user_type === 'admin';
   const { theme } = useTheme();
   const logo = theme === 'light' ? logoLight : logoDark;
+  const homePath = isAdmin ? '/dashboard' : '/events';
 
   useEffect(() => {
     if (!open) return;
@@ -35,14 +36,16 @@ export function HeaderBar() {
   return (
     <header className="relative z-50 border-b border-border bg-panel px-4 py-3">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
-        <Link to="/dashboard" className="flex items-center">
+        <Link to={homePath} className="flex items-center">
           <img src={logo} alt="Trivia Ops" className="h-10 w-auto" />
         </Link>
         <div className="flex items-center gap-2">
           <nav className="hidden items-center gap-2 lg:flex">
-            <NavLink to="/dashboard" className={navLinkClass}>
-              Dashboard
-            </NavLink>
+            {isAdmin && (
+              <NavLink to="/dashboard" className={navLinkClass}>
+                Dashboard
+              </NavLink>
+            )}
             {isAdmin && (
               <NavLink to="/games" className={navLinkClass}>
                 Games
@@ -68,9 +71,11 @@ export function HeaderBar() {
             {open && (
               <div className="absolute right-0 z-50 mt-3 w-48 rounded-md border border-border bg-panel2 p-2 shadow-sm">
                 <nav className="flex flex-col gap-2">
-                  <NavLink to="/dashboard" className={navLinkClass} onClick={() => setOpen(false)}>
-                    Dashboard
-                  </NavLink>
+                  {isAdmin && (
+                    <NavLink to="/dashboard" className={navLinkClass} onClick={() => setOpen(false)}>
+                      Dashboard
+                    </NavLink>
+                  )}
                   {isAdmin && (
                     <NavLink to="/games" className={navLinkClass} onClick={() => setOpen(false)}>
                       Games
