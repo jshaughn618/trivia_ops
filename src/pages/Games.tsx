@@ -244,6 +244,29 @@ export function GamesPage() {
     return filteredCategoryMap[resolvedCategory] ?? [];
   }, [filteredCategoryMap, resolvedCategory, hasCategories, sortedFilteredGames]);
 
+  const categoryTabs = hasCategories ? (
+    <div className="inline-flex rounded-full border border-border bg-panel2/70 p-1">
+      {categoryGroups.map((group) => {
+        const isActive = group.id === resolvedCategory;
+        return (
+          <button
+            key={group.id}
+            type="button"
+            aria-pressed={isActive}
+            onClick={() => setActiveCategory(group.id)}
+            className={`rounded-full px-3 py-1.5 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg ${
+              isActive
+                ? 'bg-accent-soft text-accent-ink'
+                : 'text-muted hover:text-text'
+            }`}
+          >
+            {group.label}
+          </button>
+        );
+      })}
+    </div>
+  ) : null;
+
   const visibleGameIds = useMemo(() => {
     return categoryGames.map((game) => game.id);
   }, [categoryGames]);
@@ -285,31 +308,7 @@ export function GamesPage() {
           </div>
         )}
         <div className="grid gap-4 lg:grid-cols-[1fr,320px]">
-          <Section title="Edition library">
-            {hasCategories && (
-              <div className="mb-3 flex flex-wrap items-center gap-2">
-                <div className="inline-flex rounded-full border border-border bg-panel2/70 p-1">
-                  {categoryGroups.map((group) => {
-                    const isActive = group.id === resolvedCategory;
-                    return (
-                      <button
-                        key={group.id}
-                        type="button"
-                        aria-pressed={isActive}
-                        onClick={() => setActiveCategory(group.id)}
-                        className={`rounded-full px-3 py-1.5 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg ${
-                          isActive
-                            ? 'bg-accent-soft text-accent-ink'
-                            : 'text-muted hover:text-text'
-                        }`}
-                      >
-                        {group.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+          <Section title="Edition library" actions={categoryTabs}>
             {categoryGames.length > 0 && (
               <div className="mb-2 text-xs uppercase tracking-[0.2em] text-muted">
                 Select a game to view editions.
