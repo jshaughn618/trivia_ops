@@ -46,7 +46,7 @@ export function PlayLeaderboardPage() {
     let cancelled = false;
     const load = async () => {
       if (!normalizedCode) return;
-      const res = await api.publicEvent(normalizedCode);
+      const res = await api.publicEvent(normalizedCode, 'leaderboard');
       if (cancelled) return;
       if (res.ok) {
         const next = res.data as PublicLeaderboardResponse;
@@ -60,11 +60,54 @@ export function PlayLeaderboardPage() {
       }
       setLoading(false);
     };
-    load();
-    const timer = window.setInterval(load, POLL_MS);
+    let timer: number | null = null;
+    let source: EventSource | null = null;
+
+    const applyData = (next: PublicLeaderboardResponse) => {
+      if (cancelled) return;
+      setData(next);
+      setError(null);
+      if (next.live && !next.live.show_full_leaderboard) {
+        navigate(`/play/${normalizedCode}${storedTeamId ? `?team_id=${storedTeamId}` : ''}`);
+      }
+      setLoading(false);
+    };
+
+    const startPolling = () => {
+      if (timer) return;
+      load();
+      timer = window.setInterval(load, POLL_MS);
+    };
+
+    const startStream = () => {
+      source = new EventSource(`/api/public/event/${encodeURIComponent(normalizedCode)}/stream?view=leaderboard`);
+      source.addEventListener('update', (event) => {
+        try {
+          const next = JSON.parse((event as MessageEvent).data) as PublicLeaderboardResponse;
+          applyData(next);
+        } catch {
+          // Ignore malformed events and let polling handle it if needed.
+        }
+      });
+      source.addEventListener('error', () => {
+        if (cancelled) return;
+        source?.close();
+        source = null;
+        startPolling();
+      });
+    };
+
+    if (typeof EventSource === 'undefined') {
+      startPolling();
+    } else {
+      startStream();
+      load();
+    }
+
     return () => {
       cancelled = true;
-      window.clearInterval(timer);
+      if (timer) window.clearInterval(timer);
+      source?.close();
     };
   }, [normalizedCode, navigate, storedTeamId]);
 

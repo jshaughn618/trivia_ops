@@ -146,7 +146,7 @@ export function PlayEventPage() {
 
   const load = async () => {
     if (!normalizedCode) return;
-    const res = await api.publicEvent(normalizedCode);
+    const res = await api.publicEvent(normalizedCode, 'play');
     if (res.ok) {
       setData(res.data as PublicEventResponse);
       setError(null);
@@ -158,9 +158,54 @@ export function PlayEventPage() {
   };
 
   useEffect(() => {
-    load();
-    const timer = setInterval(load, POLL_MS);
-    return () => clearInterval(timer);
+    if (!normalizedCode) return;
+    let cancelled = false;
+    let timer: number | null = null;
+    let source: EventSource | null = null;
+
+    const applyData = (payload: PublicEventResponse) => {
+      if (cancelled) return;
+      setData(payload);
+      setError(null);
+      setLoading(false);
+    };
+
+    const startPolling = () => {
+      if (timer) return;
+      load();
+      timer = window.setInterval(load, POLL_MS);
+    };
+
+    const startStream = () => {
+      source = new EventSource(`/api/public/event/${encodeURIComponent(normalizedCode)}/stream?view=play`);
+      source.addEventListener('update', (event) => {
+        try {
+          const next = JSON.parse((event as MessageEvent).data) as PublicEventResponse;
+          applyData(next);
+        } catch {
+          // Ignore malformed events and let polling handle it if needed.
+        }
+      });
+      source.addEventListener('error', () => {
+        if (cancelled) return;
+        source?.close();
+        source = null;
+        if (!timer) startPolling();
+      });
+    };
+
+    if (typeof EventSource === 'undefined') {
+      startPolling();
+    } else {
+      startStream();
+      load();
+    }
+
+    return () => {
+      cancelled = true;
+      if (timer) window.clearInterval(timer);
+      source?.close();
+    };
   }, [normalizedCode]);
 
   useEffect(() => {
