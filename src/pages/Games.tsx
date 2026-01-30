@@ -138,21 +138,6 @@ export function GamesPage() {
     return games.filter((game) => game.game_type_id === gameTypeFilterId);
   }, [games, gameTypeFilterId]);
 
-  const visibleGameIds = useMemo(() => {
-    return categoryGames.map((game) => game.id);
-  }, [categoryGames]);
-
-  useEffect(() => {
-    setOpenGames((prev) => {
-      const next: Record<string, boolean> = {};
-      visibleGameIds.forEach((id) => {
-        if (prev[id]) next[id] = true;
-      });
-      return next;
-    });
-    setGameMenuId((current) => (current && visibleGameIds.includes(current) ? current : null));
-  }, [visibleGameIds]);
-
   const handleCreate = async () => {
     if (!name.trim() || !gameTypeId) return;
     setLoading(true);
@@ -258,6 +243,21 @@ export function GamesPage() {
     if (!hasCategories) return sortedFilteredGames;
     return filteredCategoryMap[resolvedCategory] ?? [];
   }, [filteredCategoryMap, resolvedCategory, hasCategories, sortedFilteredGames]);
+
+  const visibleGameIds = useMemo(() => {
+    return categoryGames.map((game) => game.id);
+  }, [categoryGames]);
+
+  useEffect(() => {
+    setOpenGames((prev) => {
+      const next: Record<string, boolean> = {};
+      visibleGameIds.forEach((id) => {
+        if (prev[id]) next[id] = true;
+      });
+      return next;
+    });
+    setGameMenuId((current) => (current && visibleGameIds.includes(current) ? current : null));
+  }, [visibleGameIds]);
 
   return (
     <AppShell title="Games" showTitle={false}>
