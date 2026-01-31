@@ -99,35 +99,6 @@ export async function getPublicEventPayload(env: Env, rawCode: string, view?: Pu
     [event.id]
   );
 
-  const teams = await queryAll<{ id: string; name: string }>(
-    env,
-    'SELECT id, name FROM teams WHERE event_id = ? AND COALESCE(deleted, 0) = 0 ORDER BY created_at ASC',
-    [event.id]
-  );
-
-  const leaderboard = await queryAll<{ team_id: string; name: string; total: number }>(
-    env,
-    `SELECT t.id AS team_id, t.name, COALESCE(SUM(s.score), 0) AS total
-     FROM teams t
-     LEFT JOIN event_round_scores s ON s.team_id = t.id AND COALESCE(s.deleted, 0) = 0
-     LEFT JOIN event_rounds r ON r.id = s.event_round_id
-     WHERE t.event_id = ? AND COALESCE(t.deleted, 0) = 0
-     GROUP BY t.id
-     ORDER BY total DESC, t.name ASC`,
-    [event.id]
-  );
-
-  const roundScores = await queryAll<{ event_round_id: string; team_id: string; score: number }>(
-    env,
-    `SELECT event_round_id, team_id, score
-     FROM event_round_scores
-     WHERE COALESCE(deleted, 0) = 0
-       AND event_round_id IN (
-         SELECT id FROM event_rounds WHERE event_id = ? AND COALESCE(deleted, 0) = 0
-       )`,
-    [event.id]
-  );
-
   const live = await queryFirst<{
     id: string;
     event_id: string;
@@ -211,12 +182,51 @@ export async function getPublicEventPayload(env: Env, rawCode: string, view?: Pu
     return base;
   };
 
+  const isLeaderboardView = view === 'leaderboard';
+  const includeLeaderboard = isLeaderboardView || Boolean(normalizedLive?.waiting_show_leaderboard);
+  const includeTeams = !isLeaderboardView;
+
+  const teams = includeTeams
+    ? await queryAll<{ id: string; name: string }>(
+      env,
+      'SELECT id, name FROM teams WHERE event_id = ? AND COALESCE(deleted, 0) = 0 ORDER BY created_at ASC',
+      [event.id]
+    )
+    : [];
+
+  const leaderboard = includeLeaderboard
+    ? await queryAll<{ team_id: string; name: string; total: number }>(
+      env,
+      `SELECT t.id AS team_id, t.name, COALESCE(SUM(s.score), 0) AS total
+       FROM teams t
+       LEFT JOIN event_round_scores s ON s.team_id = t.id AND COALESCE(s.deleted, 0) = 0
+       LEFT JOIN event_rounds r ON r.id = s.event_round_id
+       WHERE t.event_id = ? AND COALESCE(t.deleted, 0) = 0
+       GROUP BY t.id
+       ORDER BY total DESC, t.name ASC`,
+      [event.id]
+    )
+    : [];
+
+  const roundScores = isLeaderboardView
+    ? await queryAll<{ event_round_id: string; team_id: string; score: number }>(
+      env,
+      `SELECT event_round_id, team_id, score
+       FROM event_round_scores
+       WHERE COALESCE(deleted, 0) = 0
+         AND event_round_id IN (
+           SELECT id FROM event_rounds WHERE event_id = ? AND COALESCE(deleted, 0) = 0
+         )`,
+      [event.id]
+    )
+    : [];
+
   let currentItem: PublicItem | null = null;
   let visualRound = false;
   let visualItems: PublicItem[] = [];
   let responseCounts: { total: number; counts: number[] } | null = null;
 
-  if (live?.active_round_id) {
+  if (!isLeaderboardView && live?.active_round_id) {
     const roundStatus = await queryFirst<{ status: string }>(
       env,
       'SELECT status FROM event_rounds WHERE id = ? AND COALESCE(deleted, 0) = 0',
@@ -271,7 +281,7 @@ export async function getPublicEventPayload(env: Env, rawCode: string, view?: Pu
     }
   }
 
-  if (live?.active_round_id && live.current_item_ordinal) {
+  if (!isLeaderboardView && live?.active_round_id && live.current_item_ordinal) {
     const rawItem = await queryFirst(
       env,
       `SELECT
@@ -302,32 +312,40 @@ export async function getPublicEventPayload(env: Env, rawCode: string, view?: Pu
     }
   }
 
-  if (currentItem?.choices_json && live?.active_round_id) {
-    let choices: string[] = [];
-    try {
-      const parsed = JSON.parse(currentItem.choices_json);
-      if (Array.isArray(parsed)) {
-        choices = parsed.filter((choice) => typeof choice === 'string' && choice.trim().length > 0);
+  if (!isLeaderboardView && currentItem?.choices_json && live?.active_round_id && normalizedLive?.timer_started_at && normalizedLive?.timer_duration_seconds) {
+    const startMs = Date.parse(normalizedLive.timer_started_at);
+    const expiresAt = startMs + normalizedLive.timer_duration_seconds * 1000;
+    const graceMs = 5000;
+    const expired = !Number.isNaN(startMs) && Date.now() > expiresAt + graceMs;
+    if (!expired) {
+      responseCounts = null;
+    } else {
+      let choices: string[] = [];
+      try {
+        const parsed = JSON.parse(currentItem.choices_json);
+        if (Array.isArray(parsed)) {
+          choices = parsed.filter((choice) => typeof choice === 'string' && choice.trim().length > 0);
+        }
+      } catch {
+        choices = [];
       }
-    } catch {
-      choices = [];
-    }
-    if (choices.length > 0) {
-      const countsRows = await queryAll<{ choice_index: number; total: number }>(
-        env,
-        `SELECT choice_index, COUNT(*) AS total
+      if (choices.length > 0) {
+        const countsRows = await queryAll<{ choice_index: number; total: number }>(
+          env,
+          `SELECT choice_index, COUNT(*) AS total
          FROM event_item_responses
          WHERE event_id = ?
            AND edition_item_id = ?
            AND COALESCE(deleted, 0) = 0
          GROUP BY choice_index`,
-        [event.id, currentItem.id]
-      );
-      const counts = choices.map((_, idx) => {
-        const row = countsRows.find((entry) => Number(entry.choice_index) === idx);
-        return row ? row.total : 0;
-      });
-      responseCounts = { total: counts.reduce((sum, value) => sum + value, 0), counts };
+          [event.id, currentItem.id]
+        );
+        const counts = choices.map((_, idx) => {
+          const row = countsRows.find((entry) => Number(entry.choice_index) === idx);
+          return row ? row.total : 0;
+        });
+        responseCounts = { total: counts.reduce((sum, value) => sum + value, 0), counts };
+      }
     }
   }
 
