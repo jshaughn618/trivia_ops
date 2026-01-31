@@ -266,6 +266,7 @@ export async function getPublicEventPayload(env: Env, rawCode: string, view?: Pu
           ei.media_type,
           ei.media_key,
           ei.audio_answer_key,
+          ei.media_caption,
           eri.ordinal
          FROM event_round_items eri
          JOIN edition_items ei ON ei.id = eri.edition_item_id
