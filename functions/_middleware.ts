@@ -157,7 +157,7 @@ function validateCsrf(request: Request, env: Env, url: URL) {
       ? { ok: true as const }
       : { ok: false as const, reason: `referer_not_allowed:${originFromReferer}` };
   }
-  return { ok: true as const };
+  return { ok: false as const, reason: 'origin_missing' };
 }
 
 function safeOrigin(value: string) {

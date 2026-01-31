@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { api } from '../api';
+import { api, formatApiError } from '../api';
 import { AppShell } from '../components/AppShell';
 import { Panel } from '../components/Panel';
 import { SecondaryButton } from '../components/Buttons';
@@ -33,17 +33,17 @@ export function EventLeaderboardPage() {
       ]);
       if (eventRes.ok) setEvent(eventRes.data);
       if (!eventRes.ok) {
-        setError(eventRes.error.message ?? 'Failed to load event.');
+      setError(formatApiError(eventRes, 'Failed to load event.'));
         logError('leaderboard_event_load_failed', { error: eventRes.error });
       }
       if (roundsRes.ok) setRounds(roundsRes.data);
       if (!roundsRes.ok) {
-        setError(roundsRes.error.message ?? 'Failed to load rounds.');
+      setError(formatApiError(roundsRes, 'Failed to load rounds.'));
         logError('leaderboard_rounds_load_failed', { error: roundsRes.error });
       }
       if (teamsRes.ok) setTeams(teamsRes.data);
       if (!teamsRes.ok) {
-        setError(teamsRes.error.message ?? 'Failed to load teams.');
+      setError(formatApiError(teamsRes, 'Failed to load teams.'));
         logError('leaderboard_teams_load_failed', { error: teamsRes.error });
       }
 

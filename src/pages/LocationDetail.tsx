@@ -1,6 +1,6 @@
 import { useEffect, useId, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { api } from '../api';
+import { api, formatApiError } from '../api';
 import { AppShell } from '../components/AppShell';
 import { Panel } from '../components/Panel';
 import { PrimaryButton, SecondaryButton, DangerButton } from '../components/Buttons';
@@ -65,7 +65,7 @@ export function LocationDetailPage() {
     if (res.ok) {
       setLocation(res.data);
     } else {
-      setLogoError(res.error.message ?? 'Upload failed.');
+      setLogoError(formatApiError(res, 'Upload failed.'));
     }
     setLogoUploading(false);
   };
@@ -78,7 +78,7 @@ export function LocationDetailPage() {
     if (res.ok) {
       setLocation(res.data);
     } else {
-      setLogoError(res.error.message ?? 'Remove failed.');
+      setLogoError(formatApiError(res, 'Remove failed.'));
     }
     setLogoUploading(false);
   };

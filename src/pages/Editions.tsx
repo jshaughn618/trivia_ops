@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { api } from '../api';
+import { api, formatApiError } from '../api';
 import { AppShell } from '../components/AppShell';
 import { ButtonLink, SecondaryButton } from '../components/Buttons';
 import { PageHeader } from '../components/PageHeader';
@@ -49,17 +49,17 @@ export function EditionsPage() {
     const locationsRes = await api.listLocations();
     if (gamesRes.ok) setGames(gamesRes.data);
     if (!gamesRes.ok) {
-      setError(gamesRes.error.message ?? 'Failed to load games.');
+      setError(formatApiError(gamesRes, 'Failed to load games.'));
       logError('editions_games_load_failed', { error: gamesRes.error });
     }
     if (editionsRes.ok) setEditions(editionsRes.data);
     if (!editionsRes.ok) {
-      setError(editionsRes.error.message ?? 'Failed to load editions.');
+      setError(formatApiError(editionsRes, 'Failed to load editions.'));
       logError('editions_load_failed', { error: editionsRes.error });
     }
     if (locationsRes.ok) setLocations(locationsRes.data);
     if (!locationsRes.ok) {
-      setError(locationsRes.error.message ?? 'Failed to load locations.');
+      setError(formatApiError(locationsRes, 'Failed to load locations.'));
       logError('editions_locations_load_failed', { error: locationsRes.error });
     }
   };

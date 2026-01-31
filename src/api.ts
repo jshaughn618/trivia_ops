@@ -62,7 +62,11 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<Api
     durationMs
   });
   if (json && typeof json === 'object' && json !== null && 'ok' in json) {
-    return json as ApiEnvelope<T>;
+    const envelope = json as ApiEnvelope<T> & { requestId?: string };
+    if (!envelope.ok && !envelope.requestId && responseRequestId) {
+      envelope.requestId = responseRequestId;
+    }
+    return envelope;
   }
 
   if (!res.ok) {
@@ -386,4 +390,9 @@ function getCsrfToken() {
   if (typeof document === 'undefined') return null;
   const match = document.cookie.match(/(?:^|; )csrf_token=([^;]+)/);
   return match ? decodeURIComponent(match[1]) : null;
+}
+
+export function formatApiError(res: { error: { message?: string }; requestId?: string }, fallback: string) {
+  const message = res.error?.message ?? fallback;
+  return res.requestId ? `${message} (ref ${res.requestId})` : message;
 }

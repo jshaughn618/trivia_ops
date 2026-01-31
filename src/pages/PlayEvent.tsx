@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type React from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { api } from '../api';
+import { api, formatApiError } from '../api';
 import { PrimaryButton, SecondaryButton } from '../components/Buttons';
 import { logError } from '../lib/log';
 import { useTheme } from '../lib/theme';
@@ -154,7 +154,7 @@ export function PlayEventPage() {
       setError(null);
       setLoading(false);
     } else {
-      setError(res.error.message);
+      setError(formatApiError(res, 'Event not available.'));
       setLoading(false);
     }
   };
@@ -436,7 +436,7 @@ export function PlayEventPage() {
       setTeamName('');
       setJoinError(null);
     } else {
-      setJoinError(res.error.message ?? 'Unable to join team.');
+      setJoinError(formatApiError(res, 'Unable to join team.'));
     }
     setJoinLoading(false);
   };
@@ -472,7 +472,7 @@ export function PlayEventPage() {
       setResponseSync({ expectedTotal, expiresAt: Date.now() + 3000 });
     } else {
       setSubmitStatus('error');
-      setSubmitError(res.error.message ?? 'Failed to submit choice.');
+      setSubmitError(formatApiError(res, 'Failed to submit choice.'));
     }
   };
 

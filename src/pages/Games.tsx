@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { api } from '../api';
+import { api, formatApiError } from '../api';
 import { AppShell } from '../components/AppShell';
 import { PageHeader } from '../components/PageHeader';
 import { Section } from '../components/Section';
@@ -93,22 +93,22 @@ export function GamesPage() {
     ]);
     if (gamesRes.ok) setGames(gamesRes.data);
     if (!gamesRes.ok) {
-      setError(gamesRes.error.message ?? 'Failed to load games.');
+      setError(formatApiError(gamesRes, 'Failed to load games.'));
       logError('games_load_failed', { error: gamesRes.error });
     }
     if (editionsRes.ok) setEditions(editionsRes.data);
     if (!editionsRes.ok) {
-      setError(editionsRes.error.message ?? 'Failed to load editions.');
+      setError(formatApiError(editionsRes, 'Failed to load editions.'));
       logError('editions_load_failed', { error: editionsRes.error });
     }
     if (locationsRes.ok) setLocations(locationsRes.data);
     if (!locationsRes.ok) {
-      setError(locationsRes.error.message ?? 'Failed to load locations.');
+      setError(formatApiError(locationsRes, 'Failed to load locations.'));
       logError('locations_load_failed', { error: locationsRes.error });
     }
     if (gameTypesRes.ok) setGameTypes(gameTypesRes.data);
     if (!gameTypesRes.ok) {
-      setError(gameTypesRes.error.message ?? 'Failed to load game types.');
+      setError(formatApiError(gameTypesRes, 'Failed to load game types.'));
       logError('game_types_load_failed', { error: gameTypesRes.error });
     }
   };
@@ -162,7 +162,7 @@ export function GamesPage() {
       updateCreateParam(false);
       load();
     } else {
-      setCreateError(res.error.message);
+      setCreateError(formatApiError(res, 'Failed to create game.'));
     }
   };
 

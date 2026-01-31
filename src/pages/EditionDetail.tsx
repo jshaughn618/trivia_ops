@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { api } from '../api';
+import { api, formatApiError } from '../api';
 import { QUESTION_AI_MODEL } from '../lib/ai';
 import { AppShell } from '../components/AppShell';
 import { Panel } from '../components/Panel';
@@ -531,7 +531,7 @@ export function EditionDetailPage() {
       }
       load();
     } else {
-      setMediaError(uploadRes.error.message);
+      setMediaError(formatApiError(uploadRes, 'Upload failed.'));
     }
   };
 
@@ -542,7 +542,7 @@ export function EditionDetailPage() {
     const res = await api.deleteMedia(itemDraft.media_key);
     setMediaUploading(false);
     if (!res.ok) {
-      setMediaError(res.error.message);
+      setMediaError(formatApiError(res, 'Upload failed.'));
       return;
     }
     if (item) {
@@ -587,7 +587,7 @@ export function EditionDetailPage() {
         }
       }
     } else {
-      setMediaError(uploadRes.error.message);
+      setMediaError(formatApiError(uploadRes, 'Upload failed.'));
     }
   };
 
@@ -602,7 +602,7 @@ export function EditionDetailPage() {
     const uploadRes = await api.uploadMedia(file, 'audio');
     setMediaUploading(false);
     if (!uploadRes.ok) {
-      setMediaError(uploadRes.error.message);
+      setMediaError(formatApiError(uploadRes, 'Upload failed.'));
       return null;
     }
     return uploadRes.data.key;
@@ -642,7 +642,7 @@ export function EditionDetailPage() {
     const res = await api.deleteMedia(itemDraft.audio_answer_key);
     setMediaUploading(false);
     if (!res.ok) {
-      setMediaError(res.error.message);
+      setMediaError(formatApiError(res, 'Upload failed.'));
       return;
     }
     if (item) {
@@ -664,7 +664,7 @@ export function EditionDetailPage() {
     const res = await api.deleteEditionItem(itemId);
     if (!res.ok) {
       setItems(previous);
-      setItemDeleteError(res.error.message ?? 'Failed to delete item.');
+      setItemDeleteError(formatApiError(res, 'Failed to delete item.'));
     }
   };
 
@@ -698,7 +698,7 @@ export function EditionDetailPage() {
     const res = await api.aiGenerate({ prompt, max_output_tokens: 300 });
     setRefineLoading(false);
     if (!res.ok) {
-      setRefineError(res.error.message);
+      setRefineError(formatApiError(res, 'Refine failed.'));
       setRefineOptions([]);
       return;
     }
@@ -738,7 +738,7 @@ export function EditionDetailPage() {
     const res = await api.aiGenerate({ prompt, max_output_tokens: 200 });
     setMetaLoading(false);
     if (!res.ok) {
-      setMetaError(res.error.message);
+      setMetaError(formatApiError(res, 'Failed to save metadata.'));
       return;
     }
     const lines = res.data.text.split('\n').map((line) => line.trim());
@@ -777,7 +777,7 @@ export function EditionDetailPage() {
       const res = await api.aiGenerate({ prompt, max_output_tokens: maxTokens, model: QUESTION_AI_MODEL });
       setAiLoading(false);
       if (!res.ok) {
-        setAiError(res.error.message);
+        setAiError(formatApiError(res, 'AI request failed.'));
         return;
       }
 
@@ -837,7 +837,7 @@ export function EditionDetailPage() {
     const res = await api.aiGenerate({ prompt, max_output_tokens: 80 });
     setAnswerLoading(false);
     if (!res.ok) {
-      setAnswerError(res.error.message);
+      setAnswerError(formatApiError(res, 'Failed to save answer.'));
       return;
     }
     const line = res.data.text.split('\n')[0] ?? '';
@@ -870,7 +870,7 @@ export function EditionDetailPage() {
     const res = await api.aiGenerate({ prompt, max_output_tokens: 80 });
     setFactLoading(false);
     if (!res.ok) {
-      setFactError(res.error.message);
+      setFactError(formatApiError(res, 'Failed to save factoid.'));
       return;
     }
     const line = res.data.text.split('\n')[0] ?? '';
@@ -936,7 +936,7 @@ export function EditionDetailPage() {
     const res = await api.aiGenerate({ prompt, max_output_tokens: 900, model: QUESTION_AI_MODEL });
     setAiLoading(false);
     if (!res.ok) {
-      setAiError(res.error.message);
+      setAiError(formatApiError(res, 'AI request failed.'));
       return;
     }
 
@@ -1014,7 +1014,7 @@ export function EditionDetailPage() {
     const res = await api.aiGenerate({ prompt, max_output_tokens: 900, model: QUESTION_AI_MODEL });
     setAiLoading(false);
     if (!res.ok) {
-      setAiError(res.error.message);
+      setAiError(formatApiError(res, 'AI request failed.'));
       return;
     }
 

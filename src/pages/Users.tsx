@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { api } from '../api';
+import { api, formatApiError } from '../api';
 import { AppShell } from '../components/AppShell';
 import { Panel } from '../components/Panel';
 import { PrimaryButton, SecondaryButton, DangerButton } from '../components/Buttons';
@@ -32,7 +32,7 @@ export function UsersPage() {
       setUsers(res.data);
       setError(null);
     } else {
-      setError(res.error.message);
+      setError(formatApiError(res, 'Failed to load users.'));
     }
   };
 
@@ -55,7 +55,7 @@ export function UsersPage() {
       setError(null);
       load();
     } else {
-      setError(res.error.message);
+      setError(formatApiError(res, 'Failed to update user.'));
     }
   };
 
@@ -81,7 +81,7 @@ export function UsersPage() {
     const res = await api.createInvites({ emails, role: 'host' });
     setInviteSending(false);
     if (!res.ok) {
-      setInviteError(res.error.message ?? 'Failed to send invites.');
+      setInviteError(formatApiError(res, 'Failed to send invites.'));
       return;
     }
     const sent = res.data.results.filter((item) => item.status === 'sent').length;

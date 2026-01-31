@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { api } from '../api';
+import { api, formatApiError } from '../api';
 import { Panel } from '../components/Panel';
 import { SecondaryButton } from '../components/Buttons';
 import { Table } from '../components/Table';
@@ -60,7 +60,7 @@ export function PlayLeaderboardPage() {
           setRedirecting(false);
         }
       } else {
-        setError(res.error.message);
+        setError(formatApiError(res, 'Leaderboard unavailable.'));
       }
       setLoading(false);
     };

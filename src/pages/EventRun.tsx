@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
-import { api } from '../api';
+import { api, formatApiError } from '../api';
 import { useAuth } from '../auth';
 import { AppShell } from '../components/AppShell';
 import { Panel } from '../components/Panel';
@@ -427,7 +427,7 @@ export function EventRunPage() {
       show_full_leaderboard: false
     });
     if (!res.ok) {
-      setWaitingError(res.error.message ?? 'Failed to update waiting room.');
+      setWaitingError(formatApiError(res, 'Failed to update waiting room.'));
       logError('waiting_room_update_failed', { eventId, error: res.error });
     }
     setWaitingSaving(false);
@@ -464,7 +464,7 @@ export function EventRunPage() {
       setClearResponsesMessage('Responses cleared.');
     } else {
       setClearResponsesStatus('error');
-      setClearResponsesMessage(res.error.message ?? 'Failed to clear responses.');
+      setClearResponsesMessage(formatApiError(res, 'Failed to clear responses.'));
     }
   };
 
@@ -498,7 +498,7 @@ export function EventRunPage() {
     });
     const res = await api.updateRoundScores(activeRound.id, payload);
     if (!res.ok) {
-      setScoresError(res.error.message ?? 'Failed to save scores.');
+      setScoresError(formatApiError(res, 'Failed to save scores.'));
     } else {
       setScoresOpen(false);
     }

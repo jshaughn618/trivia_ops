@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { api } from '../api';
+import { api, formatApiError } from '../api';
 import { AppShell } from '../components/AppShell';
 import { Panel } from '../components/Panel';
 import { PrimaryButton, SecondaryButton, DangerButton } from '../components/Buttons';
@@ -66,7 +66,7 @@ export function GameDetailPage() {
       setGame(res.data);
       setUpdateError(null);
     } else {
-      setUpdateError(res.error.message);
+      setUpdateError(formatApiError(res, 'Failed to update game.'));
     }
   };
 
@@ -82,7 +82,7 @@ export function GameDetailPage() {
     const res = await api.aiGenerate({ prompt, max_output_tokens: 120 });
     setDescLoading(false);
     if (!res.ok) {
-      setDescError(res.error.message);
+      setDescError(formatApiError(res, 'Failed to update description.'));
       return;
     }
     const line = res.data.text.split('\n')[0] ?? '';

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { PrimaryButton, SecondaryButton } from '../components/Buttons';
-import { api } from '../api';
+import { api, formatApiError } from '../api';
 import { useAuth } from '../auth';
 import logoDark from '../assets/trivia_ops_logo_dark.png';
 import logoLight from '../assets/trivia_ops_logo_light.png';
@@ -35,7 +35,7 @@ export function InviteAcceptPage() {
         setEmail(res.data.email);
         setExpiresAt(res.data.expires_at);
       } else {
-        setError(res.error.message ?? 'Invite not available.');
+        setError(formatApiError(res, 'Invite not available.'));
       }
       setLoading(false);
     };
@@ -58,7 +58,7 @@ export function InviteAcceptPage() {
       await auth.refresh();
       navigate('/events');
     } else {
-      setError(res.error.message ?? 'Could not accept invite.');
+      setError(formatApiError(res, 'Could not accept invite.'));
     }
   };
 

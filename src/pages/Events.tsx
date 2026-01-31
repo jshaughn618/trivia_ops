@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { api } from '../api';
+import { api, formatApiError } from '../api';
 import { useAuth } from '../auth';
 import { AppShell } from '../components/AppShell';
 import { ButtonLink } from '../components/Buttons';
@@ -25,8 +25,7 @@ export function EventsPage() {
       setEvents(res.data);
       setError(null);
     } else {
-      const requestId = res.requestId;
-      setError(requestId ? `${res.error.message ?? 'Failed to load events.'} (ref ${requestId})` : res.error.message ?? 'Failed to load events.');
+      setError(formatApiError(res, 'Failed to load events.'));
       logError('events_load_failed', { error: res.error });
     }
   };

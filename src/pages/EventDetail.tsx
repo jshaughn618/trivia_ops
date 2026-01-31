@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, useId } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import QRCode from 'qrcode';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
-import { api } from '../api';
+import { api, formatApiError } from '../api';
 import logoLight from '../assets/trivia_ops_logo_light.png';
 import { AppShell } from '../components/AppShell';
 import { PrimaryButton, SecondaryButton, DangerButton, ButtonLink, TextLink } from '../components/Buttons';
@@ -650,7 +650,7 @@ export function EventDetailPage() {
       setEvent(res.data);
       setEditingTitle(false);
     } else {
-      setTitleError(res.error.message ?? 'Failed to update title.');
+      setTitleError(formatApiError(res, 'Failed to update title.'));
     }
     setTitleSaving(false);
   };
@@ -787,7 +787,7 @@ export function EventDetailPage() {
     const uploadRes = await api.uploadMedia(file, 'audio');
     if (!uploadRes.ok) {
       setRoundAudioUploadingId(null);
-      setRoundAudioError((prev) => ({ ...prev, [round.id]: uploadRes.error.message ?? 'Upload failed.' }));
+      setRoundAudioError((prev) => ({ ...prev, [round.id]: formatApiError(uploadRes, 'Upload failed.') }));
       return;
     }
     const previousKey = round.audio_key;
@@ -797,7 +797,7 @@ export function EventDetailPage() {
     });
     setRoundAudioUploadingId(null);
     if (!updateRes.ok) {
-      setRoundAudioError((prev) => ({ ...prev, [round.id]: updateRes.error.message ?? 'Failed to save audio.' }));
+      setRoundAudioError((prev) => ({ ...prev, [round.id]: formatApiError(updateRes, 'Failed to save audio.') }));
       await api.deleteMedia(uploadRes.data.key);
       return;
     }
@@ -814,7 +814,7 @@ export function EventDetailPage() {
     const updateRes = await api.updateEventRound(round.id, { audio_key: null, audio_name: null });
     setRoundAudioUploadingId(null);
     if (!updateRes.ok) {
-      setRoundAudioError((prev) => ({ ...prev, [round.id]: updateRes.error.message ?? 'Failed to remove audio.' }));
+      setRoundAudioError((prev) => ({ ...prev, [round.id]: formatApiError(updateRes, 'Failed to remove audio.') }));
       return;
     }
     setRounds((prev) => prev.map((item) => (item.id === round.id ? updateRes.data : item)));
@@ -833,7 +833,7 @@ export function EventDetailPage() {
         [round.id]: count > 0 ? `Added ${count} new item${count === 1 ? '' : 's'}.` : 'No new items.'
       }));
     } else {
-      setRoundSyncError((prev) => ({ ...prev, [round.id]: res.error.message ?? 'Sync failed.' }));
+      setRoundSyncError((prev) => ({ ...prev, [round.id]: formatApiError(res, 'Sync failed.') }));
     }
     setRoundSyncingId(null);
   };
@@ -848,7 +848,7 @@ export function EventDetailPage() {
       setTeamError(null);
       loadCore();
     } else {
-      setTeamError(res.error.message ?? 'Unable to create team.');
+      setTeamError(formatApiError(res, 'Unable to create team.'));
     }
   };
 
@@ -910,7 +910,7 @@ export function EventDetailPage() {
     if (res.ok) {
       setEvent(res.data);
     } else {
-      setError(res.error.message ?? 'Upload failed.');
+      setError(formatApiError(res, 'Upload failed.'));
     }
     setUploading(false);
   };
@@ -925,7 +925,7 @@ export function EventDetailPage() {
     if (res.ok) {
       setEvent(res.data);
     } else {
-      setError(res.error.message ?? 'Remove failed.');
+      setError(formatApiError(res, 'Remove failed.'));
     }
     setUploading(false);
   };

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { api } from '../api';
+import { api, formatApiError } from '../api';
 import { useAuth } from '../auth';
 import { AppShell } from '../components/AppShell';
 import { ButtonLink } from '../components/Buttons';
@@ -25,12 +25,12 @@ export function DashboardPage() {
       ]);
       if (eventsRes.ok) setEvents(eventsRes.data);
       if (!eventsRes.ok) {
-        setError(eventsRes.error.message ?? 'Failed to load events.');
+        setError(formatApiError(eventsRes, 'Failed to load events.'));
         logError('dashboard_events_load_failed', { error: eventsRes.error });
       }
       if (editionsRes.ok) setEditions(editionsRes.data);
       if (!editionsRes.ok) {
-        setError(editionsRes.error.message ?? 'Failed to load editions.');
+        setError(formatApiError(editionsRes, 'Failed to load editions.'));
         logError('dashboard_editions_load_failed', { error: editionsRes.error });
       }
     };
