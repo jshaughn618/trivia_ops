@@ -1,0 +1,7 @@
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
+  X-Frame-Options: DENY
+  Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+  Content-Security-Policy: default-src 'self'; base-uri 'self'; frame-ancestors 'none'; img-src 'self' data: https:; media-src 'self' https:; font-src 'self' https: data:; style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; script-src 'self'; connect-src 'self' https://api.openai.com; object-src 'none'; form-action 'self'; upgrade-insecure-requests
