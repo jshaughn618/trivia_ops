@@ -23,12 +23,14 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<Api
   const method = (options.method ?? 'GET').toUpperCase();
   const start = performance.now();
   logInfo('api_request_start', { requestId, method, path });
+  const csrfToken = getCsrfToken();
   const res = await fetch(path, {
     ...options,
     credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
       'x-request-id': requestId,
+      ...(csrfToken && method !== 'GET' && method !== 'HEAD' ? { 'x-csrf-token': csrfToken } : {}),
       ...(options.headers ?? {})
     }
   });
@@ -134,12 +136,14 @@ export const api = {
   uploadLocationLogo: async (locationId: string, file: File) => {
     const requestId = createRequestId();
     const start = performance.now();
+    const csrfToken = getCsrfToken();
     const res = await fetch(`/api/locations/${locationId}/logo`, {
       method: 'POST',
       body: await file.arrayBuffer(),
       credentials: 'include',
       headers: {
         'x-request-id': requestId,
+        ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
         'x-logo-filename': file.name || 'logo',
         'Content-Type': file.type || 'application/octet-stream'
       }
@@ -212,12 +216,14 @@ export const api = {
   uploadEventDocument: async (eventId: string, type: 'scoresheet' | 'answersheet', file: File) => {
     const requestId = createRequestId();
     const start = performance.now();
+    const csrfToken = getCsrfToken();
     const res = await fetch(`/api/events/${eventId}/documents?type=${type}`, {
       method: 'POST',
       body: await file.arrayBuffer(),
       credentials: 'include',
       headers: {
         'x-request-id': requestId,
+        ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
         'x-doc-type': type,
         'x-doc-filename': file.name || `${type}.pdf`,
         'Content-Type': file.type || 'application/pdf'
@@ -302,12 +308,14 @@ export const api = {
   uploadMedia: async (file: File, kind: 'image' | 'audio') => {
     const requestId = createRequestId();
     const start = performance.now();
+    const csrfToken = getCsrfToken();
     const res = await fetch('/api/media/upload', {
       method: 'POST',
       body: await file.arrayBuffer(),
       credentials: 'include',
       headers: {
         'x-request-id': requestId,
+        ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
         'x-media-kind': kind,
         'x-media-filename': file.name || (kind === 'audio' ? 'upload.mp3' : 'upload.png'),
         'Content-Type': file.type || 'application/octet-stream'
@@ -373,3 +381,9 @@ export const api = {
   publicMediaUrl: (code: string, key: string) =>
     `/api/public/event/${encodeURIComponent(code)}/media/${encodeURI(key)}`
 };
+
+function getCsrfToken() {
+  if (typeof document === 'undefined') return null;
+  const match = document.cookie.match(/(?:^|; )csrf_token=([^;]+)/);
+  return match ? decodeURIComponent(match[1]) : null;
+}

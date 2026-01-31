@@ -3,7 +3,7 @@ import { jsonError, jsonOk } from '../../../../responses';
 import { parseJson } from '../../../../request';
 import { inviteAcceptSchema } from '../../../../../shared/validators';
 import { execute, nowIso, queryFirst } from '../../../../db';
-import { createSession, buildSessionCookie, hashPassword } from '../../../../auth';
+import { createSession, buildSessionCookie, buildCsrfCookie, hashPassword } from '../../../../auth';
 
 export const onRequestPost: PagesFunction<Env> = async ({ env, params, request }) => {
   const token = params.token as string;
@@ -75,6 +75,10 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request }
   );
 
   const session = await createSession(env, userId, request);
+  const csrfToken = crypto.randomUUID();
+  const headers = new Headers();
+  headers.append('Set-Cookie', buildSessionCookie(session.signed, session.expiresAt));
+  headers.append('Set-Cookie', buildCsrfCookie(csrfToken));
   return jsonOk(
     {
       id: userId,
@@ -85,6 +89,6 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request }
       last_name: parsed.data.last_name ?? null,
       user_type: invite.role as 'admin' | 'host' | 'player'
     },
-    { headers: { 'Set-Cookie': buildSessionCookie(session.signed, session.expiresAt) } }
+    { headers }
   );
 };

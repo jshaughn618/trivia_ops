@@ -1,6 +1,6 @@
 import type { Env } from '../types';
 import { jsonOk } from '../responses';
-import { parseCookies, verifySessionCookie, clearSessionCookie } from '../auth';
+import { parseCookies, verifySessionCookie, clearSessionCookie, clearCsrfCookie } from '../auth';
 import { execute, nowIso } from '../db';
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
@@ -13,5 +13,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
     }
   }
 
-  return jsonOk({ ok: true }, { headers: { 'Set-Cookie': clearSessionCookie() } });
+  const headers = new Headers();
+  headers.append('Set-Cookie', clearSessionCookie());
+  headers.append('Set-Cookie', clearCsrfCookie());
+  return jsonOk({ ok: true }, { headers });
 };

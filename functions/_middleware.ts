@@ -20,18 +20,6 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
   try {
     if (publicRoutes.includes(path) || publicPrefixes.some((prefix) => path.startsWith(prefix)) || isStatic) {
-      if (isStateChanging(method)) {
-        const csrfResult = validateCsrf(request, env, url);
-        if (!csrfResult.ok) {
-          const response = path.startsWith('/api')
-            ? jsonError(
-              { code: 'csrf_failed', message: 'CSRF validation failed', details: { reason: csrfResult.reason } },
-              403
-            )
-            : new Response('Forbidden', { status: 403 });
-          return withRequestId(response, requestId);
-        }
-      }
       if (loggable) {
         logInfo(env, 'request_start', {
           requestId,
@@ -101,25 +89,26 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     }
 
     context.data.user = user;
-      if (loggable) {
-        logInfo(env, 'request_start', {
-          requestId,
-          method,
-          path,
-          userId: user.id
-        });
-      }
-      const response = await context.next();
-      if (loggable) {
-        logInfo(env, 'request_end', {
-          requestId,
-          method,
-          path,
-          status: response.status,
-          userId: user.id
-        });
-      }
-    return withRequestId(response, requestId);
+    if (loggable) {
+      logInfo(env, 'request_start', {
+        requestId,
+        method,
+        path,
+        userId: user.id
+      });
+    }
+    const response = await context.next();
+    const responseWithCsrf = withCsrfCookie(response, request);
+    if (loggable) {
+      logInfo(env, 'request_end', {
+        requestId,
+        method,
+        path,
+        status: response.status,
+        userId: user.id
+      });
+    }
+    return withRequestId(responseWithCsrf, requestId);
   } catch (error) {
     logError(env, 'request_error', {
       requestId,
@@ -140,6 +129,17 @@ function isStateChanging(method: string) {
 }
 
 function validateCsrf(request: Request, env: Env, url: URL) {
+  const method = request.method.toUpperCase();
+  if (!isStateChanging(method)) return { ok: true as const };
+  const cookies = parseCookies(request.headers.get('cookie'));
+  const csrfCookie = cookies['csrf_token'];
+  const csrfHeader = request.headers.get('x-csrf-token');
+  if (csrfCookie && csrfHeader && csrfCookie !== csrfHeader) {
+    return { ok: false as const, reason: 'csrf_token_mismatch' };
+  }
+  if (csrfCookie && !csrfHeader) {
+    return { ok: false as const, reason: 'csrf_token_missing' };
+  }
   const origin = request.headers.get('origin');
   const referer = request.headers.get('referer');
   const originFromReferer = referer ? safeOrigin(referer) : null;
@@ -166,6 +166,20 @@ function safeOrigin(value: string) {
   } catch {
     return null;
   }
+}
+
+function withCsrfCookie(response: Response, request: Request) {
+  const method = request.method.toUpperCase();
+  if (isStateChanging(method)) return response;
+  const cookies = parseCookies(request.headers.get('cookie'));
+  if (cookies['csrf_token']) return response;
+  const token = crypto.randomUUID();
+  const headers = new Headers(response.headers);
+  headers.append(
+    'Set-Cookie',
+    `csrf_token=${encodeURIComponent(token)}; Path=/; SameSite=Strict; Secure; Max-Age=604800`
+  );
+  return new Response(response.body, { ...response, headers });
 }
 
 function unauthorized(path: string, requestId: string) {

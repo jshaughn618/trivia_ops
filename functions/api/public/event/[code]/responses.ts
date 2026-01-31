@@ -5,23 +5,39 @@ import { parseJson } from '../../../../request';
 import { execute, nowIso, queryFirst } from '../../../../db';
 import { checkRateLimit, recordRateLimitHit } from '../../../../rate-limit';
 
-const PUBLIC_RESPONSE_RATE_LIMIT = {
+const DEFAULT_PUBLIC_RESPONSE_RATE_LIMIT = {
   maxAttempts: 20,
   windowSeconds: 2 * 60,
   blockSeconds: 5 * 60
 };
 
+function getPublicResponseRateLimit(env: Env) {
+  return {
+    maxAttempts: parseEnvInt(env.PUBLIC_RESPONSE_RATE_MAX, DEFAULT_PUBLIC_RESPONSE_RATE_LIMIT.maxAttempts),
+    windowSeconds: parseEnvInt(env.PUBLIC_RESPONSE_RATE_WINDOW_SECONDS, DEFAULT_PUBLIC_RESPONSE_RATE_LIMIT.windowSeconds),
+    blockSeconds: parseEnvInt(env.PUBLIC_RESPONSE_RATE_BLOCK_SECONDS, DEFAULT_PUBLIC_RESPONSE_RATE_LIMIT.blockSeconds)
+  };
+}
+
+function parseEnvInt(value: string | undefined, fallback: number) {
+  if (!value) return fallback;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 export const onRequestPost: PagesFunction<Env> = async ({ env, params, request }) => {
   const ip = request.headers.get('cf-connecting-ip') ?? 'unknown';
   const limitKey = `public-response:${ip}`;
-  const status = await checkRateLimit(env, limitKey, PUBLIC_RESPONSE_RATE_LIMIT);
+  const status = await checkRateLimit(env, limitKey, getPublicResponseRateLimit(env));
   if (!status.allowed) {
+    const headers = status.retryAfterSeconds ? { 'Retry-After': String(status.retryAfterSeconds) } : undefined;
     return jsonError(
       { code: 'rate_limited', message: 'Too many attempts. Please try again later.', details: { retry_after: status.retryAfterSeconds } },
-      429
+      429,
+      { headers }
     );
   }
-  const recordFailure = async () => recordRateLimitHit(env, limitKey, PUBLIC_RESPONSE_RATE_LIMIT);
+  const recordFailure = async () => recordRateLimitHit(env, limitKey, getPublicResponseRateLimit(env));
   const payload = await parseJson(request);
   const teamId = payload?.team_id;
   const itemId = payload?.item_id;

@@ -61,6 +61,14 @@ export function clearSessionCookie() {
   return 'triviaops_session=; Path=/; HttpOnly; SameSite=Strict; Secure; Max-Age=0';
 }
 
+export function buildCsrfCookie(token: string) {
+  return `csrf_token=${encodeURIComponent(token)}; Path=/; SameSite=Strict; Secure; Max-Age=604800`;
+}
+
+export function clearCsrfCookie() {
+  return 'csrf_token=; Path=/; SameSite=Strict; Secure; Max-Age=0';
+}
+
 export async function createSession(env: Env, userId: string, req: Request) {
   const sessionId = crypto.randomUUID();
   const createdAt = nowIso();
