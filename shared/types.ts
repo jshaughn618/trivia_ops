@@ -14,7 +14,7 @@ export type ApiError = {
 
 export type ApiEnvelope<T> =
   | { ok: true; data: T }
-  | { ok: false; error: ApiError };
+  | { ok: false; error: ApiError; requestId?: string };
 
 export type User = {
   id: Id;

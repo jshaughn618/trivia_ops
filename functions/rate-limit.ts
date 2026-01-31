@@ -16,6 +16,7 @@ const nowSeconds = () => Math.floor(Date.now() / 1000);
 
 export async function checkRateLimit(env: Env, key: string, config: RateLimitConfig): Promise<RateLimitResult> {
   const now = nowSeconds();
+  await cleanupRateLimits(env, config);
 
   // Perform check-and-record atomically within a transaction to avoid races between
   // separate "check" and "record" calls for the same key.
@@ -104,4 +105,14 @@ export async function recordRateLimitHit(env: Env, key: string, _config: RateLim
 
 export async function clearRateLimit(env: Env, key: string) {
   await execute(env, 'DELETE FROM rate_limits WHERE key = ?', [key]);
+}
+
+async function cleanupRateLimits(env: Env, config: RateLimitConfig) {
+  const now = nowSeconds();
+  const cutoff = now - (config.windowSeconds + config.blockSeconds);
+  await execute(
+    env,
+    'DELETE FROM rate_limits WHERE last_seen < ? AND (blocked_until IS NULL OR blocked_until < ?)',
+    [cutoff, now]
+  );
 }

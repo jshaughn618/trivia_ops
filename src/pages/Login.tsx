@@ -31,7 +31,8 @@ export function LoginPage() {
     if (result.ok) {
       navigate(result.user?.user_type === 'admin' ? '/dashboard' : '/events');
     } else {
-      setError(result.message ?? 'Login failed');
+      const requestId = (result as { requestId?: string }).requestId;
+      setError(requestId ? `${result.message ?? 'Login failed'} (ref ${requestId})` : result.message ?? 'Login failed');
     }
   };
 

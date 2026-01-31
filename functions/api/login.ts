@@ -15,6 +15,12 @@ const LOGIN_RATE_LIMIT = {
 
 export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   const ip = request.headers.get('cf-connecting-ip') ?? 'unknown';
+  if (!env.SESSION_SECRET) {
+    return jsonError(
+      { code: 'server_misconfig', message: 'SESSION_SECRET not configured' },
+      500
+    );
+  }
   const payload = await parseJson<{ email: string; password: string }>(request);
   const parsed = loginSchema.safeParse(payload);
   if (!parsed.success) {

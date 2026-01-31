@@ -17,6 +17,12 @@
 - Apply locally: `npx wrangler d1 migrations apply trivia_ops --local`
 - Apply to Cloudflare (remote): `npx wrangler d1 migrations apply trivia_ops --remote`
 
+## Release Checklist
+- Apply D1 migrations (local + remote as appropriate).
+- Verify production/preview bindings for D1 + R2.
+- Confirm required env vars are set in Pages (SESSION_SECRET, OPENAI_API_KEY, APP_BASE_URL, ZEPTO_*).
+- Smoke test login, public join, and event run flow.
+
 ## AI Tool Prompts (Examples)
 
 ### Bulk import

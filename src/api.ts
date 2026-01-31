@@ -72,7 +72,11 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<Api
       status: res.status,
       body_snippet: text.slice(0, 200)
     });
-    return { ok: false, error: { code: 'http_error', message: res.statusText, details: text.slice(0, 200) } };
+    return {
+      ok: false,
+      error: { code: 'http_error', message: res.statusText, details: text.slice(0, 200) },
+      requestId: responseRequestId ?? requestId
+    } as ApiEnvelope<T> & { requestId?: string };
   }
 
   return { ok: true, data: json as T };

@@ -25,7 +25,8 @@ export function EventsPage() {
       setEvents(res.data);
       setError(null);
     } else {
-      setError(res.error.message ?? 'Failed to load events.');
+      const requestId = res.requestId;
+      setError(requestId ? `${res.error.message ?? 'Failed to load events.'} (ref ${requestId})` : res.error.message ?? 'Failed to load events.');
       logError('events_load_failed', { error: res.error });
     }
   };

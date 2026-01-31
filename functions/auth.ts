@@ -82,6 +82,7 @@ export async function createSession(env: Env, userId: string, req: Request) {
 }
 
 export async function getSession(env: Env, sessionId: string) {
+  await cleanupExpiredSessions(env);
   const session = await queryFirst<{ id: string; user_id: string; expires_at: string; revoked_at: string | null }>(
     env,
     `SELECT id, user_id, expires_at, revoked_at FROM sessions WHERE id = ?`,
@@ -91,4 +92,13 @@ export async function getSession(env: Env, sessionId: string) {
   if (session.revoked_at) return null;
   if (new Date(session.expires_at).getTime() < Date.now()) return null;
   return session;
+}
+
+async function cleanupExpiredSessions(env: Env) {
+  const now = nowIso();
+  await execute(
+    env,
+    'DELETE FROM sessions WHERE (expires_at IS NOT NULL AND expires_at < ?) OR revoked_at IS NOT NULL',
+    [now]
+  );
 }
