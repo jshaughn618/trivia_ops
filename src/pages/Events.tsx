@@ -66,7 +66,7 @@ export function EventsPage() {
               </select>
             </label>
             {error && (
-              <div className="border border-danger bg-panel2 px-3 py-2 text-xs text-danger-ink">
+              <div className="border border-danger bg-panel2 px-3 py-2 text-xs text-danger-ink" aria-live="polite">
                 {error}
               </div>
             )}
@@ -89,7 +89,10 @@ export function EventsPage() {
                     <div className="text-sm font-display tracking-[0.12em]">{event.title}</div>
                     <div className="mt-1 text-xs text-muted">{new Date(event.starts_at).toLocaleString()}</div>
                   </div>
-                  <div className="pt-1">
+                  <div className="pt-1 text-right">
+                    <div className="text-[10px] uppercase tracking-[0.2em] text-muted">
+                      {isAdmin ? 'Manage' : 'Run'}
+                    </div>
                     <StatusPill status={event.status} label={event.status} />
                   </div>
                 </ListRow>

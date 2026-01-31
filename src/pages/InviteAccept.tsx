@@ -72,7 +72,7 @@ export function InviteAcceptPage() {
         ) : (
           <>
             {error && (
-              <div className="mt-3 border-2 border-danger bg-panel2 px-3 py-2 text-xs uppercase tracking-[0.2em] text-danger">
+              <div className="mt-3 border-2 border-danger bg-panel2 px-3 py-2 text-xs uppercase tracking-[0.2em] text-danger" aria-live="polite">
                 {error}
               </div>
             )}

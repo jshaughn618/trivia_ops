@@ -41,6 +41,7 @@ export function PlayLeaderboardPage() {
   const [data, setData] = useState<PublicLeaderboardResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [redirecting, setRedirecting] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -53,7 +54,10 @@ export function PlayLeaderboardPage() {
         setData(next);
         setError(null);
         if (next.live && !next.live.show_full_leaderboard) {
+          setRedirecting(true);
           navigate(`/play/${normalizedCode}${storedTeamId ? `?team_id=${storedTeamId}` : ''}`);
+        } else {
+          setRedirecting(false);
         }
       } else {
         setError(res.error.message);
@@ -68,7 +72,10 @@ export function PlayLeaderboardPage() {
       setData(next);
       setError(null);
       if (next.live && !next.live.show_full_leaderboard) {
+        setRedirecting(true);
         navigate(`/play/${normalizedCode}${storedTeamId ? `?team_id=${storedTeamId}` : ''}`);
+      } else {
+        setRedirecting(false);
       }
       setLoading(false);
     };
@@ -158,6 +165,11 @@ export function PlayLeaderboardPage() {
   return (
     <div className="min-h-screen bg-bg text-text">
       <div className="mx-auto max-w-4xl px-6 py-8">
+        {redirecting && (
+          <div className="mb-4 rounded-md border border-border bg-panel2 px-3 py-2 text-xs uppercase tracking-[0.2em] text-muted" aria-live="polite">
+            Returning to game…
+          </div>
+        )}
         <div className="mb-6 border-b border-border pb-3">
           <div className="flex items-start justify-between gap-4">
             <div>

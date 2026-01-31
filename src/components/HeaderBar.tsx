@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, NavLink } from 'react-router-dom';
+import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth';
 import { useTheme } from '../lib/theme';
 import logoDark from '../assets/trivia_ops_logo_dark.png';
@@ -16,6 +16,7 @@ export function HeaderBar() {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const auth = useAuth();
+  const navigate = useNavigate();
   const isAdmin = auth.user?.user_type === 'admin';
   const { theme } = useTheme();
   const logo = theme === 'light' ? logoLight : logoDark;
@@ -69,7 +70,7 @@ export function HeaderBar() {
               </span>
             </button>
             {open && (
-              <div className="absolute right-0 z-50 mt-3 w-48 rounded-md border border-border bg-panel2 p-2 shadow-sm">
+              <div className="absolute right-0 z-50 mt-3 w-52 rounded-md border border-border bg-panel2 p-2 shadow-sm">
                 <nav className="flex flex-col gap-2">
                   {isAdmin && (
                     <NavLink to="/dashboard" className={navLinkClass} onClick={() => setOpen(false)}>
@@ -99,6 +100,17 @@ export function HeaderBar() {
                       User Admin
                     </NavLink>
                   )}
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setOpen(false);
+                      await auth.logout();
+                      navigate('/login');
+                    }}
+                    className="rounded-md border border-border px-3 py-2 text-left text-sm font-medium text-muted hover:border-danger hover:text-danger-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+                  >
+                    Logout
+                  </button>
                 </nav>
               </div>
             )}

@@ -4,6 +4,7 @@ import { api } from '../api';
 import { useAuth } from '../auth';
 import { AppShell } from '../components/AppShell';
 import { Panel } from '../components/Panel';
+import { AccordionSection } from '../components/AccordionSection';
 import { ButtonLink, PrimaryButton, SecondaryButton } from '../components/Buttons';
 import { StampBadge } from '../components/StampBadge';
 import { logError, logInfo } from '../lib/log';
@@ -734,7 +735,7 @@ export function EventRunPage() {
           )}
         </Panel>
         <div className="flex flex-col gap-4">
-          <Panel title="Rounds">
+          <AccordionSection title="Rounds" defaultOpen>
             <div className="flex flex-col gap-3">
               {rounds.length === 0 && (
                 <div className="text-xs uppercase tracking-[0.2em] text-muted">No rounds yet.</div>
@@ -769,8 +770,8 @@ export function EventRunPage() {
                 );
               })}
             </div>
-          </Panel>
-          <Panel title="Round Control">
+          </AccordionSection>
+          <AccordionSection title="Round Control" defaultOpen>
             <div className="flex flex-col gap-4">
               <div className="text-xs uppercase tracking-[0.2em] text-muted">Event</div>
               <div className="text-sm font-display uppercase tracking-[0.2em]">{event.title}</div>
@@ -781,8 +782,8 @@ export function EventRunPage() {
                 {activeRound ? `Status: ${roundStatusLabel(activeRound.status)}` : 'Awaiting round selection'}
               </div>
             </div>
-          </Panel>
-          <Panel title="Waiting Room">
+          </AccordionSection>
+          <AccordionSection title="Waiting Room">
             <div className="flex flex-col gap-3">
               <div className="flex items-center justify-between gap-3">
                 <div className="text-xs uppercase tracking-[0.2em] text-muted">Leaderboard</div>
@@ -828,7 +829,7 @@ export function EventRunPage() {
                 {waitingSaving ? 'Updating…' : 'Update Waiting Room'}
               </PrimaryButton>
             </div>
-          </Panel>
+          </AccordionSection>
         </div>
       </div>
       {scoresOpen && (

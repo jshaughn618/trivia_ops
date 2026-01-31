@@ -131,7 +131,7 @@ export function LoginPage() {
               ))}
             </div>
             {joinError && (
-              <div className="border border-danger bg-panel2 px-3 py-2 text-xs text-danger-ink">
+              <div className="border border-danger bg-panel2 px-3 py-2 text-xs text-danger-ink" aria-live="polite">
                 {joinError}
               </div>
             )}
@@ -177,7 +177,7 @@ export function LoginPage() {
                   />
                 </label>
                 {error && (
-                  <div className="border-2 border-danger bg-panel2 px-3 py-2 text-xs uppercase tracking-[0.2em] text-danger">
+                  <div className="border-2 border-danger bg-panel2 px-3 py-2 text-xs uppercase tracking-[0.2em] text-danger" aria-live="polite">
                     {error}
                   </div>
                 )}

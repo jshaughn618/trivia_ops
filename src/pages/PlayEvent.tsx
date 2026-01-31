@@ -125,6 +125,8 @@ export function PlayEventPage() {
   const [teamName, setTeamName] = useState('');
   const [teamNameLabel, setTeamNameLabel] = useState<string | null>(null);
   const [teamMenuOpen, setTeamMenuOpen] = useState(false);
+  const [joinError, setJoinError] = useState<string | null>(null);
+  const [joinLoading, setJoinLoading] = useState(false);
   const [mediaError, setMediaError] = useState<string | null>(null);
   const [visualIndex, setVisualIndex] = useState(0);
   const [selectedChoiceIndex, setSelectedChoiceIndex] = useState<number | null>(null);
@@ -418,7 +420,12 @@ export function PlayEventPage() {
 
   const handleJoin = async () => {
     if (!data) return;
-    if (!teamId && !teamName.trim()) return;
+    if (!teamId && !teamName.trim()) {
+      setJoinError('Select a team or enter a team name.');
+      return;
+    }
+    setJoinError(null);
+    setJoinLoading(true);
     const payload = teamId ? { team_id: teamId } : { team_name: teamName.trim() };
     const res = await api.publicJoin(data.event.public_code, payload);
     if (res.ok) {
@@ -427,7 +434,11 @@ export function PlayEventPage() {
       localStorage.setItem(`player_team_${data.event.id}`, res.data.team.id);
       localStorage.setItem(`player_team_code_${data.event.public_code}`, res.data.team.id);
       setTeamName('');
+      setJoinError(null);
+    } else {
+      setJoinError(res.error.message ?? 'Unable to join team.');
     }
+    setJoinLoading(false);
   };
 
   const handleChangeTeam = () => {
@@ -670,7 +681,17 @@ export function PlayEventPage() {
                   <span className="text-xs uppercase tracking-[0.25em] text-muted">New team name</span>
                   <input className="h-10 px-3" value={teamName} onChange={(event) => setTeamName(event.target.value)} />
                 </label>
-                <PrimaryButton onClick={handleJoin}>Join</PrimaryButton>
+                {joinError && (
+                  <div className="rounded-md border border-danger bg-panel2 px-3 py-2 text-xs text-danger-ink" aria-live="polite">
+                    {joinError}
+                  </div>
+                )}
+                <PrimaryButton
+                  onClick={handleJoin}
+                  disabled={joinLoading || (!teamId && !teamName.trim())}
+                >
+                  {joinLoading ? 'Joining…' : 'Join'}
+                </PrimaryButton>
               </div>
             </div>
           </div>

@@ -1703,13 +1703,23 @@ export function EventDetailPage() {
         <div className="hidden sm:block">
           <div className="grid gap-4 lg:grid-cols-[1fr,340px]">
             <div className="space-y-4">
-              <Section title="Rounds">{roundsContent}</Section>
-              <Section title="Teams">{teamsContent}</Section>
-              <Section title="Round scores">{scoresContent}</Section>
+              <AccordionSection title="Rounds" defaultOpen>
+                {roundsContent}
+              </AccordionSection>
+              <AccordionSection title="Teams" defaultOpen>
+                {teamsContent}
+              </AccordionSection>
+              <AccordionSection title="Round scores">
+                {scoresContent}
+              </AccordionSection>
             </div>
             <div className="space-y-4">
-              <Section title="Documents & share">{documentsContent}</Section>
-              <Section title="Event settings">{settingsContent}</Section>
+              <AccordionSection title="Documents & share" defaultOpen>
+                {documentsContent}
+              </AccordionSection>
+              <AccordionSection title="Event settings">
+                {settingsContent}
+              </AccordionSection>
             </div>
           </div>
         </div>
