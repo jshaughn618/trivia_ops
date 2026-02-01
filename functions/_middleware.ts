@@ -131,14 +131,19 @@ function isStateChanging(method: string) {
 function validateCsrf(request: Request, env: Env, url: URL) {
   const method = request.method.toUpperCase();
   if (!isStateChanging(method)) return { ok: true as const };
-  const cookies = parseCookies(request.headers.get('cookie'));
+  const cookieHeader = request.headers.get('cookie');
+  const cookies = parseCookies(cookieHeader);
   const csrfCookie = cookies['csrf_token'];
   const csrfHeader = request.headers.get('x-csrf-token');
-  if (csrfCookie && csrfHeader && csrfCookie !== csrfHeader) {
-    return { ok: false as const, reason: 'csrf_token_mismatch' };
-  }
-  if (csrfCookie && !csrfHeader) {
+  if (csrfCookie && csrfHeader) {
+    const csrfValues = getCookieValues(cookieHeader, 'csrf_token');
+    if (!csrfValues.includes(csrfHeader)) {
+      return { ok: false as const, reason: 'csrf_token_mismatch' };
+    }
+  } else if (csrfCookie && !csrfHeader) {
     return { ok: false as const, reason: 'csrf_token_missing' };
+  } else if (!csrfCookie && csrfHeader) {
+    return { ok: false as const, reason: 'csrf_cookie_missing' };
   }
   const origin = request.headers.get('origin');
   const referer = request.headers.get('referer');
@@ -166,6 +171,18 @@ function safeOrigin(value: string) {
   } catch {
     return null;
   }
+}
+
+function getCookieValues(cookieHeader: string | null, name: string) {
+  if (!cookieHeader) return [];
+  const values: string[] = [];
+  cookieHeader.split(';').forEach((part) => {
+    const [cookieName, ...rest] = part.trim().split('=');
+    if (cookieName === name) {
+      values.push(decodeURIComponent(rest.join('=')));
+    }
+  });
+  return values;
 }
 
 function withCsrfCookie(response: Response, request: Request, env: Env) {
