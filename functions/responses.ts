@@ -1,20 +1,26 @@
 import type { ApiError } from '../shared/types';
 
-const jsonHeaders = {
-  'Content-Type': 'application/json'
-};
-
 export function jsonOk<T>(data: T, init: ResponseInit = {}) {
+  const headers = buildJsonHeaders(init.headers);
   return new Response(JSON.stringify({ ok: true, data }), {
     ...init,
-    headers: { ...jsonHeaders, ...(init.headers ?? {}) }
+    headers
   });
 }
 
 export function jsonError(error: ApiError, status = 400, init: ResponseInit = {}) {
+  const headers = buildJsonHeaders(init.headers);
   return new Response(JSON.stringify({ ok: false, error }), {
     ...init,
     status,
-    headers: { ...jsonHeaders, ...(init.headers ?? {}) }
+    headers
   });
+}
+
+function buildJsonHeaders(initHeaders?: HeadersInit) {
+  const headers = new Headers(initHeaders);
+  if (!headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
+  return headers;
 }
