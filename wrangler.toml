@@ -1,5 +1,7 @@
 name = "trivia-ops"
 pages_build_output_dir = "dist"
+compatibility_date = "2026-02-01"
+compatibility_flags = ["streams_enable_constructors"]
 
 [[d1_databases]]
 binding = "DB"
