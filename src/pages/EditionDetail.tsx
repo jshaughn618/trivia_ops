@@ -227,6 +227,16 @@ export function EditionDetailPage() {
     return [...items].sort((a, b) => a.ordinal - b.ordinal);
   }, [items]);
 
+  const activeItem = useMemo(() => {
+    if (!activeItemId || activeItemId === 'new') return null;
+    return orderedItems.find((item) => item.id === activeItemId) ?? null;
+  }, [orderedItems, activeItemId]);
+
+  const activeItemIndex = useMemo(() => {
+    if (!activeItem) return -1;
+    return orderedItems.findIndex((item) => item.id === activeItem.id);
+  }, [orderedItems, activeItem]);
+
   const filteredGames = useMemo(() => {
     if (!gameTypeId) return games;
     return games.filter((game) => game.game_type_id === gameTypeId);
@@ -1788,6 +1798,950 @@ export function EditionDetailPage() {
     setMusicBulkLoading(false);
   };
 
+  const renderEditPanel = (item: EditionItem, index: number) => (
+    <div className="border-2 border-border bg-panel p-3">
+      <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">
+        Edit Item {index >= 0 ? index + 1 : item.ordinal}
+      </div>
+      <div className="mt-3 grid gap-3">
+        {gameTypeId === 'music' && (
+          <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+            Item Type
+            <select
+              className="h-10 px-3"
+              value={itemDraft.item_mode}
+              onChange={(event) =>
+                setItemDraft((draft) => {
+                  const mode = event.target.value as 'audio' | 'text';
+                  const nextParts =
+                    mode === 'audio'
+                      ? draft.answer_parts.length > 0
+                        ? draft.answer_parts
+                        : defaultMusicAnswerParts
+                      : [];
+                  return {
+                    ...draft,
+                    item_mode: mode,
+                    media_type: mode === 'audio' ? 'audio' : '',
+                    media_key: mode === 'audio' ? draft.media_key : '',
+                    audio_answer_key: mode === 'audio' ? draft.audio_answer_key : '',
+                    answer_parts: nextParts
+                  };
+                })
+              }
+            >
+              <option value="audio">Audio Clip</option>
+              <option value="text">Text Question</option>
+            </select>
+          </label>
+        )}
+        {gameTypeId !== 'audio' && (
+          <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+            Question Type
+            <select
+              className="h-10 px-3"
+              value={itemDraft.question_type}
+              onChange={(event) =>
+                setItemDraft((draft) => ({
+                  ...draft,
+                  question_type: event.target.value as 'text' | 'multiple_choice'
+                }))
+              }
+            >
+              <option value="text">Text</option>
+              <option value="multiple_choice">Multiple Choice</option>
+            </select>
+          </label>
+        )}
+        <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+          <span className="flex items-center justify-between">
+            {gameTypeId === 'music' && itemDraft.item_mode === 'audio' ? 'Question (optional)' : 'Question'}
+            <button
+              type="button"
+              onClick={startRefine}
+              className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
+            >
+              Refine
+            </button>
+          </span>
+          <input
+            className="h-10 px-3"
+            value={itemDraft.prompt}
+            onChange={(event) => setItemDraft((draft) => ({ ...draft, prompt: event.target.value }))}
+          />
+        </label>
+        {gameTypeId !== 'audio' &&
+          itemDraft.question_type !== 'multiple_choice' &&
+          !(gameTypeId === 'music' && itemDraft.item_mode === 'audio') && (
+          <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+            <span className="flex items-center justify-between">
+              Answer
+              <button
+                type="button"
+                onClick={generateAnswer}
+                className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
+                disabled={answerLoading}
+              >
+                {answerLoading ? 'Generating' : 'Generate'}
+              </button>
+            </span>
+            <input
+              className="h-10 px-3"
+              value={itemDraft.answer}
+              onChange={(event) => setItemDraft((draft) => ({ ...draft, answer: event.target.value }))}
+            />
+            {answerError && <span className="text-[10px] tracking-[0.2em] text-danger">{answerError}</span>}
+            {imageAnswerLoading && (
+              <span className="text-[10px] uppercase tracking-[0.2em] text-muted">Analyzing image…</span>
+            )}
+            {imageAnswerError && (
+              <span className="text-[10px] tracking-[0.2em] text-danger">{imageAnswerError}</span>
+            )}
+          </label>
+        )}
+        {gameTypeId === 'music' && itemDraft.item_mode === 'audio' && (
+          <div className="flex flex-col gap-2">
+            <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">Answer parts</div>
+            <div className="flex flex-col gap-2">
+              {itemDraft.answer_parts.map((part, idx) => (
+                <div
+                  key={`edit-answer-part-${idx}`}
+                  className="grid gap-2 sm:grid-cols-[1fr,2fr,auto] sm:items-end"
+                >
+                  <label className="flex flex-col gap-1 text-[10px] font-display uppercase tracking-[0.25em] text-muted">
+                    Answer type
+                    <input
+                      className="h-10 px-3"
+                      value={part.label}
+                      onChange={(event) =>
+                        setItemDraft((draft) => {
+                          const next = [...draft.answer_parts];
+                          next[idx] = { ...next[idx], label: event.target.value };
+                          return { ...draft, answer_parts: next };
+                        })
+                      }
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-[10px] font-display uppercase tracking-[0.25em] text-muted">
+                    Answer
+                    <input
+                      className="h-10 px-3"
+                      value={part.answer}
+                      onChange={(event) =>
+                        setItemDraft((draft) => {
+                          const next = [...draft.answer_parts];
+                          next[idx] = { ...next[idx], answer: event.target.value };
+                          return { ...draft, answer_parts: next };
+                        })
+                      }
+                    />
+                  </label>
+                  {itemDraft.answer_parts.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setItemDraft((draft) => ({
+                          ...draft,
+                          answer_parts: draft.answer_parts.filter((_, partIdx) => partIdx !== idx)
+                        }))
+                      }
+                      className="h-10 rounded-md border border-border px-3 text-xs uppercase tracking-[0.2em] text-muted hover:border-danger hover:text-danger-ink"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+            <SecondaryButton
+              onClick={() =>
+                setItemDraft((draft) => ({
+                  ...draft,
+                  answer_parts: [
+                    ...draft.answer_parts,
+                    { label: `Answer ${draft.answer_parts.length + 1}`, answer: '' }
+                  ]
+                }))
+              }
+              className="self-start px-3 py-2 text-xs"
+            >
+              Add answer part
+            </SecondaryButton>
+          </div>
+        )}
+        {gameTypeId !== 'audio' && itemDraft.question_type === 'multiple_choice' && (
+          <div className="grid gap-3 border-2 border-border bg-panel2 p-3">
+            <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">
+              Multiple Choice
+            </div>
+            {choiceLabels.map((label, idx) => (
+              <label
+                key={label}
+                className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted"
+              >
+                Option {label}
+                <input
+                  className="h-10 px-3"
+                  value={itemDraft.choices[idx] ?? ''}
+                  onChange={(event) =>
+                    setItemDraft((draft) => {
+                      const next = [...draft.choices];
+                      next[idx] = event.target.value;
+                      return { ...draft, choices: next };
+                    })
+                  }
+                />
+              </label>
+            ))}
+            <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+              Correct Choice
+              <select
+                className="h-10 px-3"
+                value={itemDraft.correct_choice_index}
+                onChange={(event) =>
+                  setItemDraft((draft) => ({
+                    ...draft,
+                    correct_choice_index: Number(event.target.value)
+                  }))
+                }
+              >
+                {choiceLabels.map((label, idx) => (
+                  <option key={label} value={idx}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        )}
+        {gameTypeId === 'audio' && (
+          <>
+            <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+              Answer A Label
+              <input
+                className="h-10 px-3"
+                value={itemDraft.answer_a_label}
+                onChange={(event) =>
+                  setItemDraft((draft) => ({ ...draft, answer_a_label: event.target.value }))
+                }
+              />
+            </label>
+            <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+              Answer A
+              <input
+                className="h-10 px-3"
+                value={itemDraft.answer_a}
+                onChange={(event) => setItemDraft((draft) => ({ ...draft, answer_a: event.target.value }))}
+              />
+            </label>
+            <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+              Answer B Label
+              <input
+                className="h-10 px-3"
+                value={itemDraft.answer_b_label}
+                onChange={(event) =>
+                  setItemDraft((draft) => ({ ...draft, answer_b_label: event.target.value }))
+                }
+              />
+            </label>
+            <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+              Answer B
+              <input
+                className="h-10 px-3"
+                value={itemDraft.answer_b}
+                onChange={(event) => setItemDraft((draft) => ({ ...draft, answer_b: event.target.value }))}
+              />
+            </label>
+          </>
+        )}
+        <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+          <span className="flex items-center justify-between">
+            Factoid
+            <button
+              type="button"
+              onClick={generateFunFact}
+              className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
+              disabled={factLoading}
+            >
+              {factLoading ? 'Generating' : 'Generate'}
+            </button>
+          </span>
+          <textarea
+            className="min-h-[70px] px-3 py-2"
+            value={itemDraft.fun_fact}
+            onChange={(event) => setItemDraft((draft) => ({ ...draft, fun_fact: event.target.value }))}
+          />
+          {factError && <span className="text-[10px] tracking-[0.2em] text-danger">{factError}</span>}
+        </label>
+        {(gameTypeId === 'audio' || gameTypeId === 'visual') && (
+          <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+            Media Upload
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                ref={editUploadRef}
+                type="file"
+                accept={gameTypeId === 'audio' ? 'audio/mpeg' : 'image/png,image/jpeg,image/webp'}
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) handleUpload(item, file);
+                }}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => editUploadRef.current?.click()}
+                className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
+              >
+                {mediaUploading
+                  ? 'Uploading'
+                  : gameTypeId === 'audio'
+                    ? 'Upload MP3'
+                    : 'Upload Image'}
+              </button>
+              {itemDraft.media_key && (
+                <button
+                  type="button"
+                  onClick={() => handleDeleteMedia(item)}
+                  className="border-2 border-danger px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-danger hover:border-[#9d2a24]"
+                >
+                  Delete Media
+                </button>
+              )}
+              {itemDraft.media_key && (
+                <span className="text-[10px] uppercase tracking-[0.2em] text-muted">
+                  {gameTypeId === 'audio' ? 'Audio attached' : 'Image attached'}
+                  {itemDraft.media_filename ? ` • ${itemDraft.media_filename}` : ''}
+                </span>
+              )}
+              {gameTypeId === 'visual' && itemDraft.media_key && (
+                <img
+                  src={api.mediaUrl(itemDraft.media_key)}
+                  alt="Uploaded"
+                  className="h-16 w-16 border-2 border-border object-cover"
+                />
+              )}
+              {gameTypeId === 'audio' && itemDraft.media_key && (
+                <audio className="w-full" controls src={api.mediaUrl(itemDraft.media_key)} />
+              )}
+            </div>
+            {gameTypeId === 'audio' && (
+              <span className="text-[10px] tracking-[0.2em] text-muted">MP3 only for audio rounds.</span>
+            )}
+            {gameTypeId === 'visual' && (
+              <span className="text-[10px] tracking-[0.2em] text-muted">PNG, JPG, or WEBP only.</span>
+            )}
+            {mediaError && <span className="text-[10px] tracking-[0.2em] text-danger">{mediaError}</span>}
+          </label>
+        )}
+        {gameTypeId === 'music' && itemDraft.item_mode === 'audio' && !isMusicSpeedRound && (
+          <div className="grid gap-3">
+            <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+              Question Audio
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  type="file"
+                  accept="audio/mpeg"
+                  className="hidden"
+                  ref={editUploadRef}
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    event.target.value = '';
+                    if (file) handleQuestionAudioUpload(item, file);
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => editUploadRef.current?.click()}
+                  className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
+                >
+                  {mediaUploading ? 'Uploading' : 'Upload Question MP3'}
+                </button>
+                {itemDraft.media_key && (
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteMedia(item)}
+                    className="border-2 border-danger px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-danger hover:border-[#9d2a24]"
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+              {itemDraft.media_key && (
+                <audio className="w-full" controls src={api.mediaUrl(itemDraft.media_key)} />
+              )}
+            </label>
+            <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+              Answer Audio (Optional)
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  type="file"
+                  accept="audio/mpeg"
+                  className="hidden"
+                  ref={newUploadRef}
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    event.target.value = '';
+                    if (file) handleAnswerAudioUpload(item, file);
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => newUploadRef.current?.click()}
+                  className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
+                >
+                  {mediaUploading ? 'Uploading' : 'Upload Answer MP3'}
+                </button>
+                {itemDraft.audio_answer_key && (
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteAnswerAudio(item)}
+                    className="border-2 border-danger px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-danger hover:border-[#9d2a24]"
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+              {itemDraft.audio_answer_key && (
+                <audio className="w-full" controls src={api.mediaUrl(itemDraft.audio_answer_key)} />
+              )}
+            </label>
+          </div>
+        )}
+        {gameTypeId === 'music' && itemDraft.item_mode === 'audio' && isMusicSpeedRound && (
+          <div className="rounded-md border border-border bg-panel2 px-3 py-2 text-[10px] uppercase tracking-[0.2em] text-muted">
+            Speed round audio is uploaded per event round.
+          </div>
+        )}
+        {itemValidationError && (
+          <div className="border-2 border-danger bg-panel px-3 py-2 text-xs uppercase tracking-[0.2em] text-danger">
+            {itemValidationError}
+          </div>
+        )}
+        <div className="flex flex-wrap gap-2">
+          <PrimaryButton onClick={() => saveEdit(item)}>Save</PrimaryButton>
+          <SecondaryButton onClick={cancelEdit}>Cancel</SecondaryButton>
+        </div>
+        {refineOpen && (
+          <div className="border-2 border-border bg-panel2 p-3">
+            <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">Refined Questions</div>
+            {refineLoading && (
+              <div className="mt-2 text-xs uppercase tracking-[0.2em] text-muted">Generating…</div>
+            )}
+            {refineError && (
+              <div className="mt-2 text-xs uppercase tracking-[0.2em] text-danger">{refineError}</div>
+            )}
+            <div className="mt-3 flex flex-col gap-2">
+              {refineOptions.map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => applyRefine(option)}
+                  className="border-2 border-border bg-panel px-3 py-2 text-left text-xs uppercase tracking-[0.2em] text-text hover:border-accent-ink"
+                >
+                  {option}
+                </button>
+              ))}
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={startRefine}
+                className="border-2 border-border px-3 py-2 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
+              >
+                Generate Again
+              </button>
+              <button
+                type="button"
+                onClick={keepOriginal}
+                className="border-2 border-border px-3 py-2 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
+              >
+                Keep Original
+              </button>
+              <button
+                type="button"
+                onClick={() => setRefineOpen(false)}
+                className="border-2 border-border px-3 py-2 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  const renderNewPanel = () => (
+    <div className="border-2 border-border bg-panel p-3">
+      <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">New Item</div>
+      <div className="mt-3 grid gap-3">
+        {gameTypeId === 'music' && (
+          <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+            Item Type
+            <select
+              className="h-10 px-3"
+              value={itemDraft.item_mode}
+              onChange={(event) =>
+                setItemDraft((draft) => {
+                  const mode = event.target.value as 'audio' | 'text';
+                  const nextParts =
+                    mode === 'audio'
+                      ? draft.answer_parts.length > 0
+                        ? draft.answer_parts
+                        : defaultMusicAnswerParts
+                      : [];
+                  return {
+                    ...draft,
+                    item_mode: mode,
+                    media_type: mode === 'audio' ? 'audio' : '',
+                    media_key: mode === 'audio' ? draft.media_key : '',
+                    audio_answer_key: mode === 'audio' ? draft.audio_answer_key : '',
+                    answer_parts: nextParts
+                  };
+                })
+              }
+            >
+              <option value="audio">Audio Clip</option>
+              <option value="text">Text Question</option>
+            </select>
+          </label>
+        )}
+        {gameTypeId !== 'audio' && (
+          <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+            Question Type
+            <select
+              className="h-10 px-3"
+              value={itemDraft.question_type}
+              onChange={(event) =>
+                setItemDraft((draft) => ({
+                  ...draft,
+                  question_type: event.target.value as 'text' | 'multiple_choice'
+                }))
+              }
+            >
+              <option value="text">Text</option>
+              <option value="multiple_choice">Multiple Choice</option>
+            </select>
+          </label>
+        )}
+        <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+          <span className="flex items-center justify-between">
+            {gameTypeId === 'music' && itemDraft.item_mode === 'audio' ? 'Question (optional)' : 'Question'}
+            <button
+              type="button"
+              onClick={startRefine}
+              className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
+            >
+              Refine
+            </button>
+          </span>
+          <input
+            className="h-10 px-3"
+            value={itemDraft.prompt}
+            onChange={(event) => setItemDraft((draft) => ({ ...draft, prompt: event.target.value }))}
+          />
+        </label>
+        {gameTypeId !== 'audio' &&
+          itemDraft.question_type !== 'multiple_choice' &&
+          !(gameTypeId === 'music' && itemDraft.item_mode === 'audio') && (
+          <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+            <span className="flex items-center justify-between">
+              Answer
+              <button
+                type="button"
+                onClick={generateAnswer}
+                className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
+                disabled={answerLoading}
+              >
+                {answerLoading ? 'Generating' : 'Generate'}
+              </button>
+            </span>
+            <input
+              className="h-10 px-3"
+              value={itemDraft.answer}
+              onChange={(event) => setItemDraft((draft) => ({ ...draft, answer: event.target.value }))}
+            />
+            {answerError && <span className="text-[10px] tracking-[0.2em] text-danger">{answerError}</span>}
+            {imageAnswerLoading && (
+              <span className="text-[10px] uppercase tracking-[0.2em] text-muted">Analyzing image…</span>
+            )}
+            {imageAnswerError && (
+              <span className="text-[10px] tracking-[0.2em] text-danger">{imageAnswerError}</span>
+            )}
+          </label>
+        )}
+        {gameTypeId === 'music' && itemDraft.item_mode === 'audio' && (
+          <div className="flex flex-col gap-2">
+            <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">Answer parts</div>
+            <div className="flex flex-col gap-2">
+              {itemDraft.answer_parts.map((part, idx) => (
+                <div
+                  key={`new-answer-part-${idx}`}
+                  className="grid gap-2 sm:grid-cols-[1fr,2fr,auto] sm:items-end"
+                >
+                  <label className="flex flex-col gap-1 text-[10px] font-display uppercase tracking-[0.25em] text-muted">
+                    Answer type
+                    <input
+                      className="h-10 px-3"
+                      value={part.label}
+                      onChange={(event) =>
+                        setItemDraft((draft) => {
+                          const next = [...draft.answer_parts];
+                          next[idx] = { ...next[idx], label: event.target.value };
+                          return { ...draft, answer_parts: next };
+                        })
+                      }
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-[10px] font-display uppercase tracking-[0.25em] text-muted">
+                    Answer
+                    <input
+                      className="h-10 px-3"
+                      value={part.answer}
+                      onChange={(event) =>
+                        setItemDraft((draft) => {
+                          const next = [...draft.answer_parts];
+                          next[idx] = { ...next[idx], answer: event.target.value };
+                          return { ...draft, answer_parts: next };
+                        })
+                      }
+                    />
+                  </label>
+                  {itemDraft.answer_parts.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setItemDraft((draft) => ({
+                          ...draft,
+                          answer_parts: draft.answer_parts.filter((_, partIdx) => partIdx !== idx)
+                        }))
+                      }
+                      className="h-10 rounded-md border border-border px-3 text-xs uppercase tracking-[0.2em] text-muted hover:border-danger hover:text-danger-ink"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+            <SecondaryButton
+              onClick={() =>
+                setItemDraft((draft) => ({
+                  ...draft,
+                  answer_parts: [
+                    ...draft.answer_parts,
+                    { label: `Answer ${draft.answer_parts.length + 1}`, answer: '' }
+                  ]
+                }))
+              }
+              className="self-start px-3 py-2 text-xs"
+            >
+              Add answer part
+            </SecondaryButton>
+          </div>
+        )}
+        {gameTypeId !== 'audio' && itemDraft.question_type === 'multiple_choice' && (
+          <div className="grid gap-3 border-2 border-border bg-panel2 p-3">
+            <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">
+              Multiple Choice
+            </div>
+            {choiceLabels.map((label, idx) => (
+              <label
+                key={label}
+                className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted"
+              >
+                Option {label}
+                <input
+                  className="h-10 px-3"
+                  value={itemDraft.choices[idx] ?? ''}
+                  onChange={(event) =>
+                    setItemDraft((draft) => {
+                      const next = [...draft.choices];
+                      next[idx] = event.target.value;
+                      return { ...draft, choices: next };
+                    })
+                  }
+                />
+              </label>
+            ))}
+            <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+              Correct Choice
+              <select
+                className="h-10 px-3"
+                value={itemDraft.correct_choice_index}
+                onChange={(event) =>
+                  setItemDraft((draft) => ({
+                    ...draft,
+                    correct_choice_index: Number(event.target.value)
+                  }))
+                }
+              >
+                {choiceLabels.map((label, idx) => (
+                  <option key={label} value={idx}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        )}
+        {gameTypeId === 'audio' && (
+          <>
+            <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+              Answer A Label
+              <input
+                className="h-10 px-3"
+                value={itemDraft.answer_a_label}
+                onChange={(event) =>
+                  setItemDraft((draft) => ({ ...draft, answer_a_label: event.target.value }))
+                }
+              />
+            </label>
+            <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+              Answer A
+              <input
+                className="h-10 px-3"
+                value={itemDraft.answer_a}
+                onChange={(event) => setItemDraft((draft) => ({ ...draft, answer_a: event.target.value }))}
+              />
+            </label>
+            <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+              Answer B Label
+              <input
+                className="h-10 px-3"
+                value={itemDraft.answer_b_label}
+                onChange={(event) =>
+                  setItemDraft((draft) => ({ ...draft, answer_b_label: event.target.value }))
+                }
+              />
+            </label>
+            <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+              Answer B
+              <input
+                className="h-10 px-3"
+                value={itemDraft.answer_b}
+                onChange={(event) => setItemDraft((draft) => ({ ...draft, answer_b: event.target.value }))}
+              />
+            </label>
+          </>
+        )}
+        <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+          <span className="flex items-center justify-between">
+            Factoid
+            <button
+              type="button"
+              onClick={generateFunFact}
+              className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
+              disabled={factLoading}
+            >
+              {factLoading ? 'Generating' : 'Generate'}
+            </button>
+          </span>
+          <textarea
+            className="min-h-[70px] px-3 py-2"
+            value={itemDraft.fun_fact}
+            onChange={(event) => setItemDraft((draft) => ({ ...draft, fun_fact: event.target.value }))}
+          />
+          {factError && <span className="text-[10px] tracking-[0.2em] text-danger">{factError}</span>}
+        </label>
+        {(gameTypeId === 'audio' || gameTypeId === 'visual') && (
+          <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+            Media Upload
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                ref={newUploadRef}
+                type="file"
+                accept={gameTypeId === 'audio' ? 'audio/mpeg' : 'image/png,image/jpeg,image/webp'}
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) handleDraftUpload(file);
+                }}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => newUploadRef.current?.click()}
+                className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
+              >
+                {mediaUploading
+                  ? 'Uploading'
+                  : gameTypeId === 'audio'
+                    ? 'Upload MP3'
+                    : 'Upload Image'}
+              </button>
+              {itemDraft.media_key && (
+                <button
+                  type="button"
+                  onClick={() => handleDeleteMedia()}
+                  className="border-2 border-danger px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-danger hover:border-[#9d2a24]"
+                >
+                  Delete Media
+                </button>
+              )}
+              {itemDraft.media_key && (
+                <span className="text-[10px] uppercase tracking-[0.2em] text-muted">
+                  {gameTypeId === 'audio' ? 'Audio attached' : 'Image attached'}
+                  {itemDraft.media_filename ? ` • ${itemDraft.media_filename}` : ''}
+                </span>
+              )}
+              {gameTypeId === 'visual' && itemDraft.media_key && (
+                <img
+                  src={api.mediaUrl(itemDraft.media_key)}
+                  alt="Uploaded"
+                  className="h-16 w-16 border-2 border-border object-cover"
+                />
+              )}
+              {gameTypeId === 'audio' && itemDraft.media_key && (
+                <audio className="w-full" controls src={api.mediaUrl(itemDraft.media_key)} />
+              )}
+            </div>
+            {gameTypeId === 'audio' && (
+              <span className="text-[10px] tracking-[0.2em] text-muted">MP3 only for audio rounds.</span>
+            )}
+            {gameTypeId === 'visual' && (
+              <span className="text-[10px] tracking-[0.2em] text-muted">PNG, JPG, or WEBP only.</span>
+            )}
+            {mediaError && <span className="text-[10px] tracking-[0.2em] text-danger">{mediaError}</span>}
+          </label>
+        )}
+        {gameTypeId === 'music' && itemDraft.item_mode === 'audio' && !isMusicSpeedRound && (
+          <div className="grid gap-3">
+            <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+              Question Audio
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  ref={newUploadRef}
+                  type="file"
+                  accept="audio/mpeg"
+                  className="hidden"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    event.target.value = '';
+                    if (file) handleQuestionAudioUpload(null, file);
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => newUploadRef.current?.click()}
+                  className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
+                >
+                  {mediaUploading ? 'Uploading' : 'Upload Question MP3'}
+                </button>
+                {itemDraft.media_key && (
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteMedia()}
+                    className="border-2 border-danger px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-danger hover:border-[#9d2a24]"
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+              {itemDraft.media_key && (
+                <audio className="w-full" controls src={api.mediaUrl(itemDraft.media_key)} />
+              )}
+            </label>
+            <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+              Answer Audio (Optional)
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  ref={editUploadRef}
+                  type="file"
+                  accept="audio/mpeg"
+                  className="hidden"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    event.target.value = '';
+                    if (file) handleAnswerAudioUpload(null, file);
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => editUploadRef.current?.click()}
+                  className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
+                >
+                  {mediaUploading ? 'Uploading' : 'Upload Answer MP3'}
+                </button>
+                {itemDraft.audio_answer_key && (
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteAnswerAudio()}
+                    className="border-2 border-danger px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-danger hover:border-[#9d2a24]"
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+              {itemDraft.audio_answer_key && (
+                <audio className="w-full" controls src={api.mediaUrl(itemDraft.audio_answer_key)} />
+              )}
+            </label>
+          </div>
+        )}
+        {gameTypeId === 'music' && itemDraft.item_mode === 'audio' && isMusicSpeedRound && (
+          <div className="rounded-md border border-border bg-panel2 px-3 py-2 text-[10px] uppercase tracking-[0.2em] text-muted">
+            Speed round audio is uploaded per event round.
+          </div>
+        )}
+        {itemValidationError && (
+          <div className="border-2 border-danger bg-panel px-3 py-2 text-xs uppercase tracking-[0.2em] text-danger">
+            {itemValidationError}
+          </div>
+        )}
+        <div className="flex flex-wrap gap-2">
+          <PrimaryButton onClick={handleCreateItem}>Save</PrimaryButton>
+          <SecondaryButton onClick={cancelEdit}>Cancel</SecondaryButton>
+        </div>
+        {refineOpen && (
+          <div className="border-2 border-border bg-panel2 p-3">
+            <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">Refined Questions</div>
+            {refineLoading && (
+              <div className="mt-2 text-xs uppercase tracking-[0.2em] text-muted">Generating…</div>
+            )}
+            {refineError && (
+              <div className="mt-2 text-xs uppercase tracking-[0.2em] text-danger">{refineError}</div>
+            )}
+            <div className="mt-3 flex flex-col gap-2">
+              {refineOptions.map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => applyRefine(option)}
+                  className="border-2 border-border bg-panel px-3 py-2 text-left text-xs uppercase tracking-[0.2em] text-text hover:border-accent-ink"
+                >
+                  {option}
+                </button>
+              ))}
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={startRefine}
+                className="border-2 border-border px-3 py-2 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
+              >
+                Generate Again
+              </button>
+              <button
+                type="button"
+                onClick={keepOriginal}
+                className="border-2 border-border px-3 py-2 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
+              >
+                Keep Original
+              </button>
+              <button
+                type="button"
+                onClick={() => setRefineOpen(false)}
+                className="border-2 border-border px-3 py-2 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   if (!edition) {
     return (
       <AppShell title="Edition Detail">
@@ -2108,1044 +3062,118 @@ export function EditionDetailPage() {
               )}
             </div>
           )}
-          <div className="flex flex-col gap-3">
-            {orderedItems.length === 0 && (
-              <div className="text-xs uppercase tracking-[0.2em] text-muted">No items yet.</div>
-            )}
-            {orderedItems.map((item, index) => (
-              <div key={item.id} className="flex flex-col gap-3">
-                <div
-                  className={`border-2 ${activeItemId === item.id ? 'border-accent-ink' : 'border-border'} bg-panel2 p-2`}
-                  draggable
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => startEdit(item)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault();
-                      startEdit(item);
-                    }
-                  }}
-                  onDragStart={() => setDraggedId(item.id)}
-                  onDragOver={(event) => event.preventDefault()}
-                  onDrop={() => {
-                    if (draggedId) {
-                      reorderItems(draggedId, item.id);
-                      setDraggedId(null);
-                    }
-                  }}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">
-                      Item {index + 1}
-                    </div>
-                    <div className="relative" ref={itemMenuRef}>
-                      <button
-                        type="button"
-                        aria-label="Item actions"
-                        aria-haspopup="menu"
-                        aria-expanded={itemMenuId === item.id}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          setItemMenuId((current) => (current === item.id ? null : item.id));
-                        }}
-                        className="flex h-7 w-7 items-center justify-center border border-border text-text"
-                      >
-                        ⋯
-                      </button>
-                      {itemMenuId === item.id && (
-                        <div className="absolute right-0 mt-2 min-w-[160px] rounded-md border border-border bg-panel p-2 text-left shadow-sm">
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr),minmax(0,1.4fr)]">
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">Item list</div>
+                <SecondaryButton onClick={startNewItem} className="px-3 py-2 text-xs">
+                  New Item
+                </SecondaryButton>
+              </div>
+              <div className="flex flex-col gap-3 lg:max-h-[70vh] lg:overflow-auto lg:pr-1">
+                {orderedItems.length === 0 && (
+                  <div className="text-xs uppercase tracking-[0.2em] text-muted">No items yet.</div>
+                )}
+                {orderedItems.map((item, index) => (
+                  <div key={item.id} className="flex flex-col gap-3">
+                    <div
+                      className={`border-2 ${activeItemId === item.id ? 'border-accent-ink' : 'border-border'} bg-panel2 p-2`}
+                      draggable
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => startEdit(item)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          startEdit(item);
+                        }
+                      }}
+                      onDragStart={() => setDraggedId(item.id)}
+                      onDragOver={(event) => event.preventDefault()}
+                      onDrop={() => {
+                        if (draggedId) {
+                          reorderItems(draggedId, item.id);
+                          setDraggedId(null);
+                        }
+                      }}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">
+                          Item {index + 1}
+                        </div>
+                        <div className="relative" ref={itemMenuRef}>
                           <button
                             type="button"
+                            aria-label="Item actions"
+                            aria-haspopup="menu"
+                            aria-expanded={itemMenuId === item.id}
                             onClick={(event) => {
                               event.stopPropagation();
-                              handleDeleteItem(item.id);
+                              setItemMenuId((current) => (current === item.id ? null : item.id));
                             }}
-                            className="w-full rounded-md border border-danger bg-panel2 px-3 py-2 text-xs font-medium text-danger-ink"
+                            className="flex h-7 w-7 items-center justify-center border border-border text-text"
                           >
-                            Delete Item
+                            ⋯
                           </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="mt-2 text-sm text-text">
-                    {item.prompt?.trim()
-                      ? item.prompt
-                      : gameTypeId === 'music' && item.media_type === 'audio'
-                        ? `Audio Clip ${item.ordinal}`
-                        : ''}
-                  </div>
-                  <div className="mt-1 text-xs uppercase tracking-[0.2em] text-muted">
-                    {answerSummary(item, gameTypeId === 'music') || 'Answer missing'}
-                  </div>
-                  {(gameTypeId === 'audio' || gameTypeId === 'visual') && (
-                    <div className="mt-2 text-[10px] uppercase tracking-[0.2em] text-muted">
-                      {item.media_key ? `${item.media_type} attached` : 'No media'} • Drag to reorder
-                    </div>
-                  )}
-                  {gameTypeId === 'music' && (
-                    <div className="mt-2 text-[10px] uppercase tracking-[0.2em] text-muted">
-                      {isMusicSpeedRound
-                        ? 'Speed round audio attached per event'
-                        : item.media_key ? 'Question audio attached' : 'No question audio'}
-                      {!isMusicSpeedRound && (
-                        <>
-                          {' • '}
-                          {item.audio_answer_key ? 'Answer audio attached' : 'No answer audio'}
-                        </>
-                      )}
-                      {' • Drag to reorder'}
-                    </div>
-                  )}
-                </div>
-                {activeItemId === item.id && (
-                  <div className="border-2 border-border bg-panel p-3">
-                    <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">
-                      Edit Item {index + 1}
-                    </div>
-                    <div className="mt-3 grid gap-3">
-                      {gameTypeId === 'music' && (
-                        <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-                          Item Type
-                          <select
-                            className="h-10 px-3"
-                            value={itemDraft.item_mode}
-                            onChange={(event) =>
-                              setItemDraft((draft) => {
-                                const mode = event.target.value as 'audio' | 'text';
-                                const nextParts =
-                                  mode === 'audio'
-                                    ? draft.answer_parts.length > 0
-                                      ? draft.answer_parts
-                                      : defaultMusicAnswerParts
-                                    : [];
-                                return {
-                                  ...draft,
-                                  item_mode: mode,
-                                  media_type: mode === 'audio' ? 'audio' : '',
-                                  media_key: mode === 'audio' ? draft.media_key : '',
-                                  audio_answer_key: mode === 'audio' ? draft.audio_answer_key : '',
-                                  answer_parts: nextParts
-                                };
-                              })
-                            }
-                          >
-                            <option value="audio">Audio Clip</option>
-                            <option value="text">Text Question</option>
-                          </select>
-                        </label>
-                      )}
-                      {gameTypeId !== 'audio' && (
-                        <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-                          Question Type
-                          <select
-                            className="h-10 px-3"
-                            value={itemDraft.question_type}
-                            onChange={(event) =>
-                              setItemDraft((draft) => ({
-                                ...draft,
-                                question_type: event.target.value as 'text' | 'multiple_choice'
-                              }))
-                            }
-                          >
-                            <option value="text">Text</option>
-                            <option value="multiple_choice">Multiple Choice</option>
-                          </select>
-                        </label>
-                      )}
-                      <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-                        <span className="flex items-center justify-between">
-                          {gameTypeId === 'music' && itemDraft.item_mode === 'audio' ? 'Question (optional)' : 'Question'}
-                          <button
-                            type="button"
-                            onClick={startRefine}
-                            className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
-                          >
-                            Refine
-                          </button>
-                        </span>
-                        <input
-                          className="h-10 px-3"
-                          value={itemDraft.prompt}
-                          onChange={(event) => setItemDraft((draft) => ({ ...draft, prompt: event.target.value }))}
-                        />
-                      </label>
-                      {gameTypeId !== 'audio' &&
-                        itemDraft.question_type !== 'multiple_choice' &&
-                        !(gameTypeId === 'music' && itemDraft.item_mode === 'audio') && (
-                        <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-                          <span className="flex items-center justify-between">
-                            Answer
-                            <button
-                              type="button"
-                              onClick={generateAnswer}
-                              className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
-                              disabled={answerLoading}
-                            >
-                              {answerLoading ? 'Generating' : 'Generate'}
-                            </button>
-                          </span>
-                          <input
-                            className="h-10 px-3"
-                            value={itemDraft.answer}
-                            onChange={(event) => setItemDraft((draft) => ({ ...draft, answer: event.target.value }))}
-                          />
-                          {answerError && <span className="text-[10px] tracking-[0.2em] text-danger">{answerError}</span>}
-                          {imageAnswerLoading && (
-                            <span className="text-[10px] uppercase tracking-[0.2em] text-muted">Analyzing image…</span>
-                          )}
-                          {imageAnswerError && (
-                            <span className="text-[10px] tracking-[0.2em] text-danger">{imageAnswerError}</span>
-                          )}
-                        </label>
-                      )}
-                      {gameTypeId === 'music' && itemDraft.item_mode === 'audio' && (
-                        <div className="flex flex-col gap-2">
-                          <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">Answer parts</div>
-                          <div className="flex flex-col gap-2">
-                            {itemDraft.answer_parts.map((part, idx) => (
-                              <div
-                                key={`edit-answer-part-${idx}`}
-                                className="grid gap-2 sm:grid-cols-[1fr,2fr,auto] sm:items-end"
+                          {itemMenuId === item.id && (
+                            <div className="absolute right-0 mt-2 min-w-[160px] rounded-md border border-border bg-panel p-2 text-left shadow-sm">
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  handleDeleteItem(item.id);
+                                }}
+                                className="w-full rounded-md border border-danger bg-panel2 px-3 py-2 text-xs font-medium text-danger-ink"
                               >
-                                <label className="flex flex-col gap-1 text-[10px] font-display uppercase tracking-[0.25em] text-muted">
-                                  Answer type
-                                  <input
-                                    className="h-10 px-3"
-                                    value={part.label}
-                                    onChange={(event) =>
-                                      setItemDraft((draft) => {
-                                        const next = [...draft.answer_parts];
-                                        next[idx] = { ...next[idx], label: event.target.value };
-                                        return { ...draft, answer_parts: next };
-                                      })
-                                    }
-                                  />
-                                </label>
-                                <label className="flex flex-col gap-1 text-[10px] font-display uppercase tracking-[0.25em] text-muted">
-                                  Answer
-                                  <input
-                                    className="h-10 px-3"
-                                    value={part.answer}
-                                    onChange={(event) =>
-                                      setItemDraft((draft) => {
-                                        const next = [...draft.answer_parts];
-                                        next[idx] = { ...next[idx], answer: event.target.value };
-                                        return { ...draft, answer_parts: next };
-                                      })
-                                    }
-                                  />
-                                </label>
-                                {itemDraft.answer_parts.length > 1 && (
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      setItemDraft((draft) => ({
-                                        ...draft,
-                                        answer_parts: draft.answer_parts.filter((_, partIdx) => partIdx !== idx)
-                                      }))
-                                    }
-                                    className="h-10 rounded-md border border-border px-3 text-xs uppercase tracking-[0.2em] text-muted hover:border-danger hover:text-danger-ink"
-                                  >
-                                    Remove
-                                  </button>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                          <SecondaryButton
-                            onClick={() =>
-                              setItemDraft((draft) => ({
-                                ...draft,
-                                answer_parts: [
-                                  ...draft.answer_parts,
-                                  { label: `Answer ${draft.answer_parts.length + 1}`, answer: '' }
-                                ]
-                              }))
-                            }
-                            className="self-start px-3 py-2 text-xs"
-                          >
-                            Add answer part
-                          </SecondaryButton>
+                                Delete Item
+                              </button>
+                            </div>
+                          )}
                         </div>
-                      )}
-                      {gameTypeId !== 'audio' && itemDraft.question_type === 'multiple_choice' && (
-                        <div className="grid gap-3 border-2 border-border bg-panel2 p-3">
-                          <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">
-                            Multiple Choice
-                          </div>
-                          {choiceLabels.map((label, idx) => (
-                            <label
-                              key={label}
-                              className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted"
-                            >
-                              Option {label}
-                              <input
-                                className="h-10 px-3"
-                                value={itemDraft.choices[idx] ?? ''}
-                                onChange={(event) =>
-                                  setItemDraft((draft) => {
-                                    const next = [...draft.choices];
-                                    next[idx] = event.target.value;
-                                    return { ...draft, choices: next };
-                                  })
-                                }
-                              />
-                            </label>
-                          ))}
-                          <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-                            Correct Choice
-                            <select
-                              className="h-10 px-3"
-                              value={itemDraft.correct_choice_index}
-                              onChange={(event) =>
-                                setItemDraft((draft) => ({
-                                  ...draft,
-                                  correct_choice_index: Number(event.target.value)
-                                }))
-                              }
-                            >
-                              {choiceLabels.map((label, idx) => (
-                                <option key={label} value={idx}>
-                                  {label}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                        </div>
-                      )}
-                      {gameTypeId === 'audio' && (
-                        <>
-                          <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-                            Answer A Label
-                            <input
-                              className="h-10 px-3"
-                              value={itemDraft.answer_a_label}
-                              onChange={(event) =>
-                                setItemDraft((draft) => ({ ...draft, answer_a_label: event.target.value }))
-                              }
-                            />
-                          </label>
-                          <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-                            Answer A
-                            <input
-                              className="h-10 px-3"
-                              value={itemDraft.answer_a}
-                              onChange={(event) => setItemDraft((draft) => ({ ...draft, answer_a: event.target.value }))}
-                            />
-                          </label>
-                          <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-                            Answer B Label
-                            <input
-                              className="h-10 px-3"
-                              value={itemDraft.answer_b_label}
-                              onChange={(event) =>
-                                setItemDraft((draft) => ({ ...draft, answer_b_label: event.target.value }))
-                              }
-                            />
-                          </label>
-                          <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-                            Answer B
-                            <input
-                              className="h-10 px-3"
-                              value={itemDraft.answer_b}
-                              onChange={(event) => setItemDraft((draft) => ({ ...draft, answer_b: event.target.value }))}
-                            />
-                          </label>
-                        </>
-                      )}
-                      <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-                        <span className="flex items-center justify-between">
-                          Factoid
-                          <button
-                            type="button"
-                            onClick={generateFunFact}
-                            className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
-                            disabled={factLoading}
-                          >
-                            {factLoading ? 'Generating' : 'Generate'}
-                          </button>
-                        </span>
-                        <textarea
-                          className="min-h-[70px] px-3 py-2"
-                          value={itemDraft.fun_fact}
-                          onChange={(event) => setItemDraft((draft) => ({ ...draft, fun_fact: event.target.value }))}
-                        />
-                        {factError && <span className="text-[10px] tracking-[0.2em] text-danger">{factError}</span>}
-                      </label>
+                      </div>
+                      <div className="mt-2 text-sm text-text">
+                        {item.prompt?.trim()
+                          ? item.prompt
+                          : gameTypeId === 'music' && item.media_type === 'audio'
+                            ? `Audio Clip ${item.ordinal}`
+                            : ''}
+                      </div>
+                      <div className="mt-1 text-xs uppercase tracking-[0.2em] text-muted">
+                        {answerSummary(item, gameTypeId === 'music') || 'Answer missing'}
+                      </div>
                       {(gameTypeId === 'audio' || gameTypeId === 'visual') && (
-                        <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-                          Media Upload
-                          <div className="flex flex-wrap items-center gap-2">
-                            <input
-                              ref={editUploadRef}
-                              type="file"
-                              accept={gameTypeId === 'audio' ? 'audio/mpeg' : 'image/png,image/jpeg,image/webp'}
-                              onChange={(event) => {
-                                const file = event.target.files?.[0];
-                                if (file) handleUpload(item, file);
-                              }}
-                              className="hidden"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => editUploadRef.current?.click()}
-                              className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
-                            >
-                              {mediaUploading
-                                ? 'Uploading'
-                                : gameTypeId === 'audio'
-                                  ? 'Upload MP3'
-                                  : 'Upload Image'}
-                            </button>
-                            {itemDraft.media_key && (
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteMedia(item)}
-                                className="border-2 border-danger px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-danger hover:border-[#9d2a24]"
-                              >
-                                Delete Media
-                              </button>
-                            )}
-                            {itemDraft.media_key && (
-                              <span className="text-[10px] uppercase tracking-[0.2em] text-muted">
-                                {gameTypeId === 'audio' ? 'Audio attached' : 'Image attached'}
-                                {itemDraft.media_filename ? ` • ${itemDraft.media_filename}` : ''}
-                              </span>
-                            )}
-                            {gameTypeId === 'visual' && itemDraft.media_key && (
-                              <img
-                                src={api.mediaUrl(itemDraft.media_key)}
-                                alt="Uploaded"
-                                className="h-16 w-16 border-2 border-border object-cover"
-                              />
-                            )}
-                            {gameTypeId === 'audio' && itemDraft.media_key && (
-                              <audio className="w-full" controls src={api.mediaUrl(itemDraft.media_key)} />
-                            )}
-                          </div>
-                          {gameTypeId === 'audio' && (
-                            <span className="text-[10px] tracking-[0.2em] text-muted">MP3 only for audio rounds.</span>
-                          )}
-                          {gameTypeId === 'visual' && (
-                            <span className="text-[10px] tracking-[0.2em] text-muted">PNG, JPG, or WEBP only.</span>
-                          )}
-                          {mediaError && <span className="text-[10px] tracking-[0.2em] text-danger">{mediaError}</span>}
-                        </label>
-                      )}
-                      {gameTypeId === 'music' && itemDraft.item_mode === 'audio' && !isMusicSpeedRound && (
-                        <div className="grid gap-3">
-                          <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-                            Question Audio
-                            <div className="flex flex-wrap items-center gap-2">
-                              <input
-                                type="file"
-                                accept="audio/mpeg"
-                                className="hidden"
-                                ref={editUploadRef}
-                                onChange={(event) => {
-                                  const file = event.target.files?.[0];
-                                  event.target.value = '';
-                                  if (file) handleQuestionAudioUpload(item, file);
-                                }}
-                              />
-                              <button
-                                type="button"
-                                onClick={() => editUploadRef.current?.click()}
-                                className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
-                              >
-                                {mediaUploading ? 'Uploading' : 'Upload Question MP3'}
-                              </button>
-                              {itemDraft.media_key && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeleteMedia(item)}
-                                  className="border-2 border-danger px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-danger hover:border-[#9d2a24]"
-                                >
-                                  Remove
-                                </button>
-                              )}
-                            </div>
-                            {itemDraft.media_key && (
-                              <audio className="w-full" controls src={api.mediaUrl(itemDraft.media_key)} />
-                            )}
-                          </label>
-                          <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-                            Answer Audio (Optional)
-                            <div className="flex flex-wrap items-center gap-2">
-                              <input
-                                type="file"
-                                accept="audio/mpeg"
-                                className="hidden"
-                                ref={newUploadRef}
-                                onChange={(event) => {
-                                  const file = event.target.files?.[0];
-                                  event.target.value = '';
-                                  if (file) handleAnswerAudioUpload(item, file);
-                                }}
-                              />
-                              <button
-                                type="button"
-                                onClick={() => newUploadRef.current?.click()}
-                                className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
-                              >
-                                {mediaUploading ? 'Uploading' : 'Upload Answer MP3'}
-                              </button>
-                              {itemDraft.audio_answer_key && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleDeleteAnswerAudio(item)}
-                                  className="border-2 border-danger px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-danger hover:border-[#9d2a24]"
-                                >
-                                  Remove
-                                </button>
-                              )}
-                            </div>
-                            {itemDraft.audio_answer_key && (
-                              <audio className="w-full" controls src={api.mediaUrl(itemDraft.audio_answer_key)} />
-                            )}
-                          </label>
+                        <div className="mt-2 text-[10px] uppercase tracking-[0.2em] text-muted">
+                          {item.media_key ? `${item.media_type} attached` : 'No media'} • Drag to reorder
                         </div>
                       )}
-                      {gameTypeId === 'music' && itemDraft.item_mode === 'audio' && isMusicSpeedRound && (
-                        <div className="rounded-md border border-border bg-panel2 px-3 py-2 text-[10px] uppercase tracking-[0.2em] text-muted">
-                          Speed round audio is uploaded per event round.
-                        </div>
-                      )}
-                      {itemValidationError && (
-                        <div className="border-2 border-danger bg-panel px-3 py-2 text-xs uppercase tracking-[0.2em] text-danger">
-                          {itemValidationError}
-                        </div>
-                      )}
-                      <div className="flex flex-wrap gap-2">
-                        <PrimaryButton onClick={() => saveEdit(item)}>Save</PrimaryButton>
-                        <SecondaryButton onClick={cancelEdit}>Cancel</SecondaryButton>
-                      </div>
-                      {refineOpen && (
-                        <div className="border-2 border-border bg-panel2 p-3">
-                          <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">Refined Questions</div>
-                          {refineLoading && (
-                            <div className="mt-2 text-xs uppercase tracking-[0.2em] text-muted">Generating…</div>
+                      {gameTypeId === 'music' && (
+                        <div className="mt-2 text-[10px] uppercase tracking-[0.2em] text-muted">
+                          {isMusicSpeedRound
+                            ? 'Speed round audio attached per event'
+                            : item.media_key ? 'Question audio attached' : 'No question audio'}
+                          {!isMusicSpeedRound && (
+                            <>
+                              {' • '}
+                              {item.audio_answer_key ? 'Answer audio attached' : 'No answer audio'}
+                            </>
                           )}
-                          {refineError && (
-                            <div className="mt-2 text-xs uppercase tracking-[0.2em] text-danger">{refineError}</div>
-                          )}
-                          <div className="mt-3 flex flex-col gap-2">
-                            {refineOptions.map((option) => (
-                              <button
-                                key={option}
-                                type="button"
-                                onClick={() => applyRefine(option)}
-                                className="border-2 border-border bg-panel px-3 py-2 text-left text-xs uppercase tracking-[0.2em] text-text hover:border-accent-ink"
-                              >
-                                {option}
-                              </button>
-                            ))}
-                          </div>
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            <button
-                              type="button"
-                              onClick={startRefine}
-                              className="border-2 border-border px-3 py-2 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
-                            >
-                              Generate Again
-                            </button>
-                            <button
-                              type="button"
-                              onClick={keepOriginal}
-                              className="border-2 border-border px-3 py-2 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
-                            >
-                              Keep Original
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setRefineOpen(false)}
-                              className="border-2 border-border px-3 py-2 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
-                            >
-                              Close
-                            </button>
-                          </div>
+                          {' • Drag to reorder'}
                         </div>
                       )}
                     </div>
                   </div>
-                )}
+                ))}
               </div>
-            ))}
-          </div>
-          {activeItemId === 'new' && (
-            <div className="mt-4 border-2 border-border bg-panel p-3">
-              <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">New Item</div>
-              <div className="mt-3 grid gap-3">
-                {gameTypeId === 'music' && (
-                  <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-                    Item Type
-                    <select
-                      className="h-10 px-3"
-                      value={itemDraft.item_mode}
-                      onChange={(event) =>
-                        setItemDraft((draft) => {
-                          const mode = event.target.value as 'audio' | 'text';
-                          const nextParts =
-                            mode === 'audio'
-                              ? draft.answer_parts.length > 0
-                                ? draft.answer_parts
-                                : defaultMusicAnswerParts
-                              : [];
-                          return {
-                            ...draft,
-                            item_mode: mode,
-                            media_type: mode === 'audio' ? 'audio' : '',
-                            media_key: mode === 'audio' ? draft.media_key : '',
-                            audio_answer_key: mode === 'audio' ? draft.audio_answer_key : '',
-                            answer_parts: nextParts
-                          };
-                        })
-                      }
-                    >
-                      <option value="audio">Audio Clip</option>
-                      <option value="text">Text Question</option>
-                    </select>
-                  </label>
-                )}
-                {gameTypeId !== 'audio' && (
-                  <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-                    Question Type
-                    <select
-                      className="h-10 px-3"
-                      value={itemDraft.question_type}
-                      onChange={(event) =>
-                        setItemDraft((draft) => ({
-                          ...draft,
-                          question_type: event.target.value as 'text' | 'multiple_choice'
-                        }))
-                      }
-                    >
-                      <option value="text">Text</option>
-                      <option value="multiple_choice">Multiple Choice</option>
-                    </select>
-                  </label>
-                )}
-                <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-                  <span className="flex items-center justify-between">
-                    {gameTypeId === 'music' && itemDraft.item_mode === 'audio' ? 'Question (optional)' : 'Question'}
-                  <button
-                    type="button"
-                    onClick={startRefine}
-                    className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
-                  >
-                    Refine
-                  </button>
-                </span>
-                <input
-                  className="h-10 px-3"
-                  value={itemDraft.prompt}
-                  onChange={(event) => setItemDraft((draft) => ({ ...draft, prompt: event.target.value }))}
-                />
-              </label>
-              {gameTypeId !== 'audio' &&
-                itemDraft.question_type !== 'multiple_choice' &&
-                !(gameTypeId === 'music' && itemDraft.item_mode === 'audio') && (
-                <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-                  <span className="flex items-center justify-between">
-                    Answer
-                    <button
-                      type="button"
-                      onClick={generateAnswer}
-                      className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
-                      disabled={answerLoading}
-                    >
-                      {answerLoading ? 'Generating' : 'Generate'}
-                    </button>
-                  </span>
-                  <input
-                    className="h-10 px-3"
-                    value={itemDraft.answer}
-                    onChange={(event) => setItemDraft((draft) => ({ ...draft, answer: event.target.value }))}
-                  />
-                  {answerError && <span className="text-[10px] tracking-[0.2em] text-danger">{answerError}</span>}
-                  {imageAnswerLoading && (
-                    <span className="text-[10px] uppercase tracking-[0.2em] text-muted">Analyzing image…</span>
-                  )}
-                  {imageAnswerError && (
-                    <span className="text-[10px] tracking-[0.2em] text-danger">{imageAnswerError}</span>
-                  )}
-                </label>
-              )}
-              {gameTypeId === 'music' && itemDraft.item_mode === 'audio' && (
-                <div className="flex flex-col gap-2">
-                  <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">Answer parts</div>
-                  <div className="flex flex-col gap-2">
-                    {itemDraft.answer_parts.map((part, idx) => (
-                      <div
-                        key={`new-answer-part-${idx}`}
-                        className="grid gap-2 sm:grid-cols-[1fr,2fr,auto] sm:items-end"
-                      >
-                        <label className="flex flex-col gap-1 text-[10px] font-display uppercase tracking-[0.25em] text-muted">
-                          Answer type
-                          <input
-                            className="h-10 px-3"
-                            value={part.label}
-                            onChange={(event) =>
-                              setItemDraft((draft) => {
-                                const next = [...draft.answer_parts];
-                                next[idx] = { ...next[idx], label: event.target.value };
-                                return { ...draft, answer_parts: next };
-                              })
-                            }
-                          />
-                        </label>
-                        <label className="flex flex-col gap-1 text-[10px] font-display uppercase tracking-[0.25em] text-muted">
-                          Answer
-                          <input
-                            className="h-10 px-3"
-                            value={part.answer}
-                            onChange={(event) =>
-                              setItemDraft((draft) => {
-                                const next = [...draft.answer_parts];
-                                next[idx] = { ...next[idx], answer: event.target.value };
-                                return { ...draft, answer_parts: next };
-                              })
-                            }
-                          />
-                        </label>
-                        {itemDraft.answer_parts.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setItemDraft((draft) => ({
-                                ...draft,
-                                answer_parts: draft.answer_parts.filter((_, partIdx) => partIdx !== idx)
-                              }))
-                            }
-                            className="h-10 rounded-md border border-border px-3 text-xs uppercase tracking-[0.2em] text-muted hover:border-danger hover:text-danger-ink"
-                          >
-                            Remove
-                          </button>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                  <SecondaryButton
-                    onClick={() =>
-                      setItemDraft((draft) => ({
-                        ...draft,
-                        answer_parts: [
-                          ...draft.answer_parts,
-                          { label: `Answer ${draft.answer_parts.length + 1}`, answer: '' }
-                        ]
-                      }))
-                    }
-                    className="self-start px-3 py-2 text-xs"
-                  >
-                    Add answer part
-                  </SecondaryButton>
-                </div>
-              )}
-              {gameTypeId !== 'audio' && itemDraft.question_type === 'multiple_choice' && (
-                <div className="grid gap-3 border-2 border-border bg-panel2 p-3">
-                  <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">
-                    Multiple Choice
-                  </div>
-                  {choiceLabels.map((label, idx) => (
-                    <label
-                      key={label}
-                      className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted"
-                    >
-                      Option {label}
-                      <input
-                        className="h-10 px-3"
-                        value={itemDraft.choices[idx] ?? ''}
-                        onChange={(event) =>
-                          setItemDraft((draft) => {
-                            const next = [...draft.choices];
-                            next[idx] = event.target.value;
-                            return { ...draft, choices: next };
-                          })
-                        }
-                      />
-                    </label>
-                  ))}
-                  <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-                    Correct Choice
-                    <select
-                      className="h-10 px-3"
-                      value={itemDraft.correct_choice_index}
-                      onChange={(event) =>
-                        setItemDraft((draft) => ({
-                          ...draft,
-                          correct_choice_index: Number(event.target.value)
-                        }))
-                      }
-                    >
-                      {choiceLabels.map((label, idx) => (
-                        <option key={label} value={idx}>
-                          {label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-              )}
-              {gameTypeId === 'audio' && (
-                <>
-                  <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-                    Answer A Label
-                    <input
-                      className="h-10 px-3"
-                      value={itemDraft.answer_a_label}
-                      onChange={(event) =>
-                        setItemDraft((draft) => ({ ...draft, answer_a_label: event.target.value }))
-                      }
-                    />
-                  </label>
-                  <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-                    Answer A
-                    <input
-                      className="h-10 px-3"
-                      value={itemDraft.answer_a}
-                      onChange={(event) => setItemDraft((draft) => ({ ...draft, answer_a: event.target.value }))}
-                    />
-                  </label>
-                  <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-                    Answer B Label
-                    <input
-                      className="h-10 px-3"
-                      value={itemDraft.answer_b_label}
-                      onChange={(event) =>
-                        setItemDraft((draft) => ({ ...draft, answer_b_label: event.target.value }))
-                      }
-                    />
-                  </label>
-                  <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-                    Answer B
-                    <input
-                      className="h-10 px-3"
-                      value={itemDraft.answer_b}
-                      onChange={(event) => setItemDraft((draft) => ({ ...draft, answer_b: event.target.value }))}
-                    />
-                  </label>
-                </>
-              )}
-              <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-                <span className="flex items-center justify-between">
-                  Factoid
-                  <button
-                    type="button"
-                    onClick={generateFunFact}
-                    className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
-                    disabled={factLoading}
-                  >
-                    {factLoading ? 'Generating' : 'Generate'}
-                  </button>
-                </span>
-                <textarea
-                  className="min-h-[70px] px-3 py-2"
-                  value={itemDraft.fun_fact}
-                  onChange={(event) => setItemDraft((draft) => ({ ...draft, fun_fact: event.target.value }))}
-                />
-                {factError && <span className="text-[10px] tracking-[0.2em] text-danger">{factError}</span>}
-              </label>
-              {(gameTypeId === 'audio' || gameTypeId === 'visual') && (
-                <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-                  Media Upload
-                  <div className="flex flex-wrap items-center gap-2">
-                    <input
-                      ref={newUploadRef}
-                      type="file"
-                      accept={gameTypeId === 'audio' ? 'audio/mpeg' : 'image/png,image/jpeg,image/webp'}
-                      onChange={(event) => {
-                        const file = event.target.files?.[0];
-                        if (file) handleDraftUpload(file);
-                      }}
-                      className="hidden"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => newUploadRef.current?.click()}
-                      className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
-                    >
-                      {mediaUploading
-                        ? 'Uploading'
-                        : gameTypeId === 'audio'
-                          ? 'Upload MP3'
-                          : 'Upload Image'}
-                    </button>
-                    {itemDraft.media_key && (
-                      <button
-                        type="button"
-                        onClick={() => handleDeleteMedia()}
-                        className="border-2 border-danger px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-danger hover:border-[#9d2a24]"
-                      >
-                        Delete Media
-                      </button>
-                    )}
-                    {itemDraft.media_key && (
-                      <span className="text-[10px] uppercase tracking-[0.2em] text-muted">
-                        {gameTypeId === 'audio' ? 'Audio attached' : 'Image attached'}
-                        {itemDraft.media_filename ? ` • ${itemDraft.media_filename}` : ''}
-                      </span>
-                    )}
-                    {gameTypeId === 'visual' && itemDraft.media_key && (
-                      <img
-                        src={api.mediaUrl(itemDraft.media_key)}
-                        alt="Uploaded"
-                        className="h-16 w-16 border-2 border-border object-cover"
-                      />
-                    )}
-                    {gameTypeId === 'audio' && itemDraft.media_key && (
-                      <audio className="w-full" controls src={api.mediaUrl(itemDraft.media_key)} />
-                    )}
-                  </div>
-                  {gameTypeId === 'audio' && (
-                    <span className="text-[10px] tracking-[0.2em] text-muted">MP3 only for audio rounds.</span>
-                  )}
-                  {gameTypeId === 'visual' && (
-                    <span className="text-[10px] tracking-[0.2em] text-muted">PNG, JPG, or WEBP only.</span>
-                  )}
-                  {mediaError && <span className="text-[10px] tracking-[0.2em] text-danger">{mediaError}</span>}
-                </label>
-              )}
-              {gameTypeId === 'music' && itemDraft.item_mode === 'audio' && !isMusicSpeedRound && (
-                <div className="grid gap-3">
-                  <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-                    Question Audio
-                    <div className="flex flex-wrap items-center gap-2">
-                      <input
-                        ref={newUploadRef}
-                        type="file"
-                        accept="audio/mpeg"
-                        className="hidden"
-                        onChange={(event) => {
-                          const file = event.target.files?.[0];
-                          event.target.value = '';
-                          if (file) handleQuestionAudioUpload(null, file);
-                        }}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => newUploadRef.current?.click()}
-                        className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
-                      >
-                        {mediaUploading ? 'Uploading' : 'Upload Question MP3'}
-                      </button>
-                      {itemDraft.media_key && (
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteMedia()}
-                          className="border-2 border-danger px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-danger hover:border-[#9d2a24]"
-                        >
-                          Remove
-                        </button>
-                      )}
-                    </div>
-                    {itemDraft.media_key && (
-                      <audio className="w-full" controls src={api.mediaUrl(itemDraft.media_key)} />
-                    )}
-                  </label>
-                  <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-                    Answer Audio (Optional)
-                    <div className="flex flex-wrap items-center gap-2">
-                      <input
-                        ref={editUploadRef}
-                        type="file"
-                        accept="audio/mpeg"
-                        className="hidden"
-                        onChange={(event) => {
-                          const file = event.target.files?.[0];
-                          event.target.value = '';
-                          if (file) handleAnswerAudioUpload(null, file);
-                        }}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => editUploadRef.current?.click()}
-                        className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
-                      >
-                        {mediaUploading ? 'Uploading' : 'Upload Answer MP3'}
-                      </button>
-                      {itemDraft.audio_answer_key && (
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteAnswerAudio()}
-                          className="border-2 border-danger px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-danger hover:border-[#9d2a24]"
-                        >
-                          Remove
-                        </button>
-                      )}
-                    </div>
-                    {itemDraft.audio_answer_key && (
-                      <audio className="w-full" controls src={api.mediaUrl(itemDraft.audio_answer_key)} />
-                    )}
-                  </label>
-                </div>
-              )}
-              {gameTypeId === 'music' && itemDraft.item_mode === 'audio' && isMusicSpeedRound && (
-                <div className="rounded-md border border-border bg-panel2 px-3 py-2 text-[10px] uppercase tracking-[0.2em] text-muted">
-                  Speed round audio is uploaded per event round.
-                </div>
-              )}
-              {itemValidationError && (
-                <div className="border-2 border-danger bg-panel px-3 py-2 text-xs uppercase tracking-[0.2em] text-danger">
-                  {itemValidationError}
-                </div>
-              )}
-              <div className="flex flex-wrap gap-2">
-                <PrimaryButton onClick={handleCreateItem}>Save</PrimaryButton>
-                <SecondaryButton onClick={cancelEdit}>Cancel</SecondaryButton>
-              </div>
-              {refineOpen && (
-                <div className="border-2 border-border bg-panel2 p-3">
-                  <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">Refined Questions</div>
-                  {refineLoading && (
-                    <div className="mt-2 text-xs uppercase tracking-[0.2em] text-muted">Generating…</div>
-                  )}
-                  {refineError && (
-                    <div className="mt-2 text-xs uppercase tracking-[0.2em] text-danger">{refineError}</div>
-                  )}
-                  <div className="mt-3 flex flex-col gap-2">
-                    {refineOptions.map((option) => (
-                      <button
-                        key={option}
-                        type="button"
-                        onClick={() => applyRefine(option)}
-                        className="border-2 border-border bg-panel px-3 py-2 text-left text-xs uppercase tracking-[0.2em] text-text hover:border-accent-ink"
-                      >
-                        {option}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={startRefine}
-                      className="border-2 border-border px-3 py-2 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
-                    >
-                      Generate Again
-                    </button>
-                    <button
-                      type="button"
-                      onClick={keepOriginal}
-                      className="border-2 border-border px-3 py-2 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
-                    >
-                      Keep Original
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setRefineOpen(false)}
-                      className="border-2 border-border px-3 py-2 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
-                    >
-                      Close
-                    </button>
-                  </div>
+            </div>
+            <div className="lg:sticky lg:top-24">
+              {activeItemId === 'new' && renderNewPanel()}
+              {activeItemId !== 'new' && activeItem && renderEditPanel(activeItem, activeItemIndex)}
+              {!activeItemId && (
+                <div className="border-2 border-border bg-panel2 p-4 text-xs uppercase tracking-[0.2em] text-muted">
+                  Select an item on the left or create a new item to begin editing.
                 </div>
               )}
             </div>
-            </div>
-          )}
-          <div className="mt-4 border-t-2 border-border pt-4">
-            <SecondaryButton onClick={startNewItem}>New Item</SecondaryButton>
           </div>
         </Panel>
       </div>
