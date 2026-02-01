@@ -3168,6 +3168,11 @@ export function EditionDetailPage() {
             <div className="lg:sticky lg:top-24">
               {activeItemId === 'new' && renderNewPanel()}
               {activeItemId !== 'new' && activeItem && renderEditPanel(activeItem, activeItemIndex)}
+              {activeItemId && activeItemId !== 'new' && !activeItem && (
+                <div className="border-2 border-border bg-panel2 p-4 text-xs uppercase tracking-[0.2em] text-muted">
+                  Select an item on the left or create a new item to begin editing.
+                </div>
+              )}
               {!activeItemId && (
                 <div className="border-2 border-border bg-panel2 p-4 text-xs uppercase tracking-[0.2em] text-muted">
                   Select an item on the left or create a new item to begin editing.
