@@ -23,7 +23,10 @@ type PublicLeaderboardResponse = {
   } | null;
 };
 
-const POLL_MS = 1500;
+const POLL_MS = 8000;
+const POLL_BACKUP_MS = 15000;
+const STREAM_RETRY_BASE_MS = 2000;
+const STREAM_RETRY_MAX_MS = 30000;
 
 export function PlayLeaderboardPage() {
   const { code } = useParams();
@@ -66,6 +69,8 @@ export function PlayLeaderboardPage() {
     };
     let timer: number | null = null;
     let source: EventSource | null = null;
+    let retryTimer: number | null = null;
+    let retryCount = 0;
 
     const applyData = (next: PublicLeaderboardResponse) => {
       if (cancelled) return;
@@ -80,14 +85,34 @@ export function PlayLeaderboardPage() {
       setLoading(false);
     };
 
-    const startPolling = () => {
+    const startPolling = (intervalMs = POLL_MS) => {
       if (timer) return;
       load();
-      timer = window.setInterval(load, POLL_MS);
+      timer = window.setInterval(load, intervalMs);
+    };
+
+    const stopPolling = () => {
+      if (!timer) return;
+      window.clearInterval(timer);
+      timer = null;
+    };
+
+    const scheduleStreamRetry = () => {
+      if (retryTimer) return;
+      const delay = Math.min(STREAM_RETRY_MAX_MS, STREAM_RETRY_BASE_MS * 2 ** retryCount);
+      retryCount += 1;
+      retryTimer = window.setTimeout(() => {
+        retryTimer = null;
+        startStream();
+      }, delay);
     };
 
     const startStream = () => {
       source = new EventSource(`/api/public/event/${encodeURIComponent(normalizedCode)}/stream?view=leaderboard`);
+      source.addEventListener('open', () => {
+        retryCount = 0;
+        stopPolling();
+      });
       source.addEventListener('update', (event) => {
         try {
           const next = JSON.parse((event as MessageEvent).data) as PublicLeaderboardResponse;
@@ -100,7 +125,8 @@ export function PlayLeaderboardPage() {
         if (cancelled) return;
         source?.close();
         source = null;
-        startPolling();
+        scheduleStreamRetry();
+        if (!timer) startPolling(POLL_BACKUP_MS);
       });
     };
 
@@ -114,6 +140,7 @@ export function PlayLeaderboardPage() {
     return () => {
       cancelled = true;
       if (timer) window.clearInterval(timer);
+      if (retryTimer) window.clearTimeout(retryTimer);
       source?.close();
     };
   }, [normalizedCode, navigate, storedTeamId]);

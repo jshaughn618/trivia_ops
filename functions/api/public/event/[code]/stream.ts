@@ -5,7 +5,7 @@ import { getPublicEventPayload } from '../../../../public-event';
 
 const STREAM_POLL_MS = 2000;
 const DEFAULT_PUBLIC_STREAM_RATE_LIMIT = {
-  maxAttempts: 30,
+  maxAttempts: 300,
   windowSeconds: 5 * 60,
   blockSeconds: 10 * 60
 };
@@ -36,7 +36,8 @@ function formatComment(value: string) {
 
 export const onRequestGet: PagesFunction<Env> = async ({ env, params, request }) => {
   const ip = request.headers.get('cf-connecting-ip') ?? 'unknown';
-  const limitKey = `public-event-stream:${ip}`;
+  const code = String(params.code ?? 'unknown').toUpperCase();
+  const limitKey = `public-event-stream:${ip}:${code}`;
   const status = await checkRateLimit(env, limitKey, getPublicStreamRateLimit(env));
   if (!status.allowed) {
     const headers = status.retryAfterSeconds ? { 'Retry-After': String(status.retryAfterSeconds) } : undefined;
