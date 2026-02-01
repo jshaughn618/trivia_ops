@@ -14,7 +14,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env }) => {
   }
 
   const headers = new Headers();
-  headers.append('Set-Cookie', clearSessionCookie());
-  headers.append('Set-Cookie', clearCsrfCookie());
+  headers.append('Set-Cookie', clearSessionCookie(env));
+  headers.append('Set-Cookie', clearCsrfCookie(env));
   return jsonOk({ ok: true }, { headers });
 };

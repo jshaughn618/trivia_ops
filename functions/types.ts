@@ -25,5 +25,6 @@ export type Env = {
   ZEPTO_FROM_NAME?: string;
   ZEPTO_API_URL?: string;
   APP_BASE_URL?: string;
+  COOKIE_DOMAIN?: string;
   DEBUG?: string;
 };

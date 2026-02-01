@@ -52,21 +52,37 @@ export async function verifySessionCookie(cookieValue: string, secret: string) {
   return sessionId;
 }
 
-export function buildSessionCookie(value: string, expiresAt: string) {
+function buildCookieDomain(env: Env) {
+  if (env.COOKIE_DOMAIN) return `; Domain=${env.COOKIE_DOMAIN}`;
+  if (!env.APP_BASE_URL) return '';
+  try {
+    const host = new URL(env.APP_BASE_URL).hostname;
+    if (host === 'localhost' || !host.includes('.')) return '';
+    return `; Domain=${host}`;
+  } catch {
+    return '';
+  }
+}
+
+export function buildSessionCookie(value: string, expiresAt: string, env?: Env) {
   const expires = new Date(expiresAt).toUTCString();
-  return `triviaops_session=${encodeURIComponent(value)}; Path=/; HttpOnly; SameSite=Strict; Secure; Expires=${expires}`;
+  const domain = env ? buildCookieDomain(env) : '';
+  return `triviaops_session=${encodeURIComponent(value)}; Path=/; HttpOnly; SameSite=Strict; Secure${domain}; Expires=${expires}`;
 }
 
-export function clearSessionCookie() {
-  return 'triviaops_session=; Path=/; HttpOnly; SameSite=Strict; Secure; Max-Age=0';
+export function clearSessionCookie(env?: Env) {
+  const domain = env ? buildCookieDomain(env) : '';
+  return `triviaops_session=; Path=/; HttpOnly; SameSite=Strict; Secure${domain}; Max-Age=0`;
 }
 
-export function buildCsrfCookie(token: string) {
-  return `csrf_token=${encodeURIComponent(token)}; Path=/; SameSite=Strict; Secure; Max-Age=604800`;
+export function buildCsrfCookie(token: string, env?: Env) {
+  const domain = env ? buildCookieDomain(env) : '';
+  return `csrf_token=${encodeURIComponent(token)}; Path=/; SameSite=Strict; Secure${domain}; Max-Age=604800`;
 }
 
-export function clearCsrfCookie() {
-  return 'csrf_token=; Path=/; SameSite=Strict; Secure; Max-Age=0';
+export function clearCsrfCookie(env?: Env) {
+  const domain = env ? buildCookieDomain(env) : '';
+  return `csrf_token=; Path=/; SameSite=Strict; Secure${domain}; Max-Age=0`;
 }
 
 export async function createSession(env: Env, userId: string, req: Request) {

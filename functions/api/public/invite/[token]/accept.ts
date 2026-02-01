@@ -77,8 +77,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request }
   const session = await createSession(env, userId, request);
   const csrfToken = crypto.randomUUID();
   const headers = new Headers();
-  headers.append('Set-Cookie', buildSessionCookie(session.signed, session.expiresAt));
-  headers.append('Set-Cookie', buildCsrfCookie(csrfToken));
+  headers.append('Set-Cookie', buildSessionCookie(session.signed, session.expiresAt, env));
+  headers.append('Set-Cookie', buildCsrfCookie(csrfToken, env));
   return jsonOk(
     {
       id: userId,

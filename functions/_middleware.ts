@@ -1,6 +1,6 @@
 import type { Env } from './types';
 import { jsonError } from './responses';
-import { getSession, parseCookies, verifySessionCookie } from './auth';
+import { buildCsrfCookie, getSession, parseCookies, verifySessionCookie } from './auth';
 import { queryFirst } from './db';
 import { getRequestId, logError, logInfo } from './_lib/log';
 
@@ -98,7 +98,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       });
     }
     const response = await context.next();
-    const responseWithCsrf = withCsrfCookie(response, request);
+    const responseWithCsrf = withCsrfCookie(response, request, env);
     if (loggable) {
       logInfo(env, 'request_end', {
         requestId,
@@ -168,17 +168,14 @@ function safeOrigin(value: string) {
   }
 }
 
-function withCsrfCookie(response: Response, request: Request) {
+function withCsrfCookie(response: Response, request: Request, env: Env) {
   const method = request.method.toUpperCase();
   if (isStateChanging(method)) return response;
   const cookies = parseCookies(request.headers.get('cookie'));
   if (cookies['csrf_token']) return response;
   const token = crypto.randomUUID();
   const headers = new Headers(response.headers);
-  headers.append(
-    'Set-Cookie',
-    `csrf_token=${encodeURIComponent(token)}; Path=/; SameSite=Strict; Secure; Max-Age=604800`
-  );
+  headers.append('Set-Cookie', buildCsrfCookie(token, env));
   return new Response(response.body, { ...response, headers });
 }
 
