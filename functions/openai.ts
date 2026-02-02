@@ -22,7 +22,7 @@ export async function generateText(env: Env, input: { prompt: string; model?: st
     body: JSON.stringify(body)
   });
 
-  const data = await response.json();
+  const data = (await response.json()) as OpenAIResponse;
   if (!response.ok) {
     const message = data?.error?.message ?? 'OpenAI request failed';
     throw new Error(message);
@@ -63,7 +63,7 @@ export async function generateImageAnswer(
     body: JSON.stringify(body)
   });
 
-  const data = await response.json();
+  const data = (await response.json()) as OpenAIResponse;
   if (!response.ok) {
     const message = data?.error?.message ?? 'OpenAI request failed';
     throw new Error(message);
@@ -73,7 +73,13 @@ export async function generateImageAnswer(
   return { text, raw: data };
 }
 
-function extractText(data: any) {
+type OpenAIResponse = {
+  output_text?: string;
+  output?: Array<{ content?: Array<{ text?: string }> }>;
+  error?: { message?: string };
+};
+
+function extractText(data: OpenAIResponse) {
   const output = Array.isArray(data?.output) ? data.output : [];
   const chunks: string[] = [];
 
