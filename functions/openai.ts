@@ -7,8 +7,9 @@ export async function generateText(env: Env, input: { prompt: string; model?: st
     throw new Error('OPENAI_API_KEY not configured');
   }
 
+  const model = input.model ?? env.AI_DEFAULT_MODEL ?? DEFAULT_MODEL;
   const body = {
-    model: input.model ?? DEFAULT_MODEL,
+    model,
     input: input.prompt,
     max_output_tokens: input.max_output_tokens ?? 300
   };
@@ -40,8 +41,9 @@ export async function generateImageAnswer(
     throw new Error('OPENAI_API_KEY not configured');
   }
 
+  const model = input.model ?? env.AI_DEFAULT_MODEL ?? DEFAULT_MODEL;
   const body = {
-    model: input.model ?? DEFAULT_MODEL,
+    model,
     input: [
       {
         role: 'user',

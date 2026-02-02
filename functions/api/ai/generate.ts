@@ -36,7 +36,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, data }) 
       prompt_length: parsed.data.prompt.length,
       prompt_truncated: promptLog.truncated
     });
-    const result = await generateText(env, parsed.data);
+    const result = await generateText(env, { ...parsed.data, model });
     const outputLog = truncate(result.text);
     logInfo(env, 'ai_generate_response', {
       requestId,

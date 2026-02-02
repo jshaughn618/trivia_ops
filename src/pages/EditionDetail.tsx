@@ -87,6 +87,8 @@ const sanitizeAnswerParts = (parts: AnswerPart[]) =>
     .map((part) => ({ label: part.label.trim(), answer: part.answer.trim() }))
     .filter((part) => part.label.length > 0 && part.answer.length > 0);
 
+const safeTrim = (value: unknown) => (typeof value === 'string' ? value.trim() : '');
+
 const answerSummary = (item: EditionItem, isMusic: boolean) => {
   if (isMusic) {
     const parts = parseAnswerPartsJson(item.answer_parts_json ?? null, item);
@@ -366,8 +368,9 @@ export function EditionDetailPage() {
     const isAudioItem = item.media_type === 'audio' || Boolean(item.media_key) || Boolean(item.audio_answer_key);
     const questionType = item.question_type ?? 'text';
     const choices = parseChoices(item.choices_json ?? null);
-    const correctIndex = questionType === 'multiple_choice' && item.answer
-      ? Math.max(0, choices.findIndex((choice) => choice.trim() === item.answer?.trim()))
+    const answerValue = safeTrim(item.answer);
+    const correctIndex = questionType === 'multiple_choice' && answerValue
+      ? Math.max(0, choices.findIndex((choice) => choice.trim() === answerValue))
       : 0;
     const parsedAnswerParts = parseAnswerPartsJson(item.answer_parts_json ?? null, item);
     const answerPartsDraft =
@@ -680,7 +683,7 @@ export function EditionDetailPage() {
 
   const startNewItem = () => {
     const lastItem = [...items].sort((a, b) => a.ordinal - b.ordinal).at(-1);
-    const visualPrompt = gameTypeId === 'visual' ? lastItem?.prompt?.trim() ?? '' : '';
+    const visualPrompt = gameTypeId === 'visual' ? safeTrim(lastItem?.prompt) : '';
     setActiveItemId('new');
     setRefineOpen(false);
     setRefineOptions([]);
@@ -967,14 +970,14 @@ export function EditionDetailPage() {
     let added = 0;
     for (let index = 0; index < parsed.length; index += 1) {
       const entry = parsed[index];
-      const promptText = entry.prompt?.trim();
+      const promptText = safeTrim(entry.prompt);
       if (!promptText) continue;
-      const answerText = entry.answer?.trim();
-      const answerAText = entry.answer_a?.trim();
-      const answerBText = entry.answer_b?.trim();
-      const answerALabel = entry.answer_a_label?.trim();
-      const answerBLabel = entry.answer_b_label?.trim();
-      const funFact = entry.fun_fact?.trim();
+      const answerText = safeTrim(entry.answer);
+      const answerAText = safeTrim(entry.answer_a);
+      const answerBText = safeTrim(entry.answer_b);
+      const answerALabel = safeTrim(entry.answer_a_label);
+      const answerBLabel = safeTrim(entry.answer_b_label);
+      const funFact = safeTrim(entry.fun_fact);
       if (gameTypeId === 'audio') {
         if (!answerAText || !answerBText) continue;
       } else if (!answerText) {
@@ -3134,7 +3137,7 @@ export function EditionDetailPage() {
                         </div>
                       </div>
                       <div className="mt-2 text-sm text-text">
-                        {item.prompt?.trim()
+                        {safeTrim(item.prompt)
                           ? item.prompt
                           : gameTypeId === 'music' && item.media_type === 'audio'
                             ? `Audio Clip ${item.ordinal}`

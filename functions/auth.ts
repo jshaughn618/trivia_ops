@@ -52,37 +52,61 @@ export async function verifySessionCookie(cookieValue: string, secret: string) {
   return sessionId;
 }
 
-function buildCookieDomain(env: Env) {
-  if (env.COOKIE_DOMAIN) return `; Domain=${env.COOKIE_DOMAIN}`;
-  if (!env.APP_BASE_URL) return '';
-  try {
-    const host = new URL(env.APP_BASE_URL).hostname;
-    if (host === 'localhost' || !host.includes('.')) return '';
-    return `; Domain=${host}`;
-  } catch {
-    return '';
+function resolveCookieOptions(env?: Env, request?: Request) {
+  let domain = '';
+  if (env?.COOKIE_DOMAIN) {
+    domain = `; Domain=${env.COOKIE_DOMAIN}`;
+  } else if (env?.APP_BASE_URL) {
+    try {
+      const appHost = new URL(env.APP_BASE_URL).hostname;
+      if (appHost !== 'localhost' && appHost.includes('.')) {
+        if (request) {
+          const requestHost = new URL(request.url).hostname;
+          if (requestHost === appHost) {
+            domain = `; Domain=${appHost}`;
+          }
+        } else {
+          domain = `; Domain=${appHost}`;
+        }
+      }
+    } catch {
+      // ignore invalid APP_BASE_URL
+    }
   }
+  let secure = true;
+  if (request) {
+    try {
+      secure = new URL(request.url).protocol === 'https:';
+    } catch {
+      secure = true;
+    }
+  }
+  return { domain, secure };
 }
 
-export function buildSessionCookie(value: string, expiresAt: string, env?: Env) {
+export function buildSessionCookie(value: string, expiresAt: string, env?: Env, request?: Request) {
   const expires = new Date(expiresAt).toUTCString();
-  const domain = env ? buildCookieDomain(env) : '';
-  return `triviaops_session=${encodeURIComponent(value)}; Path=/; HttpOnly; SameSite=Strict; Secure${domain}; Expires=${expires}`;
+  const { domain, secure } = resolveCookieOptions(env, request);
+  const secureFlag = secure ? '; Secure' : '';
+  return `triviaops_session=${encodeURIComponent(value)}; Path=/; HttpOnly; SameSite=Strict${secureFlag}${domain}; Expires=${expires}`;
 }
 
-export function clearSessionCookie(env?: Env) {
-  const domain = env ? buildCookieDomain(env) : '';
-  return `triviaops_session=; Path=/; HttpOnly; SameSite=Strict; Secure${domain}; Max-Age=0`;
+export function clearSessionCookie(env?: Env, request?: Request) {
+  const { domain, secure } = resolveCookieOptions(env, request);
+  const secureFlag = secure ? '; Secure' : '';
+  return `triviaops_session=; Path=/; HttpOnly; SameSite=Strict${secureFlag}${domain}; Max-Age=0`;
 }
 
-export function buildCsrfCookie(token: string, env?: Env) {
-  const domain = env ? buildCookieDomain(env) : '';
-  return `csrf_token=${encodeURIComponent(token)}; Path=/; SameSite=Strict; Secure${domain}; Max-Age=604800`;
+export function buildCsrfCookie(token: string, env?: Env, request?: Request) {
+  const { domain, secure } = resolveCookieOptions(env, request);
+  const secureFlag = secure ? '; Secure' : '';
+  return `csrf_token=${encodeURIComponent(token)}; Path=/; SameSite=Strict${secureFlag}${domain}; Max-Age=604800`;
 }
 
-export function clearCsrfCookie(env?: Env) {
-  const domain = env ? buildCookieDomain(env) : '';
-  return `csrf_token=; Path=/; SameSite=Strict; Secure${domain}; Max-Age=0`;
+export function clearCsrfCookie(env?: Env, request?: Request) {
+  const { domain, secure } = resolveCookieOptions(env, request);
+  const secureFlag = secure ? '; Secure' : '';
+  return `csrf_token=; Path=/; SameSite=Strict${secureFlag}${domain}; Max-Age=0`;
 }
 
 export async function createSession(env: Env, userId: string, req: Request) {

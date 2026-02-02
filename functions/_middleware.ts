@@ -199,7 +199,7 @@ function withCsrfCookie(response: Response, request: Request, env: Env) {
   if (cookies['csrf_token']) return response;
   const token = crypto.randomUUID();
   const headers = new Headers(response.headers);
-  headers.append('Set-Cookie', buildCsrfCookie(token, env));
+  headers.append('Set-Cookie', buildCsrfCookie(token, env, request));
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }
 
