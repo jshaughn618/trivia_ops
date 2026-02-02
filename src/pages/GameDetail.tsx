@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api, formatApiError } from '../api';
+import { AI_ICON } from '../lib/ai';
 import { AppShell } from '../components/AppShell';
 import { Panel } from '../components/Panel';
 import { PrimaryButton, SecondaryButton, DangerButton } from '../components/Buttons';
@@ -164,7 +165,7 @@ export function GameDetailPage() {
                   className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
                   disabled={descLoading}
                 >
-                  {descLoading ? 'Generating' : 'Generate'}
+                  {descLoading ? `Generating${AI_ICON}` : `Generate${AI_ICON}`}
                 </button>
               </span>
               <textarea

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api, formatApiError } from '../api';
-import { QUESTION_AI_MODEL } from '../lib/ai';
+import { AI_ICON, QUESTION_AI_MODEL } from '../lib/ai';
 import { AppShell } from '../components/AppShell';
 import { Panel } from '../components/Panel';
 import { PrimaryButton, SecondaryButton, DangerButton } from '../components/Buttons';
@@ -1873,7 +1873,7 @@ export function EditionDetailPage() {
               onClick={startRefine}
               className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
             >
-              Refine
+              {`Refine${AI_ICON}`}
             </button>
           </span>
           <textarea
@@ -1895,7 +1895,7 @@ export function EditionDetailPage() {
                 className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
                 disabled={answerLoading}
               >
-                {answerLoading ? 'Generating' : 'Generate'}
+                {answerLoading ? `Generating Answer${AI_ICON}` : `Generate Answer${AI_ICON}`}
               </button>
             </span>
             <input
@@ -2076,7 +2076,7 @@ export function EditionDetailPage() {
               className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
               disabled={factLoading}
             >
-              {factLoading ? 'Generating' : 'Generate'}
+              {factLoading ? `Generating Factoid${AI_ICON}` : `Generate Factoid${AI_ICON}`}
             </button>
           </span>
           <textarea
@@ -2261,7 +2261,7 @@ export function EditionDetailPage() {
                 onClick={startRefine}
                 className="border-2 border-border px-3 py-2 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
               >
-                Generate Again
+                {`Generate Again${AI_ICON}`}
               </button>
               <button
                 type="button"
@@ -2345,7 +2345,7 @@ export function EditionDetailPage() {
               onClick={startRefine}
               className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
             >
-              Refine
+              {`Refine${AI_ICON}`}
             </button>
           </span>
           <textarea
@@ -2367,7 +2367,7 @@ export function EditionDetailPage() {
                 className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
                 disabled={answerLoading}
               >
-                {answerLoading ? 'Generating' : 'Generate'}
+                {answerLoading ? `Generating Answer${AI_ICON}` : `Generate Answer${AI_ICON}`}
               </button>
             </span>
             <input
@@ -2548,7 +2548,7 @@ export function EditionDetailPage() {
               className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
               disabled={factLoading}
             >
-              {factLoading ? 'Generating' : 'Generate'}
+              {factLoading ? `Generating Factoid${AI_ICON}` : `Generate Factoid${AI_ICON}`}
             </button>
           </span>
           <textarea
@@ -2733,7 +2733,7 @@ export function EditionDetailPage() {
                 onClick={startRefine}
                 className="border-2 border-border px-3 py-2 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
               >
-                Generate Again
+                {`Generate Again${AI_ICON}`}
               </button>
               <button
                 type="button"
@@ -2824,7 +2824,7 @@ export function EditionDetailPage() {
                   className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
                   disabled={metaLoading}
                 >
-                  {metaLoading ? 'Generating' : 'Generate Details'}
+                  {metaLoading ? `Generating${AI_ICON}` : `Generate Details${AI_ICON}`}
                 </button>
               </span>
               <input className="h-10 px-3" value={tags} onChange={(event) => setTags(event.target.value)} />
@@ -2872,7 +2872,7 @@ export function EditionDetailPage() {
             <div className="mb-4 border-2 border-border bg-panel2 p-3">
               <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">AI Tools</div>
               <div className="mt-2 text-[10px] uppercase tracking-[0.2em] text-muted">
-                Choose a mode and provide input. Default is Bulk Import.
+                Choose a mode and provide input. These tools create new items.
               </div>
               <div className="mt-3 flex flex-wrap gap-4 text-[10px] font-display uppercase tracking-[0.2em] text-muted">
                 <label className="flex items-center gap-2">
@@ -2893,7 +2893,7 @@ export function EditionDetailPage() {
                     checked={aiMode === 'answer'}
                     onChange={() => setAiMode('answer')}
                   />
-                  Single answer
+                  Single-answer set
                 </label>
                 <label className="flex items-center gap-2">
                   <input
@@ -2908,10 +2908,10 @@ export function EditionDetailPage() {
               </div>
               <div className="mt-3 text-[10px] uppercase tracking-[0.2em] text-muted">
                 {aiMode === 'bulk'
-                  ? 'Paste question/answer blocks. AI will parse without rewriting.'
+                  ? 'Paste question/answer blocks to import new items. AI will parse without rewriting.'
                   : aiMode === 'answer'
-                    ? 'Provide a prompt for single-answer questions. Use “count: N” to override the default 10.'
-                    : 'Provide a prompt. Use “count: N” to override the default 10 questions.'}
+                    ? 'Provide a prompt to generate new single-answer items. Use “count: N” to override the default 10.'
+                    : 'Provide a prompt to generate new multiple-choice items. Use “count: N” to override the default 10.'}
               </div>
               <textarea
                 className="mt-3 min-h-[140px] w-full px-3 py-2"
@@ -2934,7 +2934,13 @@ export function EditionDetailPage() {
                   }}
                   disabled={aiLoading}
                 >
-                  {aiLoading ? 'Generating' : 'Generate'}
+                  {aiLoading
+                    ? `Generating${AI_ICON}`
+                    : aiMode === 'bulk'
+                      ? `Import Items${AI_ICON}`
+                      : aiMode === 'answer'
+                        ? `Generate Questions${AI_ICON}`
+                        : `Generate MCQ${AI_ICON}`}
                 </PrimaryButton>
                 <SecondaryButton onClick={() => setAiOpen(false)}>Cancel</SecondaryButton>
               </div>
