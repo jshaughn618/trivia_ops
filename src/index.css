@@ -42,6 +42,10 @@
 
 body {
   @apply bg-bg text-text font-body;
+  font-size: 16px;
+  line-height: 1.5;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
   min-height: 100vh;
 }
 
@@ -52,6 +56,8 @@ h1, h2, h3, h4 {
 input, select, textarea {
   @apply bg-panel2 border text-text placeholder:text-muted rounded-md px-3 py-2;
   border-color: var(--border-strong, var(--border));
+  font-size: 0.95rem;
+  line-height: 1.4;
 }
 
 input:focus, select:focus, textarea:focus {
