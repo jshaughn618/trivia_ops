@@ -16,7 +16,6 @@ export async function generateText(env: Env, input: { prompt: string; model?: st
         content: [{ type: 'input_text', text: input.prompt }]
       }
     ],
-    text: { format: { type: 'text' } },
     reasoning: { effort: 'low' },
     max_output_tokens: input.max_output_tokens ?? 300
   };
@@ -111,6 +110,7 @@ type OpenAIResponse = {
   }>;
   error?: { message?: string };
 };
+
 
 function extractText(data: OpenAIResponse) {
   const output = Array.isArray(data?.output) ? data.output : [];
