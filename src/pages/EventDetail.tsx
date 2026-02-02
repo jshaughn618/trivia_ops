@@ -468,6 +468,10 @@ export function EventDetailPage() {
   const [teamName, setTeamName] = useState('');
   const [teamTable, setTeamTable] = useState('');
   const [teamError, setTeamError] = useState<string | null>(null);
+  const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
+  const [editingTeamName, setEditingTeamName] = useState('');
+  const [editingTeamTable, setEditingTeamTable] = useState('');
+  const [teamEditError, setTeamEditError] = useState<string | null>(null);
   const [scoreRoundId, setScoreRoundId] = useState('');
   const [scoreMap, setScoreMap] = useState<Record<string, number>>({});
   const [scoreLoading, setScoreLoading] = useState(false);
@@ -868,6 +872,38 @@ export function EventDetailPage() {
   const deleteTeam = async (teamId: string) => {
     await api.deleteTeam(teamId);
     loadCore();
+  };
+
+  const startEditTeam = (team: Team) => {
+    setTeamEditError(null);
+    setEditingTeamId(team.id);
+    setEditingTeamName(team.name ?? '');
+    setEditingTeamTable(team.table_label ?? '');
+  };
+
+  const cancelEditTeam = () => {
+    setTeamEditError(null);
+    setEditingTeamId(null);
+    setEditingTeamName('');
+    setEditingTeamTable('');
+  };
+
+  const saveEditTeam = async () => {
+    if (!editingTeamId) return;
+    if (!editingTeamName.trim()) {
+      setTeamEditError('Team name is required.');
+      return;
+    }
+    const res = await api.updateTeam(editingTeamId, {
+      name: editingTeamName.trim(),
+      table_label: editingTeamTable.trim() || null
+    });
+    if (res.ok) {
+      cancelEditTeam();
+      loadCore();
+    } else {
+      setTeamEditError(formatApiError(res, 'Unable to update team.'));
+    }
   };
 
   const loadScores = async (roundId: string) => {
@@ -1330,16 +1366,62 @@ export function EventDetailPage() {
         <List>
           {teams.map((team) => (
             <ListRow key={team.id} className="items-center">
-              <div>
-                <div className="text-sm font-display tracking-[0.12em]">{team.name}</div>
-                <div className="mt-1 text-xs text-muted">{team.table_label ?? 'No table label'}</div>
-              </div>
-              <DangerButton className="px-3 py-2 text-xs" onClick={() => deleteTeam(team.id)}>
-                Remove
-              </DangerButton>
+              {editingTeamId === team.id ? (
+                <>
+                  <div className="grid w-full gap-2 sm:grid-cols-[2fr,1fr]">
+                    <label className="flex flex-col gap-1 text-xs font-display uppercase tracking-[0.25em] text-muted">
+                      Name
+                      <input
+                        className="h-10 px-3"
+                        value={editingTeamName}
+                        onChange={(event) => setEditingTeamName(event.target.value)}
+                      />
+                    </label>
+                    <label className="flex flex-col gap-1 text-xs font-display uppercase tracking-[0.25em] text-muted">
+                      Table label
+                      <input
+                        className="h-10 px-3"
+                        value={editingTeamTable}
+                        onChange={(event) => setEditingTeamTable(event.target.value)}
+                      />
+                    </label>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <PrimaryButton className="px-3 py-2 text-xs" onClick={saveEditTeam}>
+                      Save
+                    </PrimaryButton>
+                    <SecondaryButton className="px-3 py-2 text-xs" onClick={cancelEditTeam}>
+                      Cancel
+                    </SecondaryButton>
+                    <DangerButton className="px-3 py-2 text-xs" onClick={() => deleteTeam(team.id)}>
+                      Remove
+                    </DangerButton>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <div className="text-sm font-display tracking-[0.12em]">{team.name}</div>
+                    <div className="mt-1 text-xs text-muted">{team.table_label ?? 'No table label'}</div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <SecondaryButton className="px-3 py-2 text-xs" onClick={() => startEditTeam(team)}>
+                      Edit
+                    </SecondaryButton>
+                    <DangerButton className="px-3 py-2 text-xs" onClick={() => deleteTeam(team.id)}>
+                      Remove
+                    </DangerButton>
+                  </div>
+                </>
+              )}
             </ListRow>
           ))}
         </List>
+      )}
+      {teamEditError && (
+        <div className="border border-danger bg-panel2 px-3 py-2 text-xs text-danger-ink">
+          {teamEditError}
+        </div>
       )}
       <div className="border-t border-border pt-4">
         <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">Add team</div>
