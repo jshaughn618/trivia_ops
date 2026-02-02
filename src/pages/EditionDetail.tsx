@@ -1799,7 +1799,7 @@ export function EditionDetailPage() {
   };
 
   const renderEditPanel = (item: EditionItem, index: number) => (
-    <div className="border-2 border-border bg-panel p-3">
+    <div className="editor-form border-2 border-border bg-panel p-3">
       <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">
         Edit Item {index >= 0 ? index + 1 : item.ordinal}
       </div>
@@ -2272,7 +2272,7 @@ export function EditionDetailPage() {
   );
 
   const renderNewPanel = () => (
-    <div className="border-2 border-border bg-panel p-3">
+    <div className="editor-form border-2 border-border bg-panel p-3">
       <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">New Item</div>
       <div className="mt-3 grid gap-3">
         {gameTypeId === 'music' && (

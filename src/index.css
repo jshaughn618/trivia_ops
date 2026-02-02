@@ -78,6 +78,13 @@ a:hover {
   @apply font-display uppercase tracking-wider text-xs text-muted;
 }
 
+.editor-form label {
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Roboto", "Helvetica", "Arial", sans-serif;
+  font-size: 0.85rem;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
 ::selection {
   background: var(--accent-soft);
 }
