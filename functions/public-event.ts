@@ -283,7 +283,24 @@ export async function getPublicEventPayload(env: Env, rawCode: string, view?: Pu
   }
 
   if (!isLeaderboardView && live?.active_round_id && live.current_item_ordinal) {
-    const rawItem = await queryFirst(
+    const rawItem = await queryFirst<{
+      id: string;
+      question_type: string | null;
+      choices_json: string | null;
+      prompt: string;
+      answer: string;
+      answer_a: string | null;
+      answer_b: string | null;
+      answer_a_label: string | null;
+      answer_b_label: string | null;
+      answer_parts_json: string | null;
+      fun_fact: string | null;
+      media_type: string | null;
+      media_key: string | null;
+      audio_answer_key: string | null;
+      media_caption?: string | null;
+      ordinal: number;
+    }>(
       env,
       `SELECT
         ei.id,
