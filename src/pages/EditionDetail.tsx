@@ -97,13 +97,18 @@ const answerSummary = (item: EditionItem, isMusic: boolean) => {
       return parts.map((part) => `${part.label}: ${part.answer}`).join(' / ');
     }
   }
-  if (item.answer && !item.answer_a && !item.answer_b) return item.answer;
-  if (item.answer_a && item.answer_b) {
-    const labelA = item.answer_a_label ? `${item.answer_a_label}: ` : 'A: ';
-    const labelB = item.answer_b_label ? `${item.answer_b_label}: ` : 'B: ';
-    return `${labelA}${item.answer_a} / ${labelB}${item.answer_b}`;
+  const answer = safeString(item.answer);
+  const answerA = safeString(item.answer_a);
+  const answerB = safeString(item.answer_b);
+  const answerALabel = safeString(item.answer_a_label);
+  const answerBLabel = safeString(item.answer_b_label);
+  if (answer && !answerA && !answerB) return answer;
+  if (answerA && answerB) {
+    const labelA = answerALabel ? `${answerALabel}: ` : 'A: ';
+    const labelB = answerBLabel ? `${answerBLabel}: ` : 'B: ';
+    return `${labelA}${answerA} / ${labelB}${answerB}`;
   }
-  return item.answer || item.answer_a || item.answer_b || '';
+  return answer || answerA || answerB || '';
 };
 
 export function EditionDetailPage() {
@@ -391,16 +396,16 @@ export function EditionDetailPage() {
       question_type: questionType,
       choices,
       correct_choice_index: correctIndex,
-      prompt: item.prompt,
-      answer: item.answer,
-      answer_a: item.answer_a ?? '',
-      answer_b: item.answer_b ?? '',
-      answer_a_label: item.answer_a_label ?? '',
-      answer_b_label: item.answer_b_label ?? '',
-      fun_fact: item.fun_fact ?? '',
-      media_type: item.media_type ?? '',
-      media_key: item.media_key ?? '',
-      audio_answer_key: item.audio_answer_key ?? '',
+      prompt: safeString(item.prompt),
+      answer: safeString(item.answer),
+      answer_a: safeString(item.answer_a),
+      answer_b: safeString(item.answer_b),
+      answer_a_label: safeString(item.answer_a_label),
+      answer_b_label: safeString(item.answer_b_label),
+      fun_fact: safeString(item.fun_fact),
+      media_type: safeString(item.media_type),
+      media_key: safeString(item.media_key),
+      audio_answer_key: safeString(item.audio_answer_key),
       media_filename: '',
       item_mode: isAudioItem ? 'audio' : 'text',
       answer_parts: answerPartsDraft

@@ -29,7 +29,8 @@ export async function generateText(env: Env, input: { prompt: string; model?: st
     throw new Error(message);
   }
 
-  const text = typeof data.output_text === 'string' ? data.output_text : extractText(data);
+  const outputText = typeof data.output_text === 'string' ? data.output_text : '';
+  const text = outputText.trim().length > 0 ? outputText : extractText(data);
   return { text, raw: data };
 }
 
@@ -71,7 +72,8 @@ export async function generateImageAnswer(
     throw new Error(message);
   }
 
-  const text = typeof data.output_text === 'string' ? data.output_text : extractText(data);
+  const outputText = typeof data.output_text === 'string' ? data.output_text : '';
+  const text = outputText.trim().length > 0 ? outputText : extractText(data);
   return { text, raw: data };
 }
 
