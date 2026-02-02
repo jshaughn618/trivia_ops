@@ -200,7 +200,7 @@ function withCsrfCookie(response: Response, request: Request, env: Env) {
   const token = crypto.randomUUID();
   const headers = new Headers(response.headers);
   headers.append('Set-Cookie', buildCsrfCookie(token, env));
-  return new Response(response.body, { ...response, headers });
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }
 
 function unauthorized(path: string, requestId: string) {
@@ -219,5 +219,5 @@ function unauthorized(path: string, requestId: string) {
 function withRequestId(response: Response, requestId: string) {
   const headers = new Headers(response.headers);
   headers.set('x-request-id', requestId);
-  return new Response(response.body, { ...response, headers });
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }
