@@ -89,6 +89,13 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     }
 
     context.data.user = user;
+    if (path === '/') {
+      const destination = user.user_type === 'admin' ? '/dashboard' : '/events';
+      return withRequestId(
+        new Response(null, { status: 302, headers: { Location: destination } }),
+        requestId
+      );
+    }
     if (loggable) {
       logInfo(env, 'request_start', {
         requestId,
