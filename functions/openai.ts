@@ -120,6 +120,9 @@ function extractText(data: OpenAIResponse) {
     if (typeof item?.output_text === 'string') {
       chunks.push(item.output_text);
     }
+    if (typeof (item as { summary?: unknown })?.summary === 'string') {
+      chunks.push((item as { summary: string }).summary);
+    }
     if (typeof item?.text === 'string') {
       chunks.push(item.text);
     }

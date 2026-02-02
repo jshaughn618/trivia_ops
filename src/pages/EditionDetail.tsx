@@ -707,13 +707,14 @@ export function EditionDetailPage() {
   };
 
   const startRefine = async () => {
-    if (!itemDraft.prompt.trim()) return;
+    const promptValue = safeString(itemDraft.prompt);
+    if (!safeTrim(promptValue)) return;
     setRefineOpen(true);
     setRefineLoading(true);
     setRefineError(null);
-    setRefineSeed(itemDraft.prompt.trim());
+    setRefineSeed(safeTrim(promptValue));
 
-    const prompt = `Rewrite the following trivia question into 5 distinct, clean pub-trivia ready versions. Return as a numbered list only.\n\nQuestion: ${itemDraft.prompt.trim()}`;
+    const prompt = `Rewrite the following trivia question into 5 distinct, clean pub-trivia ready versions. Return as a numbered list only.\n\nQuestion: ${safeTrim(promptValue)}`;
     const res = await api.aiGenerate({ prompt, max_output_tokens: 300 });
     setRefineLoading(false);
     if (!res.ok) {
@@ -770,8 +771,8 @@ export function EditionDetailPage() {
   };
 
   const generateAnswer = async (overridePrompt?: string) => {
-    const sourcePrompt = overridePrompt ?? itemDraft.prompt;
-    if (!sourcePrompt.trim()) return;
+    const sourcePrompt = safeString(overridePrompt ?? itemDraft.prompt);
+    if (!safeTrim(sourcePrompt)) return;
     if (overridePrompt) {
       setAiLoading(true);
       setAiError(null);
@@ -790,7 +791,7 @@ export function EditionDetailPage() {
         'Output format:',
         '[{"prompt":"...","answer":"..."}]',
         '',
-        `User input (use as topic/instructions only): ${sourcePrompt.trim()}`
+        `User input (use as topic/instructions only): ${safeTrim(sourcePrompt)}`
       ].join('\n');
       const maxTokens = Math.min(1200, 200 + desiredCount * 70);
       const res = await api.aiGenerate({ prompt, max_output_tokens: maxTokens, model: QUESTION_AI_MODEL });
@@ -852,15 +853,15 @@ export function EditionDetailPage() {
 
     setAnswerLoading(true);
     setAnswerError(null);
-    const prompt = `Provide a concise, correct pub-trivia answer for the question below. Respond with only the answer.\n\nQuestion: ${sourcePrompt.trim()}`;
+    const prompt = `Provide a concise, correct pub-trivia answer for the question below. Respond with only the answer.\n\nQuestion: ${safeTrim(sourcePrompt)}`;
     const res = await api.aiGenerate({ prompt, max_output_tokens: 80 });
     setAnswerLoading(false);
     if (!res.ok) {
       setAnswerError(formatApiError(res, 'Failed to save answer.'));
       return;
     }
-    const line = res.data.text.split('\n')[0] ?? '';
-    setItemDraft((draft) => ({ ...draft, answer: line.trim() }));
+    const line = safeString(res.data.text).split('\n')[0] ?? '';
+    setItemDraft((draft) => ({ ...draft, answer: safeTrim(line) }));
   };
 
   const generateFunFact = async () => {
