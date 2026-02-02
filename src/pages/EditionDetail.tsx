@@ -82,12 +82,13 @@ const parseAnswerPartsJson = (answerPartsJson: string | null, item?: EditionItem
   return [];
 };
 
+const safeTrim = (value: unknown) => (typeof value === 'string' ? value.trim() : '');
+const safeString = (value: unknown) => (typeof value === 'string' ? value : value == null ? '' : String(value));
+
 const sanitizeAnswerParts = (parts: AnswerPart[]) =>
   parts
-    .map((part) => ({ label: part.label.trim(), answer: part.answer.trim() }))
+    .map((part) => ({ label: safeTrim(part.label), answer: safeTrim(part.answer) }))
     .filter((part) => part.label.length > 0 && part.answer.length > 0);
-
-const safeTrim = (value: unknown) => (typeof value === 'string' ? value.trim() : '');
 
 const answerSummary = (item: EditionItem, isMusic: boolean) => {
   if (isMusic) {
@@ -891,7 +892,7 @@ export function EditionDetailPage() {
   };
 
   const parseBulkJson = (text: string) => {
-    const trimmed = text.trim().replace(/^```json/i, '').replace(/^```/i, '').replace(/```$/, '').trim();
+    const trimmed = safeString(text).trim().replace(/^```json/i, '').replace(/^```/i, '').replace(/```$/, '').trim();
     const start = trimmed.indexOf('[');
     const end = trimmed.lastIndexOf(']');
     const jsonText = start >= 0 && end >= 0 ? trimmed.slice(start, end + 1) : trimmed;
@@ -1092,7 +1093,8 @@ export function EditionDetailPage() {
   };
 
   const parseAiJsonArray = (text: string) => {
-    const trimmed = text.trim().replace(/^```json/i, '').replace(/^```/i, '').replace(/```$/, '').trim();
+    const raw = safeString(text);
+    const trimmed = raw.trim().replace(/^```json/i, '').replace(/^```/i, '').replace(/```$/, '').trim();
     const start = trimmed.indexOf('[');
     const end = trimmed.lastIndexOf(']');
     const jsonText = start >= 0 && end >= 0 ? trimmed.slice(start, end + 1) : trimmed;
@@ -1125,7 +1127,8 @@ export function EditionDetailPage() {
     return [];
   };
 
-  const stripAiWrapper = (text: string) => text.trim().replace(/^```json/i, '').replace(/^```/i, '').replace(/```$/, '').trim();
+  const stripAiWrapper = (text: string) =>
+    safeString(text).trim().replace(/^```json/i, '').replace(/^```/i, '').replace(/```$/, '').trim();
 
   const cleanPromptText = (value: string) =>
     value
