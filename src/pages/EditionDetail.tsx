@@ -1864,8 +1864,9 @@ export function EditionDetailPage() {
               Refine
             </button>
           </span>
-          <input
-            className="h-10 px-3"
+          <textarea
+            className="min-h-[96px] px-3 py-2"
+            rows={3}
             value={itemDraft.prompt}
             onChange={(event) => setItemDraft((draft) => ({ ...draft, prompt: event.target.value }))}
           />
@@ -2335,8 +2336,9 @@ export function EditionDetailPage() {
               Refine
             </button>
           </span>
-          <input
-            className="h-10 px-3"
+          <textarea
+            className="min-h-[96px] px-3 py-2"
+            rows={3}
             value={itemDraft.prompt}
             onChange={(event) => setItemDraft((draft) => ({ ...draft, prompt: event.target.value }))}
           />
