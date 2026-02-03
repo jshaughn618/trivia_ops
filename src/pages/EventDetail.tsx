@@ -266,34 +266,7 @@ const renderTeamBlock = (
   const textSize = 11;
   let cursorY = cell.y + cell.height - padding;
 
-  if (extras.logoImage) {
-    const maxLogoWidth = 120;
-    const maxLogoHeight = 34;
-    const scale = Math.min(
-      maxLogoWidth / extras.logoImage.width,
-      maxLogoHeight / extras.logoImage.height,
-      1
-    );
-    const logoWidth = extras.logoImage.width * scale;
-    const logoHeight = extras.logoImage.height * scale;
-    page.drawImage(extras.logoImage, {
-      x: cell.x + padding,
-      y: cursorY - logoHeight,
-      width: logoWidth,
-      height: logoHeight
-    });
-    cursorY -= logoHeight + 6;
-    page.drawText('triviaops.com', {
-      x: cell.x + padding,
-      y: cursorY - 8,
-      size: 8.5,
-      font: fonts.regular
-    });
-    cursorY -= 14;
-  }
-
   const teamName = extras.teamName?.trim() ?? '';
-  cursorY -= textSize * 2;
   if (teamName && !extras.teamPlaceholder) {
     page.drawText(`Team: ${teamName}`, {
       x: cell.x + padding,
@@ -322,6 +295,34 @@ const renderTeamBlock = (
     });
     cursorY -= textSize + 12;
   }
+
+  if (extras.logoImage) {
+    const maxLogoWidth = 120;
+    const maxLogoHeight = 34;
+    const scale = Math.min(
+      maxLogoWidth / extras.logoImage.width,
+      maxLogoHeight / extras.logoImage.height,
+      1
+    );
+    const logoWidth = extras.logoImage.width * scale;
+    const logoHeight = extras.logoImage.height * scale;
+    page.drawImage(extras.logoImage, {
+      x: cell.x + padding,
+      y: cursorY - logoHeight,
+      width: logoWidth,
+      height: logoHeight
+    });
+    cursorY -= logoHeight + 6;
+    page.drawText('triviaops.com', {
+      x: cell.x + padding,
+      y: cursorY - 8,
+      size: 8.5,
+      font: fonts.regular
+    });
+    cursorY -= 14;
+  }
+
+  cursorY -= textSize * 2;
 
   const codeText = extras.eventCode ? `Event Code: ${extras.eventCode}` : 'Event Code: —';
   page.drawText(codeText, {
