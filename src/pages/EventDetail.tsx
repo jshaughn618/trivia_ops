@@ -277,6 +277,7 @@ const renderExtrasBlock = (
     eventCode?: string;
     teamCode?: string;
     teamName?: string;
+    teamPlaceholder?: boolean;
     upcomingLines?: string[];
     locationName?: string;
   }
@@ -313,8 +314,17 @@ const renderExtrasBlock = (
     cursorY -= 14;
   }
 
-  if (extras.teamName?.trim()) {
-    page.drawText(`Team: ${extras.teamName.trim()}`, {
+  const teamName = extras.teamName?.trim() ?? '';
+  if (teamName && !extras.teamPlaceholder) {
+    page.drawText(`Team: ${teamName}`, {
+      x: cell.x + padding,
+      y: cursorY - textSize,
+      size: textSize,
+      font: fonts.bold
+    });
+    cursorY -= textSize + 6;
+  } else {
+    page.drawText('Team Name: ____________________', {
       x: cell.x + padding,
       y: cursorY - textSize,
       size: textSize,
@@ -390,6 +400,7 @@ const buildPdf = async (
     eventCode?: string;
     teamCode?: string;
     teamName?: string;
+    teamPlaceholder?: boolean;
     upcomingLines?: string[];
     locationName?: string;
     logoBytes?: Uint8Array;
@@ -466,6 +477,7 @@ const buildPdf = async (
         eventCode: extras.eventCode,
         teamCode: extras.teamCode,
         teamName: extras.teamName,
+        teamPlaceholder: extras.teamPlaceholder,
         upcomingLines: extras.upcomingLines,
         locationName: extras.locationName
       }
@@ -498,6 +510,9 @@ export function EventDetailPage() {
   const [teamName, setTeamName] = useState('');
   const [teamTable, setTeamTable] = useState('');
   const [teamError, setTeamError] = useState<string | null>(null);
+  const [teamSeedCount, setTeamSeedCount] = useState(20);
+  const [teamSeedLoading, setTeamSeedLoading] = useState(false);
+  const [teamSeedError, setTeamSeedError] = useState<string | null>(null);
   const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
   const [editingTeamName, setEditingTeamName] = useState('');
   const [editingTeamTable, setEditingTeamTable] = useState('');
@@ -886,6 +901,19 @@ export function EventDetailPage() {
     }
   };
 
+  const prepopulateTeams = async () => {
+    if (!eventId || teamSeedLoading) return;
+    setTeamSeedLoading(true);
+    setTeamSeedError(null);
+    const res = await api.prepopulateTeams(eventId, { count: teamSeedCount });
+    if (res.ok) {
+      await loadCore();
+    } else {
+      setTeamSeedError(formatApiError(res, 'Failed to prepopulate teams.'));
+    }
+    setTeamSeedLoading(false);
+  };
+
   const deleteRound = async (roundId: string) => {
     await api.deleteEventRound(roundId);
     loadCore();
@@ -1077,6 +1105,7 @@ export function EventDetailPage() {
           eventCode: event.public_code ?? undefined,
           teamCode: team?.team_code ?? undefined,
           teamName: team?.name ?? undefined,
+          teamPlaceholder: Boolean(team?.team_placeholder),
           upcomingLines,
           locationName,
           logoBytes
@@ -1431,6 +1460,9 @@ export function EventDetailPage() {
                     </label>
                   </div>
                   <div className="text-xs text-muted">Team code: {team.team_code ?? '—'}</div>
+                  {team.team_placeholder ? (
+                    <div className="text-xs text-muted">Status: Unclaimed</div>
+                  ) : null}
                   <div className="flex flex-wrap gap-2">
                     <PrimaryButton className="px-3 py-2 text-xs" onClick={saveEditTeam}>
                       Save
@@ -1449,6 +1481,9 @@ export function EventDetailPage() {
                     <div className="text-sm font-display tracking-[0.12em]">{team.name}</div>
                     <div className="mt-1 text-xs text-muted">{team.table_label ?? 'No table label'}</div>
                     <div className="mt-1 text-xs text-muted">Team code: {team.team_code ?? '—'}</div>
+                    {team.team_placeholder ? (
+                      <div className="mt-1 text-xs text-muted">Status: Unclaimed</div>
+                    ) : null}
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <SecondaryButton className="px-3 py-2 text-xs" onClick={() => startEditTeam(team)}>
@@ -1487,6 +1522,33 @@ export function EventDetailPage() {
         {teamError && (
           <div className="mt-2 border border-danger bg-panel2 px-3 py-2 text-xs text-danger-ink">
             {teamError}
+          </div>
+        )}
+      </div>
+      <div className="border-t border-border pt-4">
+        <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">Prepopulate teams</div>
+        <div className="mt-3 flex flex-wrap items-end gap-3">
+          <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+            Count
+            <input
+              className="h-10 w-24 px-3"
+              type="number"
+              min={1}
+              max={100}
+              value={teamSeedCount}
+              onChange={(event) => {
+                const next = Number(event.target.value);
+                if (Number.isFinite(next)) setTeamSeedCount(next);
+              }}
+            />
+          </label>
+          <SecondaryButton className="h-10" onClick={prepopulateTeams} disabled={teamSeedLoading}>
+            {teamSeedLoading ? 'Generating…' : 'Generate team codes'}
+          </SecondaryButton>
+        </div>
+        {teamSeedError && (
+          <div className="mt-2 border border-danger bg-panel2 px-3 py-2 text-xs text-danger-ink">
+            {teamSeedError}
           </div>
         )}
       </div>

@@ -4,7 +4,7 @@ import { execute, queryAll, queryFirst } from '../../../db';
 import { requireAdmin, requireEventAccess } from '../../../access';
 import { generateTeamCode } from '../../../public';
 
-const TEAM_COLUMNS = 'id, event_id, name, table_label, team_code, created_at';
+const TEAM_COLUMNS = 'id, event_id, name, table_label, team_code, team_placeholder, created_at';
 
 const assignTeamCode = async (env: Env, eventId: string, teamId: string) => {
   for (let attempt = 0; attempt < 10; attempt += 1) {

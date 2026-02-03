@@ -126,6 +126,7 @@ export function PlayEventPage() {
   const [teamId, setTeamId] = useState('');
   const [teamSession, setTeamSession] = useState('');
   const [teamCodeInput, setTeamCodeInput] = useState('');
+  const [teamNameInput, setTeamNameInput] = useState('');
   const [teamNameLabel, setTeamNameLabel] = useState<string | null>(null);
   const [teamMenuOpen, setTeamMenuOpen] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
@@ -450,7 +451,11 @@ export function PlayEventPage() {
     }
     setJoinError(null);
     setJoinLoading(true);
-    const res = await api.publicJoin(data.event.public_code, { team_code: normalized });
+    const namePayload = teamNameInput.trim();
+    const res = await api.publicJoin(data.event.public_code, {
+      team_code: normalized,
+      ...(namePayload ? { team_name: namePayload } : {})
+    });
     if (res.ok) {
       setTeamId(res.data.team.id);
       setTeamSession(res.data.session_token);
@@ -461,6 +466,7 @@ export function PlayEventPage() {
       localStorage.setItem(`player_team_name_${data.event.public_code}`, res.data.team.name);
       localStorage.setItem(`player_team_session_${data.event.public_code}`, res.data.session_token);
       setTeamCodeInput('');
+      setTeamNameInput('');
       setJoinError(null);
     } else {
       setJoinError(formatApiError(res, 'Unable to join team.'));
@@ -479,6 +485,7 @@ export function PlayEventPage() {
     setTeamSession('');
     setTeamNameLabel(null);
     setTeamCodeInput('');
+    setTeamNameInput('');
     setTeamMenuOpen(false);
   };
 
@@ -722,6 +729,15 @@ export function PlayEventPage() {
                     maxLength={4}
                     value={teamCodeInput}
                     onChange={(event) => setTeamCodeInput(event.target.value.replace(/\D/g, '').slice(0, 4))}
+                  />
+                </label>
+                <label className="flex flex-col gap-2">
+                  <span className="text-xs uppercase tracking-[0.25em] text-muted">Team name (required for new teams)</span>
+                  <input
+                    className="h-10 px-3"
+                    value={teamNameInput}
+                    onChange={(event) => setTeamNameInput(event.target.value)}
+                    placeholder="Enter your team name"
                   />
                 </label>
                 {joinError && (

@@ -6,7 +6,7 @@ import { execute, nowIso, queryAll, queryFirst } from '../../../db';
 import { requireAdmin, requireEventAccess, requireHostOrAdmin } from '../../../access';
 import { generateTeamCode } from '../../../public';
 
-const TEAM_COLUMNS = 'id, event_id, name, table_label, team_code, created_at';
+const TEAM_COLUMNS = 'id, event_id, name, table_label, team_code, team_placeholder, created_at';
 
 const assignTeamCode = async (env: Env, eventId: string, teamId: string) => {
   for (let attempt = 0; attempt < 10; attempt += 1) {
@@ -70,8 +70,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request, 
 
   await execute(
     env,
-    `INSERT INTO teams (id, event_id, name, table_label, team_code, created_at)
-     VALUES (?, ?, ?, ?, ?, ?)`
+    `INSERT INTO teams (id, event_id, name, table_label, team_code, team_placeholder, created_at)
+     VALUES (?, ?, ?, ?, ?, 0, ?)`
     ,
     [id, params.id, name, payloadData.table_label ?? null, teamCode, createdAt]
   );

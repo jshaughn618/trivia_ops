@@ -15,6 +15,7 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [eventCode, setEventCode] = useState(['', '', '', '']);
   const [teamCode, setTeamCode] = useState(['', '', '', '']);
+  const [teamNameInput, setTeamNameInput] = useState('');
   const [eventInfo, setEventInfo] = useState<{ id: string; title: string; public_code: string } | null>(null);
   const [step, setStep] = useState<'event' | 'team'>('event');
   const [eventError, setEventError] = useState<string | null>(null);
@@ -61,10 +62,10 @@ export function LoginPage() {
         setEventInfo(res.data.event);
         setStep('team');
         setTeamCode(['', '', '', '']);
+        setTeamNameInput('');
         if (autoTeamCode && autoTeamCode.length === 4) {
           const digits = autoTeamCode.split('');
           setTeamCode(digits);
-          await attemptTeamJoin(autoTeamCode, res.data.event);
         }
         return;
       }
@@ -85,7 +86,11 @@ export function LoginPage() {
     setTeamError(null);
     setTeamLoading(true);
     try {
-      const res = await api.publicJoin(eventData.public_code, { team_code: normalized });
+      const namePayload = teamNameInput.trim();
+      const res = await api.publicJoin(eventData.public_code, {
+        team_code: normalized,
+        ...(namePayload ? { team_name: namePayload } : {})
+      });
       if (res.ok) {
         localStorage.setItem(`player_team_${eventData.id}`, res.data.team.id);
         localStorage.setItem(`player_team_id_${eventData.public_code}`, res.data.team.id);
@@ -274,6 +279,15 @@ export function LoginPage() {
                     />
                   ))}
                 </div>
+                <label className="flex flex-col gap-2">
+                  <span className="text-xs uppercase tracking-[0.25em] text-muted">Team name (required for new teams)</span>
+                  <input
+                    className="h-10 px-3"
+                    value={teamNameInput}
+                    onChange={(event) => setTeamNameInput(event.target.value)}
+                    placeholder="Enter your team name"
+                  />
+                </label>
                 {teamError && (
                   <div className="border border-danger bg-panel2 px-3 py-2 text-xs text-danger-ink" aria-live="polite">
                     {teamError}
@@ -296,6 +310,7 @@ export function LoginPage() {
                       setEventInfo(null);
                       setEventCode(['', '', '', '']);
                       setTeamCode(['', '', '', '']);
+                      setTeamNameInput('');
                       setEventError(null);
                       setTeamError(null);
                     }}

@@ -163,6 +163,7 @@ export type Team = {
   name: string;
   table_label: string | null;
   team_code: string | null;
+  team_placeholder: number | null;
   created_at: string;
 };
 

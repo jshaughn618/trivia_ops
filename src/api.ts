@@ -291,6 +291,11 @@ export const api = {
   listTeams: (eventId: string) => apiFetch<Team[]>(`/api/events/${eventId}/teams`),
   createTeam: (eventId: string, payload: Partial<Team>) =>
     apiFetch<Team>(`/api/events/${eventId}/teams`, { method: 'POST', body: JSON.stringify(payload) }),
+  prepopulateTeams: (eventId: string, payload: { count?: number }) =>
+    apiFetch<{ created: number; teams: Team[] }>(`/api/events/${eventId}/teams/prepopulate`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    }),
   updateTeam: (teamId: string, payload: Partial<Team>) =>
     apiFetch<Team>(`/api/teams/${teamId}`, { method: 'PUT', body: JSON.stringify(payload) }),
   deleteTeam: (teamId: string) => apiFetch<{ ok: true }>(`/api/teams/${teamId}`, { method: 'DELETE' }),
@@ -298,7 +303,7 @@ export const api = {
     const query = view ? `?view=${encodeURIComponent(view)}` : '';
     return apiFetch<any>(`/api/public/event/${code}${query}`, { cache: 'no-store' });
   },
-  publicJoin: (code: string, payload: { team_code: string }) =>
+  publicJoin: (code: string, payload: { team_code: string; team_name?: string }) =>
     apiFetch<{ team: { id: string; name: string }; session_token: string }>(`/api/public/event/${code}/join`, {
       method: 'POST',
       body: JSON.stringify(payload)
