@@ -267,7 +267,7 @@ const dataUrlToBytes = (dataUrl: string) => {
   return bytes;
 };
 
-const renderExtrasBlock = (
+const renderTeamBlock = (
   page: any,
   cell: { x: number; y: number; width: number; height: number },
   fonts: { regular: any; bold: any },
@@ -278,14 +278,10 @@ const renderExtrasBlock = (
     teamCode?: string;
     teamName?: string;
     teamPlaceholder?: boolean;
-    upcomingLines?: string[];
-    locationName?: string;
   }
 ) => {
   const padding = CELL_PADDING;
   const textSize = 11;
-  const upcomingTitleSize = 10.5;
-  const upcomingTextSize = 11;
   let cursorY = cell.y + cell.height - padding;
 
   if (extras.logoImage) {
@@ -347,7 +343,7 @@ const renderExtrasBlock = (
     x: cell.x + padding,
     y: cursorY - textSize,
     size: textSize,
-    font: fonts.regular
+    font: fonts.bold
   });
   cursorY -= textSize + 8;
 
@@ -361,7 +357,21 @@ const renderExtrasBlock = (
     });
     cursorY -= qrSize + 10;
   }
+};
 
+const renderUpcomingBlock = (
+  page: any,
+  cell: { x: number; y: number; width: number; height: number },
+  fonts: { regular: any; bold: any },
+  extras: {
+    upcomingLines?: string[];
+    locationName?: string;
+  }
+) => {
+  const padding = CELL_PADDING;
+  const upcomingTitleSize = 10.5;
+  const upcomingTextSize = 11;
+  let cursorY = cell.y + cell.height - padding;
   const upcoming = extras.upcomingLines ?? [];
   if (upcoming.length > 0) {
     const locationLabel = extras.locationName?.trim()
@@ -437,51 +447,77 @@ const buildPdf = async (
   const cellWidth = gridWidth / 2;
   const cellHeight = gridHeight / 2;
 
-  for (let index = 0; index < rounds.length; index += 1) {
-    if (index % 4 === 0) {
-      const page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
-      drawPageHeader(page, event, locationName, fonts);
-      drawGridLines(page);
-    }
-    const page = pdfDoc.getPages()[pdfDoc.getPages().length - 1];
-    const cellIndex = index % 4;
+  const pageCount = () => pdfDoc.getPages().length;
+  const createPage = () => {
+    const page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
+    drawPageHeader(page, event, locationName, fonts);
+    drawGridLines(page);
+    return page;
+  };
+
+  const getCell = (cellIndex: number) => {
     const row = cellIndex < 2 ? 0 : 1;
     const col = cellIndex % 2;
     const cellX = PAGE_MARGIN + col * cellWidth;
     const cellY = row === 0 ? gridBottom + cellHeight : gridBottom;
-    renderRoundBlock(
-      page,
-      rounds[index],
-      { x: cellX, y: cellY, width: cellWidth, height: cellHeight },
-      fonts,
-      mode
-    );
-  }
+    return { x: cellX, y: cellY, width: cellWidth, height: cellHeight };
+  };
 
-  if (mode === 'scoresheet' && extras) {
-    if (pdfDoc.getPages().length < 2) {
-      const page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
-      drawPageHeader(page, event, locationName, fonts);
-      drawGridLines(page);
-    }
-    const page = pdfDoc.getPages()[1];
-    const cellX = PAGE_MARGIN + cellWidth;
-    const cellY = gridBottom;
-    renderExtrasBlock(
-      page,
-      { x: cellX, y: cellY, width: cellWidth, height: cellHeight },
-      fonts,
-      {
-        qrImage: qrImage ?? undefined,
-        logoImage: logoImage ?? undefined,
-        eventCode: extras.eventCode,
-        teamCode: extras.teamCode,
-        teamName: extras.teamName,
-        teamPlaceholder: extras.teamPlaceholder,
-        upcomingLines: extras.upcomingLines,
-        locationName: extras.locationName
+  const hasUpcoming = Boolean(extras?.upcomingLines?.some((line) => line.trim()));
+
+  if (mode === 'scoresheet') {
+    let pageIndex = -1;
+    let page = createPage();
+    pageIndex = 0;
+    let positionIndex = 0;
+    const positionsForPage = (index: number) => {
+      if (index === 0) return [1, 2, 3];
+      if (index === 1 && hasUpcoming) return [0, 1, 2];
+      return [0, 1, 2, 3];
+    };
+
+    for (let index = 0; index < rounds.length; index += 1) {
+      let positions = positionsForPage(pageIndex);
+      if (positionIndex >= positions.length) {
+        page = createPage();
+        pageIndex += 1;
+        positionIndex = 0;
+        positions = positionsForPage(pageIndex);
       }
-    );
+      const cellIndex = positions[positionIndex];
+      positionIndex += 1;
+      renderRoundBlock(page, rounds[index], getCell(cellIndex), fonts, mode);
+    }
+
+    const firstPage = pdfDoc.getPages()[0] ?? createPage();
+    renderTeamBlock(firstPage, getCell(0), fonts, {
+      qrImage: qrImage ?? undefined,
+      logoImage: logoImage ?? undefined,
+      eventCode: extras?.eventCode,
+      teamCode: extras?.teamCode,
+      teamName: extras?.teamName,
+      teamPlaceholder: extras?.teamPlaceholder
+    });
+
+    if (hasUpcoming) {
+      while (pageCount() < 2) {
+        createPage();
+      }
+      const upcomingPage = pdfDoc.getPages()[1];
+      renderUpcomingBlock(upcomingPage, getCell(3), fonts, {
+        upcomingLines: extras?.upcomingLines,
+        locationName: extras?.locationName
+      });
+    }
+  } else {
+    for (let index = 0; index < rounds.length; index += 1) {
+      if (index % 4 === 0) {
+        createPage();
+      }
+      const page = pdfDoc.getPages()[pdfDoc.getPages().length - 1];
+      const cellIndex = index % 4;
+      renderRoundBlock(page, rounds[index], getCell(cellIndex), fonts, mode);
+    }
   }
 
   return pdfDoc.save();
