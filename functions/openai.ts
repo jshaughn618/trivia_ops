@@ -16,26 +16,23 @@ export async function generateText(env: Env, input: { prompt: string; model?: st
         content: [{ type: 'input_text', text: input.prompt }]
       }
     ],
-    reasoning: { effort: 'low' },
-    max_output_tokens: input.max_output_tokens ?? 300
+    reasoning: { effort: 'low' }
   };
 
   const { text, data, incompleteReason } = await runTextRequest(env, baseBody);
   if (text) return { text, raw: data };
 
   // Retry once without reasoning and with explicit text output.
-  const baseMax = input.max_output_tokens ?? 300;
-  const retryMax = incompleteReason === 'max_output_tokens'
-    ? Math.min(1200, Math.max(200, baseMax * 2))
-    : baseMax;
   const retryBody = {
     ...baseBody,
-    text: { format: { type: 'text' } },
-    max_output_tokens: retryMax
+    text: { format: { type: 'text' } }
   };
   delete (retryBody as { reasoning?: unknown }).reasoning;
   const retry = await runTextRequest(env, retryBody, { isRetry: true });
   if (retry.text) return { text: retry.text, raw: retry.data };
+
+  const fallback = await runChatCompletion(env, input.prompt, input.max_output_tokens, model);
+  if (fallback?.text) return { text: fallback.text, raw: fallback.data };
 
   throw new Error('OpenAI response contained no text output');
 }
@@ -103,6 +100,15 @@ type OpenAIResponse = {
   }>;
   status?: string;
   incomplete_details?: unknown;
+  error?: { message?: string };
+};
+
+type ChatCompletionResponse = {
+  choices?: Array<{
+    message?: {
+      content?: string | Array<{ type?: string; text?: string }>;
+    };
+  }>;
   error?: { message?: string };
 };
 
@@ -207,4 +213,40 @@ function isIncompleteMaxTokens(data: OpenAIResponse) {
     && typeof data?.incomplete_details === 'object'
     && data.incomplete_details !== null
     && (data.incomplete_details as { reason?: unknown }).reason === 'max_output_tokens';
+}
+
+async function runChatCompletion(env: Env, prompt: string, maxTokens: number | undefined, model: string) {
+  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${env.OPENAI_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model,
+      messages: [{ role: 'user', content: prompt }],
+      ...(typeof maxTokens === 'number' ? { max_completion_tokens: maxTokens } : {})
+    })
+  });
+
+  const data = (await response.json()) as ChatCompletionResponse;
+  if (!response.ok) {
+    return { text: '', data };
+  }
+
+  const text = extractChatText(data);
+  if (!text) return { text: '', data };
+  return { text, data };
+}
+
+function extractChatText(data: ChatCompletionResponse) {
+  const message = data?.choices?.[0]?.message?.content;
+  if (typeof message === 'string') return message.trim();
+  if (Array.isArray(message)) {
+    const chunks = message
+      .filter((part) => part && typeof part.text === 'string')
+      .map((part) => part.text as string);
+    return chunks.join('\n').trim();
+  }
+  return '';
 }
