@@ -854,7 +854,7 @@ export function EditionDetailPage() {
     setAnswerLoading(true);
     setAnswerError(null);
     const prompt = `Provide a concise, correct pub-trivia answer for the question below. Respond with only the answer.\n\nQuestion: ${safeTrim(sourcePrompt)}`;
-    const res = await api.aiGenerate({ prompt, max_output_tokens: 80 });
+    const res = await api.aiGenerate({ prompt, max_output_tokens: 200 });
     setAnswerLoading(false);
     if (!res.ok) {
       setAnswerError(formatApiError(res, 'Failed to save answer.'));
@@ -887,7 +887,7 @@ export function EditionDetailPage() {
       parts.push(`Answer: ${itemDraft.answer.trim()}`);
     }
     const prompt = parts.filter(Boolean).join('\n');
-    const res = await api.aiGenerate({ prompt, max_output_tokens: 80 });
+    const res = await api.aiGenerate({ prompt, max_output_tokens: 200 });
     setFactLoading(false);
     if (!res.ok) {
       setFactError(formatApiError(res, 'Failed to save factoid.'));

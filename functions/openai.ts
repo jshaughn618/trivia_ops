@@ -20,13 +20,18 @@ export async function generateText(env: Env, input: { prompt: string; model?: st
     max_output_tokens: input.max_output_tokens ?? 300
   };
 
-  const { text, data } = await runTextRequest(env, baseBody);
+  const { text, data, incompleteReason } = await runTextRequest(env, baseBody);
   if (text) return { text, raw: data };
 
   // Retry once without reasoning and with explicit text output.
+  const baseMax = input.max_output_tokens ?? 300;
+  const retryMax = incompleteReason === 'max_output_tokens'
+    ? Math.min(1200, Math.max(200, baseMax * 2))
+    : baseMax;
   const retryBody = {
     ...baseBody,
-    text: { format: { type: 'text' } }
+    text: { format: { type: 'text' } },
+    max_output_tokens: retryMax
   };
   delete (retryBody as { reasoning?: unknown }).reasoning;
   const retry = await runTextRequest(env, retryBody, { isRetry: true });
@@ -186,6 +191,7 @@ async function runTextRequest(
 
   const outputText = typeof data.output_text === 'string' ? data.output_text : '';
   const text = outputText.trim().length > 0 ? outputText : extractText(data);
+  const incompleteReason = isIncompleteMaxTokens(data) ? 'max_output_tokens' : null;
   if (!text) {
     logEmptyResponse(env, data, { retry: options.isRetry ? true : false });
     const refusal = extractRefusal(data);
@@ -193,5 +199,12 @@ async function runTextRequest(
       throw new Error(refusal);
     }
   }
-  return { text, data };
+  return { text, data, incompleteReason };
+}
+
+function isIncompleteMaxTokens(data: OpenAIResponse) {
+  return data?.status === 'incomplete'
+    && typeof data?.incomplete_details === 'object'
+    && data.incomplete_details !== null
+    && (data.incomplete_details as { reason?: unknown }).reason === 'max_output_tokens';
 }
