@@ -169,6 +169,8 @@ export function EditionDetailPage() {
   const itemMenuRef = useRef<HTMLDivElement | null>(null);
   const editUploadRef = useRef<HTMLInputElement | null>(null);
   const newUploadRef = useRef<HTMLInputElement | null>(null);
+  const editAudioRef = useRef<HTMLInputElement | null>(null);
+  const newAudioRef = useRef<HTMLInputElement | null>(null);
   const musicUploadRef = useRef<HTMLInputElement | null>(null);
 
   const load = async () => {
@@ -226,6 +228,7 @@ export function EditionDetailPage() {
   }, [items]);
 
   const musicSubtype = gameSubtype || 'standard';
+  const allowAudioClip = gameTypeId !== 'audio' && gameTypeId !== 'music' && gameTypeId !== 'visual';
   const isMusicSpeedRound = gameTypeId === 'music' && musicSubtype === 'speed_round';
   const isMusicMashup = gameTypeId === 'music' && musicSubtype === 'mashup';
   const isMusicCovers = gameTypeId === 'music' && musicSubtype === 'covers';
@@ -2086,6 +2089,50 @@ export function EditionDetailPage() {
           />
           {factError && <span className="text-[10px] tracking-[0.2em] text-danger">{factError}</span>}
         </label>
+        {allowAudioClip && (
+          <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+            Audio Clip (Optional)
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                ref={editAudioRef}
+                type="file"
+                accept="audio/mpeg,audio/mp3"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  event.target.value = '';
+                  if (file) handleQuestionAudioUpload(item, file);
+                }}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => editAudioRef.current?.click()}
+                className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
+              >
+                {mediaUploading ? 'Uploading' : 'Add Audio'}
+              </button>
+              {itemDraft.media_key && (
+                <button
+                  type="button"
+                  onClick={() => handleDeleteMedia(item)}
+                  className="border-2 border-danger px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-danger hover:border-[#9d2a24]"
+                >
+                  Remove
+                </button>
+              )}
+              {itemDraft.media_key && (
+                <span className="text-[10px] uppercase tracking-[0.2em] text-muted">
+                  Audio attached
+                </span>
+              )}
+            </div>
+            {itemDraft.media_key && (
+              <audio className="w-full" controls src={api.mediaUrl(itemDraft.media_key)} />
+            )}
+            <span className="text-[10px] tracking-[0.2em] text-muted">MP3 only.</span>
+            {mediaError && <span className="text-[10px] tracking-[0.2em] text-danger">{mediaError}</span>}
+          </label>
+        )}
         {(gameTypeId === 'audio' || gameTypeId === 'visual') && (
           <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
             Media Upload
@@ -2558,6 +2605,50 @@ export function EditionDetailPage() {
           />
           {factError && <span className="text-[10px] tracking-[0.2em] text-danger">{factError}</span>}
         </label>
+        {allowAudioClip && (
+          <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+            Audio Clip (Optional)
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                ref={newAudioRef}
+                type="file"
+                accept="audio/mpeg,audio/mp3"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  event.target.value = '';
+                  if (file) handleQuestionAudioUpload(null, file);
+                }}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => newAudioRef.current?.click()}
+                className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
+              >
+                {mediaUploading ? 'Uploading' : 'Add Audio'}
+              </button>
+              {itemDraft.media_key && (
+                <button
+                  type="button"
+                  onClick={() => handleDeleteMedia()}
+                  className="border-2 border-danger px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-danger hover:border-[#9d2a24]"
+                >
+                  Remove
+                </button>
+              )}
+              {itemDraft.media_key && (
+                <span className="text-[10px] uppercase tracking-[0.2em] text-muted">
+                  Audio attached
+                </span>
+              )}
+            </div>
+            {itemDraft.media_key && (
+              <audio className="w-full" controls src={api.mediaUrl(itemDraft.media_key)} />
+            )}
+            <span className="text-[10px] tracking-[0.2em] text-muted">MP3 only.</span>
+            {mediaError && <span className="text-[10px] tracking-[0.2em] text-danger">{mediaError}</span>}
+          </label>
+        )}
         {(gameTypeId === 'audio' || gameTypeId === 'visual') && (
           <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
             Media Upload
@@ -3178,6 +3269,11 @@ export function EditionDetailPage() {
                             </>
                           )}
                           {' • Drag to reorder'}
+                        </div>
+                      )}
+                      {allowAudioClip && item.media_type === 'audio' && (
+                        <div className="mt-2 text-[10px] uppercase tracking-[0.2em] text-muted">
+                          Audio clip attached • Drag to reorder
                         </div>
                       )}
                     </div>
