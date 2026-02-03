@@ -8,7 +8,7 @@ export async function generateText(env: Env, input: { prompt: string; model?: st
   }
 
   const model = input.model ?? env.AI_DEFAULT_MODEL ?? DEFAULT_MODEL;
-  const body = {
+  const baseBody = {
     model,
     input: [
       {
@@ -20,32 +20,19 @@ export async function generateText(env: Env, input: { prompt: string; model?: st
     max_output_tokens: input.max_output_tokens ?? 300
   };
 
-  const response = await fetch('https://api.openai.com/v1/responses', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${env.OPENAI_API_KEY}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(body)
-  });
+  const { text, data } = await runTextRequest(env, baseBody);
+  if (text) return { text, raw: data };
 
-  const data = (await response.json()) as OpenAIResponse;
-  if (!response.ok) {
-    const message = data?.error?.message ?? 'OpenAI request failed';
-    throw new Error(message);
-  }
+  // Retry once without reasoning and with explicit text output.
+  const retryBody = {
+    ...baseBody,
+    text: { format: { type: 'text' } }
+  };
+  delete (retryBody as { reasoning?: unknown }).reasoning;
+  const retry = await runTextRequest(env, retryBody, { isRetry: true });
+  if (retry.text) return { text: retry.text, raw: retry.data };
 
-  const outputText = typeof data.output_text === 'string' ? data.output_text : '';
-  const text = outputText.trim().length > 0 ? outputText : extractText(data);
-  if (!text) {
-    logEmptyResponse(env, data);
-    const refusal = extractRefusal(data);
-    if (refusal) {
-      throw new Error(refusal);
-    }
-    throw new Error('OpenAI response contained no text output');
-  }
-  return { text, raw: data };
+  throw new Error('OpenAI response contained no text output');
 }
 
 export async function generateImageAnswer(
@@ -107,6 +94,7 @@ type OpenAIResponse = {
     content?: Array<{ text?: string; output_text?: string; refusal?: string; type?: string }>;
     output_text?: string;
     text?: string;
+    summary?: string;
   }>;
   error?: { message?: string };
 };
@@ -120,8 +108,8 @@ function extractText(data: OpenAIResponse) {
     if (typeof item?.output_text === 'string') {
       chunks.push(item.output_text);
     }
-    if (typeof (item as { summary?: unknown })?.summary === 'string') {
-      chunks.push((item as { summary: string }).summary);
+    if (typeof item?.summary === 'string') {
+      chunks.push(item.summary);
     }
     if (typeof item?.text === 'string') {
       chunks.push(item.text);
@@ -152,7 +140,7 @@ function extractRefusal(data: OpenAIResponse) {
   return null;
 }
 
-function logEmptyResponse(env: Env, data: OpenAIResponse) {
+function logEmptyResponse(env: Env, data: OpenAIResponse, extra?: Record<string, unknown>) {
   if (env.DEBUG !== 'true') return;
   const output = Array.isArray(data?.output) ? data.output : [];
   const contentTypes = output.flatMap((item) =>
@@ -164,7 +152,40 @@ function logEmptyResponse(env: Env, data: OpenAIResponse) {
     output_items: output.length,
     output_item_keys: output.map((item) => Object.keys(item ?? {})),
     output_content_types: contentTypes,
-    output_content_count: contentTypes.length
+    output_content_count: contentTypes.length,
+    ...extra
   };
   console.warn(JSON.stringify({ level: 'warn', event: 'openai_empty_response', ...info }));
+}
+
+async function runTextRequest(
+  env: Env,
+  body: Record<string, unknown>,
+  options: { isRetry?: boolean } = {}
+) {
+  const response = await fetch('https://api.openai.com/v1/responses', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${env.OPENAI_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(body)
+  });
+
+  const data = (await response.json()) as OpenAIResponse;
+  if (!response.ok) {
+    const message = data?.error?.message ?? 'OpenAI request failed';
+    throw new Error(message);
+  }
+
+  const outputText = typeof data.output_text === 'string' ? data.output_text : '';
+  const text = outputText.trim().length > 0 ? outputText : extractText(data);
+  if (!text) {
+    logEmptyResponse(env, data, { retry: options.isRetry ? true : false });
+    const refusal = extractRefusal(data);
+    if (refusal) {
+      throw new Error(refusal);
+    }
+  }
+  return { text, data };
 }

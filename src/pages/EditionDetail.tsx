@@ -1891,7 +1891,7 @@ export function EditionDetailPage() {
               Answer
               <button
                 type="button"
-                onClick={generateAnswer}
+                onClick={() => generateAnswer()}
                 className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
                 disabled={answerLoading}
               >
@@ -2363,7 +2363,7 @@ export function EditionDetailPage() {
               Answer
               <button
                 type="button"
-                onClick={generateAnswer}
+                onClick={() => generateAnswer()}
                 className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
                 disabled={answerLoading}
               >
