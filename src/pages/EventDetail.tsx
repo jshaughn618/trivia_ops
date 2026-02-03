@@ -274,7 +274,7 @@ const renderTeamBlock = (
       size: textSize,
       font: fonts.bold
     });
-    cursorY -= textSize + 30;
+    cursorY -= textSize + 36;
   } else {
     const label = 'Team Name:';
     const labelWidth = fonts.bold.widthOfTextAtSize(label, textSize);
@@ -293,12 +293,12 @@ const renderTeamBlock = (
       thickness: 1,
       color: rgb(0, 0, 0)
     });
-    cursorY -= textSize + 30;
+    cursorY -= textSize + 36;
   }
 
   if (extras.logoImage) {
-    const maxLogoWidth = 120;
-    const maxLogoHeight = 34;
+    const maxLogoWidth = 150;
+    const maxLogoHeight = 44;
     const scale = Math.min(
       maxLogoWidth / extras.logoImage.width,
       maxLogoHeight / extras.logoImage.height,
@@ -312,14 +312,7 @@ const renderTeamBlock = (
       width: logoWidth,
       height: logoHeight
     });
-    cursorY -= logoHeight + 6;
-    page.drawText('triviaops.com', {
-      x: cell.x + padding,
-      y: cursorY - 8,
-      size: 8.5,
-      font: fonts.regular
-    });
-    cursorY -= 14;
+    cursorY -= logoHeight + 12;
   }
 
   cursorY -= textSize * 2;
