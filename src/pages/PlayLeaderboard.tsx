@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { api, formatApiError } from '../api';
 import { Panel } from '../components/Panel';
 import { SecondaryButton } from '../components/Buttons';
@@ -31,16 +31,8 @@ const STREAM_RETRY_MAX_MS = 30000;
 export function PlayLeaderboardPage() {
   const { code } = useParams();
   const navigate = useNavigate();
-  const location = useLocation();
   const { theme, toggleTheme } = useTheme();
   const normalizedCode = useMemo(() => (code ?? '').trim().toUpperCase(), [code]);
-  const storedTeamId = useMemo(() => {
-    if (!normalizedCode) return '';
-    const params = new URLSearchParams(location.search);
-    const fromQuery = params.get('team_id');
-    if (fromQuery) return fromQuery;
-    return localStorage.getItem(`player_team_code_${normalizedCode}`) ?? '';
-  }, [normalizedCode, location.search]);
   const [data, setData] = useState<PublicLeaderboardResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -58,7 +50,7 @@ export function PlayLeaderboardPage() {
         setError(null);
         if (next.live && !next.live.show_full_leaderboard) {
           setRedirecting(true);
-          navigate(`/play/${normalizedCode}${storedTeamId ? `?team_id=${storedTeamId}` : ''}`);
+          navigate(`/play/${normalizedCode}`);
         } else {
           setRedirecting(false);
         }
@@ -78,7 +70,7 @@ export function PlayLeaderboardPage() {
       setError(null);
       if (next.live && !next.live.show_full_leaderboard) {
         setRedirecting(true);
-        navigate(`/play/${normalizedCode}${storedTeamId ? `?team_id=${storedTeamId}` : ''}`);
+        navigate(`/play/${normalizedCode}`);
       } else {
         setRedirecting(false);
       }
@@ -143,7 +135,7 @@ export function PlayLeaderboardPage() {
       if (retryTimer) window.clearTimeout(retryTimer);
       source?.close();
     };
-  }, [normalizedCode, navigate, storedTeamId]);
+  }, [normalizedCode, navigate]);
 
   if (!normalizedCode) {
     return (
@@ -219,7 +211,7 @@ export function PlayLeaderboardPage() {
               <SecondaryButton
                 onClick={() =>
                   navigate(
-                    `/play/${data.event.public_code}${storedTeamId ? `?team_id=${storedTeamId}` : ''}`
+                    `/play/${data.event.public_code}`
                   )
                 }
               >

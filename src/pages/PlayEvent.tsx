@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type React from 'react';
-import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { api, formatApiError } from '../api';
 import { PrimaryButton, SecondaryButton } from '../components/Buttons';
 import { logError } from '../lib/log';
@@ -120,12 +120,12 @@ type PublicEventResponse = {
 export function PlayEventPage() {
   const { code } = useParams();
   const navigate = useNavigate();
-  const location = useLocation();
   const [data, setData] = useState<PublicEventResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [teamId, setTeamId] = useState('');
-  const [teamName, setTeamName] = useState('');
+  const [teamSession, setTeamSession] = useState('');
+  const [teamCodeInput, setTeamCodeInput] = useState('');
   const [teamNameLabel, setTeamNameLabel] = useState<string | null>(null);
   const [teamMenuOpen, setTeamMenuOpen] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
@@ -238,30 +238,27 @@ export function PlayEventPage() {
   }, [normalizedCode]);
 
   useEffect(() => {
-    if (!data?.event?.id) return;
-    const stored = localStorage.getItem(`player_team_${data.event.id}`);
-    if (stored) setTeamId(stored);
-  }, [data?.event?.id]);
-
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const teamParam = params.get('team_id') ?? '';
-    if (teamParam && !teamId) {
-      setTeamId(teamParam);
+    if (!data?.event?.id || !data?.event?.public_code) return;
+    const storedByEvent = localStorage.getItem(`player_team_${data.event.id}`) ?? '';
+    const storedByCode = localStorage.getItem(`player_team_id_${data.event.public_code}`) ?? '';
+    const storedLegacy = localStorage.getItem(`player_team_code_${data.event.public_code}`) ?? '';
+    const storedName = localStorage.getItem(`player_team_name_${data.event.public_code}`) ?? '';
+    const storedSession = localStorage.getItem(`player_team_session_${data.event.public_code}`) ?? '';
+    const nextTeamId = storedByEvent || storedByCode || storedLegacy;
+    if (nextTeamId && storedSession) {
+      setTeamId(nextTeamId);
+      setTeamSession(storedSession);
+      if (storedName) setTeamNameLabel(storedName);
+    } else {
+      setTeamId('');
+      setTeamSession('');
     }
-  }, [location.search, teamId]);
-
-  useEffect(() => {
-    if (!normalizedCode) return;
-    if (teamId) return;
-    const stored = localStorage.getItem(`player_team_code_${normalizedCode}`);
-    if (stored) setTeamId(stored);
-  }, [normalizedCode, teamId]);
+  }, [data?.event?.id, data?.event?.public_code]);
 
   useEffect(() => {
     if (!data) return;
     const matched = data.teams.find((team) => team.id === teamId);
-    setTeamNameLabel(matched?.name ?? null);
+    if (matched) setTeamNameLabel(matched.name);
   }, [data, teamId]);
 
   useEffect(() => {
@@ -340,7 +337,6 @@ export function PlayEventPage() {
     if (!data?.live?.show_full_leaderboard) return;
     if (!data?.event?.public_code) return;
     const params = new URLSearchParams();
-    if (teamId) params.set('team_id', teamId);
     params.set('from', 'host');
     const query = params.toString();
     navigate(`/play/${data.event.public_code}/leaderboard${query ? `?${query}` : ''}`);
@@ -447,20 +443,24 @@ export function PlayEventPage() {
 
   const handleJoin = async () => {
     if (!data) return;
-    if (!teamId && !teamName.trim()) {
-      setJoinError('Select a team or enter a team name.');
+    const normalized = teamCodeInput.replace(/\D/g, '');
+    if (!normalized) {
+      setJoinError('Enter the team code from your scoresheet.');
       return;
     }
     setJoinError(null);
     setJoinLoading(true);
-    const payload = teamId ? { team_id: teamId } : { team_name: teamName.trim() };
-    const res = await api.publicJoin(data.event.public_code, payload);
+    const res = await api.publicJoin(data.event.public_code, { team_code: normalized });
     if (res.ok) {
       setTeamId(res.data.team.id);
+      setTeamSession(res.data.session_token);
       setTeamNameLabel(res.data.team.name);
       localStorage.setItem(`player_team_${data.event.id}`, res.data.team.id);
+      localStorage.setItem(`player_team_id_${data.event.public_code}`, res.data.team.id);
       localStorage.setItem(`player_team_code_${data.event.public_code}`, res.data.team.id);
-      setTeamName('');
+      localStorage.setItem(`player_team_name_${data.event.public_code}`, res.data.team.name);
+      localStorage.setItem(`player_team_session_${data.event.public_code}`, res.data.session_token);
+      setTeamCodeInput('');
       setJoinError(null);
     } else {
       setJoinError(formatApiError(res, 'Unable to join team.'));
@@ -469,17 +469,32 @@ export function PlayEventPage() {
   };
 
   const handleChangeTeam = () => {
-    if (!data?.event?.id) return;
+    if (!data?.event?.id || !data?.event?.public_code) return;
     localStorage.removeItem(`player_team_${data.event.id}`);
+    localStorage.removeItem(`player_team_id_${data.event.public_code}`);
     localStorage.removeItem(`player_team_code_${data.event.public_code}`);
+    localStorage.removeItem(`player_team_name_${data.event.public_code}`);
+    localStorage.removeItem(`player_team_session_${data.event.public_code}`);
     setTeamId('');
+    setTeamSession('');
     setTeamNameLabel(null);
-    setTeamName('');
+    setTeamCodeInput('');
     setTeamMenuOpen(false);
+  };
+
+  const handleSessionExpired = (message: string) => {
+    handleChangeTeam();
+    setJoinError(message);
+    setSubmitStatus('error');
+    setSubmitError(message);
   };
 
   const handleSubmitChoice = async () => {
     if (!data?.event?.public_code || !teamId || !displayItem?.id) return;
+    if (!teamSession) {
+      handleSessionExpired('Your team session expired. Re-enter the team code to continue.');
+      return;
+    }
     if (selectedChoiceIndex === null) {
       setSubmitError('Select an option first.');
       setSubmitStatus('error');
@@ -490,7 +505,8 @@ export function PlayEventPage() {
     const res = await api.publicSubmitChoice(data.event.public_code, {
       team_id: teamId,
       item_id: displayItem.id,
-      choice_index: selectedChoiceIndex
+      choice_index: selectedChoiceIndex,
+      session_token: teamSession
     });
     if (res.ok) {
       setSubmittedChoiceIndex(selectedChoiceIndex);
@@ -498,6 +514,10 @@ export function PlayEventPage() {
       const expectedTotal = Math.max(0, lastResponseTotalRef.current) + 1;
       setResponseSync({ expectedTotal, expiresAt: Date.now() + 3000 });
     } else {
+      if (res.error?.code === 'team_session_invalid' || res.error?.code === 'team_session_required') {
+        handleSessionExpired(res.error.message ?? 'Your team session expired. Re-enter the team code to continue.');
+        return;
+      }
       setSubmitStatus('error');
       setSubmitError(formatApiError(res, 'Failed to submit choice.'));
     }
@@ -508,7 +528,7 @@ export function PlayEventPage() {
     if (submittedChoiceIndex !== null) return;
     if (submitStatus === 'submitting') return;
     if (selectedChoiceIndex === null) return;
-    if (!displayItem?.id || !data?.event?.public_code || !teamId) return;
+    if (!displayItem?.id || !data?.event?.public_code || !teamId || !teamSession) return;
     handleSubmitChoice();
   }, [
     timerExpired,
@@ -517,7 +537,8 @@ export function PlayEventPage() {
     submitStatus,
     displayItem?.id,
     data?.event?.public_code,
-    teamId
+    teamId,
+    teamSession
   ]);
 
   if (!normalizedCode) {
@@ -687,26 +708,21 @@ export function PlayEventPage() {
       <PlayStage fullBleed={isQuestionActive} scrollable>
         {!teamId ? (
           <div className="flex w-full max-w-lg flex-col items-center gap-6 text-center">
-            <div className="text-xs uppercase tracking-[0.35em] text-muted">Join a team</div>
-            <PromptHero>Pick a team to see the live question.</PromptHero>
+            <div className="text-xs uppercase tracking-[0.35em] text-muted">Join your team</div>
+            <PromptHero>Enter the team code from your scoresheet.</PromptHero>
             <div className="w-full rounded-2xl bg-panel/40 p-4 text-left">
-              <div className="text-xs uppercase tracking-[0.3em] text-muted">Choose team</div>
+              <div className="text-xs uppercase tracking-[0.3em] text-muted">Team code</div>
               <div className="mt-4 flex flex-col gap-3">
                 <label className="flex flex-col gap-2">
-                  <span className="text-xs uppercase tracking-[0.25em] text-muted">Select team</span>
-                  <select className="h-10 px-3" value={teamId} onChange={(event) => setTeamId(event.target.value)}>
-                    <option value="">Choose team</option>
-                    {data.teams.map((team) => (
-                      <option key={team.id} value={team.id}>
-                        {team.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <div className="text-center text-xs uppercase tracking-[0.2em] text-muted">Or</div>
-                <label className="flex flex-col gap-2">
-                  <span className="text-xs uppercase tracking-[0.25em] text-muted">New team name</span>
-                  <input className="h-10 px-3" value={teamName} onChange={(event) => setTeamName(event.target.value)} />
+                  <span className="text-xs uppercase tracking-[0.25em] text-muted">Enter code</span>
+                  <input
+                    className="h-10 px-3 tracking-[0.35em]"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={4}
+                    value={teamCodeInput}
+                    onChange={(event) => setTeamCodeInput(event.target.value.replace(/\D/g, '').slice(0, 4))}
+                  />
                 </label>
                 {joinError && (
                   <div className="rounded-md border border-danger bg-panel2 px-3 py-2 text-xs text-danger-ink" aria-live="polite">
@@ -715,7 +731,7 @@ export function PlayEventPage() {
                 )}
                 <PrimaryButton
                   onClick={handleJoin}
-                  disabled={joinLoading || (!teamId && !teamName.trim())}
+                  disabled={joinLoading || teamCodeInput.replace(/\D/g, '').length !== 4}
                 >
                   {joinLoading ? 'Joining…' : 'Join'}
                 </PrimaryButton>

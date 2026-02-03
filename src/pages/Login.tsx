@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { PrimaryButton, SecondaryButton } from '../components/Buttons';
-import { api } from '../api';
+import { api, formatApiError } from '../api';
 import { useAuth } from '../auth';
 import { useTheme } from '../lib/theme';
 import logoDark from '../assets/trivia_ops_logo_dark.png';
@@ -12,14 +12,22 @@ export function LoginPage() {
   const logo = theme === 'light' ? logoLight : logoDark;
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [code, setCode] = useState(['', '', '', '']);
   const [error, setError] = useState<string | null>(null);
-  const [joinError, setJoinError] = useState<string | null>(null);
-  const [joinLoading, setJoinLoading] = useState(false);
+  const [eventCode, setEventCode] = useState(['', '', '', '']);
+  const [teamCode, setTeamCode] = useState(['', '', '', '']);
+  const [eventInfo, setEventInfo] = useState<{ id: string; title: string; public_code: string } | null>(null);
+  const [step, setStep] = useState<'event' | 'team'>('event');
+  const [eventError, setEventError] = useState<string | null>(null);
+  const [teamError, setTeamError] = useState<string | null>(null);
+  const [eventLoading, setEventLoading] = useState(false);
+  const [teamLoading, setTeamLoading] = useState(false);
   const [loading, setLoading] = useState(false);
   const [hostOpen, setHostOpen] = useState(false);
-  const codeRefs = useRef<Array<HTMLInputElement | null>>([]);
+  const eventRefs = useRef<Array<HTMLInputElement | null>>([]);
+  const teamRefs = useRef<Array<HTMLInputElement | null>>([]);
+  const autoJoinRef = useRef(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const auth = useAuth();
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -37,33 +45,85 @@ export function LoginPage() {
   };
 
   const sanitized = (value: string) => value.replace(/\D/g, '');
-  const codeValue = code.join('');
-  const codeReady = code.every((digit) => digit.length === 1);
+  const eventValue = eventCode.join('');
+  const eventReady = eventCode.every((digit) => digit.length === 1);
+  const teamValue = teamCode.join('');
+  const teamReady = teamCode.every((digit) => digit.length === 1);
 
-  const attemptJoin = async (value: string) => {
+  const attemptEvent = async (value: string, autoTeamCode?: string) => {
     const normalized = sanitized(value);
-    if (normalized.length !== 4 || joinLoading) return;
-    setJoinError(null);
-    setJoinLoading(true);
+    if (normalized.length !== 4 || eventLoading) return;
+    setEventError(null);
+    setEventLoading(true);
     try {
       const res = await api.publicEvent(normalized);
       if (res.ok) {
-        navigate(`/play/${normalized}`);
+        setEventInfo(res.data.event);
+        setStep('team');
+        setTeamCode(['', '', '', '']);
+        if (autoTeamCode && autoTeamCode.length === 4) {
+          const digits = autoTeamCode.split('');
+          setTeamCode(digits);
+          await attemptTeamJoin(autoTeamCode, res.data.event);
+        }
         return;
       }
-      setJoinError('Event code not found. Check the code and try again.');
-      setCode(['', '', '', '']);
-      codeRefs.current[0]?.focus();
+      setEventError('Event code not found. Check the code and try again.');
+      setEventCode(['', '', '', '']);
+      eventRefs.current[0]?.focus();
     } catch {
-      setJoinError('Could not validate the code. Please try again.');
+      setEventError('Could not validate the event code. Please try again.');
     } finally {
-      setJoinLoading(false);
+      setEventLoading(false);
+    }
+  };
+
+  const attemptTeamJoin = async (value: string, eventOverride?: { id: string; title: string; public_code: string }) => {
+    const normalized = sanitized(value);
+    const eventData = eventOverride ?? eventInfo;
+    if (normalized.length !== 4 || teamLoading || !eventData) return;
+    setTeamError(null);
+    setTeamLoading(true);
+    try {
+      const res = await api.publicJoin(eventData.public_code, { team_code: normalized });
+      if (res.ok) {
+        localStorage.setItem(`player_team_${eventData.id}`, res.data.team.id);
+        localStorage.setItem(`player_team_id_${eventData.public_code}`, res.data.team.id);
+        localStorage.setItem(`player_team_code_${eventData.public_code}`, res.data.team.id);
+        localStorage.setItem(`player_team_name_${eventData.public_code}`, res.data.team.name);
+        localStorage.setItem(`player_team_session_${eventData.public_code}`, res.data.session_token);
+        navigate(`/play/${eventData.public_code}`);
+        return;
+      }
+      setTeamError(formatApiError(res, 'Team code not recognized. Check the code and try again.'));
+      setTeamCode(['', '', '', '']);
+      teamRefs.current[0]?.focus();
+    } catch {
+      setTeamError('Could not validate the team code. Please try again.');
+    } finally {
+      setTeamLoading(false);
     }
   };
 
   useEffect(() => {
-    codeRefs.current[0]?.focus();
-  }, []);
+    if (step === 'event') {
+      eventRefs.current[0]?.focus();
+    } else {
+      teamRefs.current[0]?.focus();
+    }
+  }, [step]);
+
+  useEffect(() => {
+    if (autoJoinRef.current) return;
+    autoJoinRef.current = true;
+    const params = new URLSearchParams(location.search);
+    const eventParam = sanitized(params.get('event') ?? params.get('code') ?? '');
+    const teamParam = sanitized(params.get('team') ?? params.get('team_code') ?? '');
+    if (eventParam.length === 4) {
+      setEventCode(eventParam.split(''));
+      attemptEvent(eventParam, teamParam.length === 4 ? teamParam : undefined);
+    }
+  }, [location.search]);
 
   return (
     <div className="min-h-screen bg-bg text-text flex items-center justify-center px-4">
@@ -72,80 +132,180 @@ export function LoginPage() {
         <div className="mt-2 text-sm leading-tight text-muted">The command center for live trivia fun.</div>
         <div className="mt-4">
           <div className="text-3xl font-display tracking-tight">Join game</div>
-          <div className="mt-2 text-sm text-muted">Enter the 4-digit code from your host</div>
-          <div className="mt-1 text-xs text-muted">&nbsp;</div>
-          <div className="mt-3 flex flex-col gap-3">
-            <div className="flex justify-center gap-3">
-              {code.map((value, index) => (
-                <input
-                  key={`code-${index}`}
-                  ref={(el) => {
-                    codeRefs.current[index] = el;
+          {step === 'event' ? (
+            <>
+              <div className="mt-2 text-sm text-muted">Enter the 4-digit event code from your host</div>
+              <div className="mt-1 text-xs text-muted">&nbsp;</div>
+              <div className="mt-3 flex flex-col gap-3">
+                <div className="flex justify-center gap-3">
+                  {eventCode.map((value, index) => (
+                    <input
+                      key={`event-code-${index}`}
+                      ref={(el) => {
+                        eventRefs.current[index] = el;
+                      }}
+                      type="tel"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={1}
+                      className="h-16 w-16 border-2 border-strong bg-panel2 text-center text-2xl font-display tracking-[0.2em] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+                      value={value}
+                      onChange={(event) => {
+                        const next = sanitized(event.target.value).slice(0, 1);
+                        setEventCode((prev) => {
+                          const updated = [...prev];
+                          updated[index] = next;
+                          if (updated.every((digit) => digit)) {
+                            attemptEvent(updated.join(''));
+                          }
+                          return updated;
+                        });
+                        if (next && index < eventRefs.current.length - 1) {
+                          eventRefs.current[index + 1]?.focus();
+                        }
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Backspace' && !eventCode[index] && index > 0) {
+                          eventRefs.current[index - 1]?.focus();
+                        }
+                        if (event.key === 'Enter' && eventReady) {
+                          attemptEvent(eventValue);
+                        }
+                      }}
+                      onPaste={(event) => {
+                        event.preventDefault();
+                        const paste = sanitized(event.clipboardData.getData('text'));
+                        if (!paste) return;
+                        setEventCode((prev) => {
+                          const updated = [...prev];
+                          for (let i = 0; i < paste.length && index + i < updated.length; i += 1) {
+                            updated[index + i] = paste[i];
+                          }
+                          if (updated.every((digit) => digit)) {
+                            attemptEvent(updated.join(''));
+                          }
+                          return updated;
+                        });
+                        const nextIndex = Math.min(index + paste.length, eventRefs.current.length - 1);
+                        eventRefs.current[nextIndex]?.focus();
+                      }}
+                      aria-label={`Event code digit ${index + 1}`}
+                    />
+                  ))}
+                </div>
+                {eventError && (
+                  <div className="border border-danger bg-panel2 px-3 py-2 text-xs text-danger-ink" aria-live="polite">
+                    {eventError}
+                  </div>
+                )}
+                <PrimaryButton
+                  type="button"
+                  onClick={() => {
+                    if (eventReady) attemptEvent(eventValue);
                   }}
-                  type="tel"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  maxLength={1}
-                  className="h-16 w-16 border-2 border-strong bg-panel2 text-center text-2xl font-display tracking-[0.2em] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
-                  value={value}
-                  onChange={(event) => {
-                    const next = sanitized(event.target.value).slice(0, 1);
-                    setCode((prev) => {
-                      const updated = [...prev];
-                      updated[index] = next;
-                      if (updated.every((digit) => digit)) {
-                        attemptJoin(updated.join(''));
-                      }
-                      return updated;
-                    });
-                    if (next && index < codeRefs.current.length - 1) {
-                      codeRefs.current[index + 1]?.focus();
-                    }
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Backspace' && !code[index] && index > 0) {
-                      codeRefs.current[index - 1]?.focus();
-                    }
-                    if (event.key === 'Enter' && codeReady) {
-                      attemptJoin(codeValue);
-                    }
-                  }}
-                  onPaste={(event) => {
-                    event.preventDefault();
-                    const paste = sanitized(event.clipboardData.getData('text'));
-                    if (!paste) return;
-                    setCode((prev) => {
-                      const updated = [...prev];
-                      for (let i = 0; i < paste.length && index + i < updated.length; i += 1) {
-                        updated[index + i] = paste[i];
-                      }
-                      if (updated.every((digit) => digit)) {
-                        attemptJoin(updated.join(''));
-                      }
-                      return updated;
-                    });
-                    const nextIndex = Math.min(index + paste.length, codeRefs.current.length - 1);
-                    codeRefs.current[nextIndex]?.focus();
-                  }}
-                  aria-label={`Event code digit ${index + 1}`}
-                />
-              ))}
-            </div>
-            {joinError && (
-              <div className="border border-danger bg-panel2 px-3 py-2 text-xs text-danger-ink" aria-live="polite">
-                {joinError}
+                  disabled={!eventReady || eventLoading}
+                >
+                  {eventLoading ? 'Checking…' : 'Continue'}
+                </PrimaryButton>
               </div>
-            )}
-            <PrimaryButton
-              type="button"
-              onClick={() => {
-                if (codeReady) attemptJoin(codeValue);
-              }}
-              disabled={!codeReady || joinLoading}
-            >
-              {joinLoading ? 'Checking…' : 'Join game'}
-            </PrimaryButton>
-          </div>
+            </>
+          ) : (
+            <>
+              <div className="mt-2 text-sm text-muted">
+                {eventInfo?.title ? `Event: ${eventInfo.title}` : 'Enter the 4-digit team code from your scoresheet'}
+              </div>
+              <div className="mt-1 text-xs text-muted">
+                Event code {eventInfo?.public_code ?? eventValue}
+              </div>
+              <div className="mt-3 flex flex-col gap-3">
+                <div className="flex justify-center gap-3">
+                  {teamCode.map((value, index) => (
+                    <input
+                      key={`team-code-${index}`}
+                      ref={(el) => {
+                        teamRefs.current[index] = el;
+                      }}
+                      type="tel"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={1}
+                      className="h-16 w-16 border-2 border-strong bg-panel2 text-center text-2xl font-display tracking-[0.2em] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+                      value={value}
+                      onChange={(event) => {
+                        const next = sanitized(event.target.value).slice(0, 1);
+                        setTeamCode((prev) => {
+                          const updated = [...prev];
+                          updated[index] = next;
+                          if (updated.every((digit) => digit)) {
+                            attemptTeamJoin(updated.join(''));
+                          }
+                          return updated;
+                        });
+                        if (next && index < teamRefs.current.length - 1) {
+                          teamRefs.current[index + 1]?.focus();
+                        }
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Backspace' && !teamCode[index] && index > 0) {
+                          teamRefs.current[index - 1]?.focus();
+                        }
+                        if (event.key === 'Enter' && teamReady) {
+                          attemptTeamJoin(teamValue);
+                        }
+                      }}
+                      onPaste={(event) => {
+                        event.preventDefault();
+                        const paste = sanitized(event.clipboardData.getData('text'));
+                        if (!paste) return;
+                        setTeamCode((prev) => {
+                          const updated = [...prev];
+                          for (let i = 0; i < paste.length && index + i < updated.length; i += 1) {
+                            updated[index + i] = paste[i];
+                          }
+                          if (updated.every((digit) => digit)) {
+                            attemptTeamJoin(updated.join(''));
+                          }
+                          return updated;
+                        });
+                        const nextIndex = Math.min(index + paste.length, teamRefs.current.length - 1);
+                        teamRefs.current[nextIndex]?.focus();
+                      }}
+                      aria-label={`Team code digit ${index + 1}`}
+                    />
+                  ))}
+                </div>
+                {teamError && (
+                  <div className="border border-danger bg-panel2 px-3 py-2 text-xs text-danger-ink" aria-live="polite">
+                    {teamError}
+                  </div>
+                )}
+                <div className="flex flex-col gap-2">
+                  <PrimaryButton
+                    type="button"
+                    onClick={() => {
+                      if (teamReady) attemptTeamJoin(teamValue);
+                    }}
+                    disabled={!teamReady || teamLoading}
+                  >
+                    {teamLoading ? 'Joining…' : 'Join game'}
+                  </PrimaryButton>
+                  <SecondaryButton
+                    type="button"
+                    onClick={() => {
+                      setStep('event');
+                      setEventInfo(null);
+                      setEventCode(['', '', '', '']);
+                      setTeamCode(['', '', '', '']);
+                      setEventError(null);
+                      setTeamError(null);
+                    }}
+                  >
+                    Change event code
+                  </SecondaryButton>
+                </div>
+              </div>
+            </>
+          )}
         </div>
         <div className="mt-6 border-t-2 border-border pt-4">
           <div className="flex items-center justify-between gap-3">

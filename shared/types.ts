@@ -162,6 +162,7 @@ export type Team = {
   event_id: Id;
   name: string;
   table_label: string | null;
+  team_code: string | null;
   created_at: string;
 };
 

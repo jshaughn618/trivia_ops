@@ -1,7 +1,25 @@
 import type { Env } from '../../../types';
 import { jsonError, jsonOk } from '../../../responses';
-import { queryAll, queryFirst } from '../../../db';
+import { execute, queryAll, queryFirst } from '../../../db';
 import { requireAdmin, requireEventAccess } from '../../../access';
+import { generateTeamCode } from '../../../public';
+
+const TEAM_COLUMNS = 'id, event_id, name, table_label, team_code, created_at';
+
+const assignTeamCode = async (env: Env, eventId: string, teamId: string) => {
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const code = await generateTeamCode(env, eventId);
+    try {
+      await execute(env, 'UPDATE teams SET team_code = ? WHERE id = ? AND team_code IS NULL', [code, teamId]);
+      return code;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '';
+      if (message.toLowerCase().includes('unique')) continue;
+      throw error;
+    }
+  }
+  throw new Error('Unable to assign team code');
+};
 
 export const onRequestGet: PagesFunction<Env> = async ({ env, params, data }) => {
   const guard = requireAdmin(data.user ?? null);
@@ -17,6 +35,15 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params, data }) =>
     return jsonError({ code: 'not_found', message: 'Event not found' }, 404);
   }
 
+  const missingTeams = await queryAll<{ id: string }>(
+    env,
+    'SELECT id FROM teams WHERE event_id = ? AND team_code IS NULL AND COALESCE(deleted, 0) = 0',
+    [params.id]
+  );
+  for (const team of missingTeams) {
+    await assignTeamCode(env, params.id as string, team.id);
+  }
+
   const [rounds, teams, editions, locations, games, hosts, gameTypes] = await Promise.all([
     queryAll(
       env,
@@ -27,7 +54,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params, data }) =>
        ORDER BY er.round_number ASC`,
       [params.id]
     ),
-    queryAll(env, 'SELECT * FROM teams WHERE event_id = ? AND COALESCE(deleted, 0) = 0 ORDER BY created_at DESC', [
+    queryAll(env, `SELECT ${TEAM_COLUMNS} FROM teams WHERE event_id = ? AND COALESCE(deleted, 0) = 0 ORDER BY created_at DESC`, [
       params.id
     ]),
     queryAll(env, 'SELECT * FROM editions WHERE COALESCE(deleted, 0) = 0 ORDER BY updated_at DESC'),

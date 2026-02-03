@@ -42,10 +42,15 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request }
   const teamId = payload?.team_id;
   const itemId = payload?.item_id;
   const choiceIndex = payload?.choice_index;
+  const sessionToken = payload?.session_token;
 
   if (!teamId || !itemId || typeof choiceIndex !== 'number') {
     await recordFailure();
     return jsonError({ code: 'validation_error', message: 'team_id, item_id, and choice_index are required.' }, 400);
+  }
+  if (!sessionToken || typeof sessionToken !== 'string') {
+    await recordFailure();
+    return jsonError({ code: 'team_session_required', message: 'Team session required.' }, 401);
   }
 
   const code = normalizeCode(params.code as string);
@@ -59,14 +64,18 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request }
     return jsonError({ code: 'not_found', message: 'Event not found' }, 404);
   }
 
-  const team = await queryFirst<{ id: string }>(
+  const team = await queryFirst<{ id: string; team_session_token: string | null }>(
     env,
-    'SELECT id FROM teams WHERE id = ? AND event_id = ? AND COALESCE(deleted, 0) = 0',
+    'SELECT id, team_session_token FROM teams WHERE id = ? AND event_id = ? AND COALESCE(deleted, 0) = 0',
     [teamId, event.id]
   );
   if (!team) {
     await recordFailure();
     return jsonError({ code: 'not_found', message: 'Team not found' }, 404);
+  }
+  if (!team.team_session_token || team.team_session_token !== sessionToken) {
+    await recordFailure();
+    return jsonError({ code: 'team_session_invalid', message: 'Team session expired. Please rejoin with your team code.' }, 401);
   }
 
   const live = await queryFirst<{

@@ -246,8 +246,7 @@ export const userUpdateSchema = z.object({
 });
 
 export const publicJoinSchema = z.object({
-  team_id: idSchema.optional(),
-  team_name: z.string().min(1).optional()
+  team_code: z.string().regex(/^\d{4}$/)
 });
 
 export const roundScoreSchema = z.object({

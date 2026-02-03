@@ -2,8 +2,8 @@ import type { Env } from '../../../../types';
 import { jsonError, jsonOk } from '../../../../responses';
 import { parseJson } from '../../../../request';
 import { publicJoinSchema } from '../../../../../shared/validators';
-import { normalizeCode } from '../../../../public';
-import { execute, nowIso, queryAll, queryFirst } from '../../../../db';
+import { normalizeCode, normalizeTeamCode } from '../../../../public';
+import { execute, nowIso, queryFirst } from '../../../../db';
 import { checkRateLimit, recordRateLimitHit } from '../../../../rate-limit';
 
 const DEFAULT_PUBLIC_JOIN_RATE_LIMIT = {
@@ -62,45 +62,30 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request }
     return jsonError({ code: 'event_closed', message: 'Event is closed' }, 403);
   }
 
-  if (parsed.data.team_id) {
-    const team = await queryFirst<{ id: string; name: string }>(
-      env,
-      'SELECT id, name FROM teams WHERE id = ? AND event_id = ? AND COALESCE(deleted, 0) = 0',
-      [parsed.data.team_id, event.id]
-    );
-    if (!team) {
-      return jsonError({ code: 'not_found', message: 'Team not found' }, 404);
-    }
-    return jsonOk({ team });
+  const teamCode = normalizeTeamCode(parsed.data.team_code);
+  if (!teamCode || teamCode.length !== 4) {
+    await recordFailure();
+    return jsonError({ code: 'validation_error', message: 'Team code required' }, 400);
   }
-
-  if (!parsed.data.team_name) {
-    return jsonError({ code: 'validation_error', message: 'Team name required' }, 400);
-  }
-
-  const existing = await queryFirst<{ id: string; name: string }>(
-    env,
-    'SELECT id, name FROM teams WHERE event_id = ? AND lower(name) = lower(?) AND COALESCE(deleted, 0) = 0',
-    [event.id, parsed.data.team_name]
-  );
-
-  if (existing) {
-    return jsonOk({ team: existing });
-  }
-
-  const id = crypto.randomUUID();
-  const createdAt = nowIso();
-  await execute(
-    env,
-    'INSERT INTO teams (id, event_id, name, table_label, created_at) VALUES (?, ?, ?, NULL, ?)',
-    [id, event.id, parsed.data.team_name, createdAt]
-  );
 
   const team = await queryFirst<{ id: string; name: string }>(
     env,
-    'SELECT id, name FROM teams WHERE id = ?',
-    [id]
+    'SELECT id, name FROM teams WHERE event_id = ? AND team_code = ? AND COALESCE(deleted, 0) = 0',
+    [event.id, teamCode]
   );
 
-  return jsonOk({ team });
+  if (!team) {
+    await recordFailure();
+    return jsonError({ code: 'not_found', message: 'Team not found' }, 404);
+  }
+
+  const sessionToken = crypto.randomUUID();
+  const now = nowIso();
+  await execute(
+    env,
+    'UPDATE teams SET team_session_token = ?, team_session_updated_at = ? WHERE id = ?',
+    [sessionToken, now, team.id]
+  );
+
+  return jsonOk({ team, session_token: sessionToken });
 };

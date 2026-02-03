@@ -275,6 +275,8 @@ const renderExtrasBlock = (
     qrImage?: any;
     logoImage?: any;
     eventCode?: string;
+    teamCode?: string;
+    teamName?: string;
     upcomingLines?: string[];
     locationName?: string;
   }
@@ -311,12 +313,31 @@ const renderExtrasBlock = (
     cursorY -= 14;
   }
 
+  if (extras.teamName?.trim()) {
+    page.drawText(`Team: ${extras.teamName.trim()}`, {
+      x: cell.x + padding,
+      y: cursorY - textSize,
+      size: textSize,
+      font: fonts.bold
+    });
+    cursorY -= textSize + 6;
+  }
+
   const codeText = extras.eventCode ? `Event Code: ${extras.eventCode}` : 'Event Code: —';
   page.drawText(codeText, {
     x: cell.x + padding,
     y: cursorY - textSize,
     size: textSize,
     font: fonts.bold
+  });
+  cursorY -= textSize + 6;
+
+  const teamCodeText = extras.teamCode ? `Team Code: ${extras.teamCode}` : 'Team Code: —';
+  page.drawText(teamCodeText, {
+    x: cell.x + padding,
+    y: cursorY - textSize,
+    size: textSize,
+    font: fonts.regular
   });
   cursorY -= textSize + 8;
 
@@ -367,6 +388,8 @@ const buildPdf = async (
   extras?: {
     qrDataUrl?: string;
     eventCode?: string;
+    teamCode?: string;
+    teamName?: string;
     upcomingLines?: string[];
     locationName?: string;
     logoBytes?: Uint8Array;
@@ -424,7 +447,12 @@ const buildPdf = async (
     );
   }
 
-  if (mode === 'scoresheet' && extras && pdfDoc.getPages().length >= 2) {
+  if (mode === 'scoresheet' && extras) {
+    if (pdfDoc.getPages().length < 2) {
+      const page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
+      drawPageHeader(page, event, locationName, fonts);
+      drawGridLines(page);
+    }
     const page = pdfDoc.getPages()[1];
     const cellX = PAGE_MARGIN + cellWidth;
     const cellY = gridBottom;
@@ -436,6 +464,8 @@ const buildPdf = async (
         qrImage: qrImage ?? undefined,
         logoImage: logoImage ?? undefined,
         eventCode: extras.eventCode,
+        teamCode: extras.teamCode,
+        teamName: extras.teamName,
         upcomingLines: extras.upcomingLines,
         locationName: extras.locationName
       }
@@ -620,7 +650,7 @@ export function EventDetailPage() {
 
   const publicUrl = useMemo(() => {
     if (!event?.public_code) return '';
-    return `https://triviaops.com/play/${event.public_code}`;
+    return `https://triviaops.com/login?event=${event.public_code}`;
   }, [event?.public_code]);
 
   const locationName = useMemo(() => {
@@ -1017,15 +1047,6 @@ export function EventDetailPage() {
             });
         }
       }
-      let qrDataUrl: string | undefined;
-      if (event.public_code) {
-        const qrTarget = publicUrl || `https://triviaops.com/play/${event.public_code}`;
-        try {
-          qrDataUrl = await QRCode.toDataURL(qrTarget, { margin: 1, width: 240 });
-        } catch {
-          qrDataUrl = undefined;
-        }
-      }
       let logoBytes: Uint8Array | undefined;
       try {
         const logoRes = await fetch(logoLight);
@@ -1036,16 +1057,39 @@ export function EventDetailPage() {
       } catch {
         logoBytes = undefined;
       }
-      const scoresheetBytes = await buildPdf(event, locationName, bundles, 'scoresheet', {
-        qrDataUrl,
-        eventCode: event.public_code ?? undefined,
-        upcomingLines,
-        locationName,
-        logoBytes
-      });
+      const scoresheetDoc = await PDFDocument.create();
+      const teamsForSheets = teams.length > 0 ? teams : [null];
+      for (const team of teamsForSheets) {
+        let qrDataUrl: string | undefined;
+        if (event.public_code) {
+          const params = new URLSearchParams();
+          params.set('event', event.public_code);
+          if (team?.team_code) params.set('team', team.team_code);
+          const qrTarget = `https://triviaops.com/login?${params.toString()}`;
+          try {
+            qrDataUrl = await QRCode.toDataURL(qrTarget, { margin: 1, width: 240 });
+          } catch {
+            qrDataUrl = undefined;
+          }
+        }
+        const teamScoresheet = await buildPdf(event, locationName, bundles, 'scoresheet', {
+          qrDataUrl,
+          eventCode: event.public_code ?? undefined,
+          teamCode: team?.team_code ?? undefined,
+          teamName: team?.name ?? undefined,
+          upcomingLines,
+          locationName,
+          logoBytes
+        });
+        const teamDoc = await PDFDocument.load(teamScoresheet);
+        const pages = await scoresheetDoc.copyPages(teamDoc, teamDoc.getPageIndices());
+        pages.forEach((page) => scoresheetDoc.addPage(page));
+      }
+      const scoresheetBytes = await scoresheetDoc.save();
       const answersheetBytes = await buildPdf(event, locationName, bundles, 'answersheet');
       const baseName = safeFileName(event.title, `event-${event.id.slice(0, 8)}`);
-      const scoresheetFile = new File([scoresheetBytes], `${baseName}-scoresheet.pdf`, {
+      const scoresheetLabel = teams.length > 1 ? `${baseName}-scoresheets.pdf` : `${baseName}-scoresheet.pdf`;
+      const scoresheetFile = new File([scoresheetBytes], scoresheetLabel, {
         type: 'application/pdf'
       });
       const answersheetFile = new File([answersheetBytes], `${baseName}-answersheet.pdf`, {
@@ -1386,6 +1430,7 @@ export function EventDetailPage() {
                       />
                     </label>
                   </div>
+                  <div className="text-xs text-muted">Team code: {team.team_code ?? '—'}</div>
                   <div className="flex flex-wrap gap-2">
                     <PrimaryButton className="px-3 py-2 text-xs" onClick={saveEditTeam}>
                       Save
@@ -1403,6 +1448,7 @@ export function EventDetailPage() {
                   <div>
                     <div className="text-sm font-display tracking-[0.12em]">{team.name}</div>
                     <div className="mt-1 text-xs text-muted">{team.table_label ?? 'No table label'}</div>
+                    <div className="mt-1 text-xs text-muted">Team code: {team.team_code ?? '—'}</div>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <SecondaryButton className="px-3 py-2 text-xs" onClick={() => startEditTeam(team)}>

@@ -298,12 +298,12 @@ export const api = {
     const query = view ? `?view=${encodeURIComponent(view)}` : '';
     return apiFetch<any>(`/api/public/event/${code}${query}`, { cache: 'no-store' });
   },
-  publicJoin: (code: string, payload: { team_id?: string; team_name?: string }) =>
-    apiFetch<{ team: { id: string; name: string } }>(`/api/public/event/${code}/join`, {
+  publicJoin: (code: string, payload: { team_code: string }) =>
+    apiFetch<{ team: { id: string; name: string }; session_token: string }>(`/api/public/event/${code}/join`, {
       method: 'POST',
       body: JSON.stringify(payload)
     }),
-  publicSubmitChoice: (code: string, payload: { team_id: string; item_id: string; choice_index: number }) =>
+  publicSubmitChoice: (code: string, payload: { team_id: string; item_id: string; choice_index: number; session_token: string }) =>
     apiFetch<{ ok: true; choice_index: number; choice_text: string }>(`/api/public/event/${code}/responses`, {
       method: 'POST',
       body: JSON.stringify(payload)
