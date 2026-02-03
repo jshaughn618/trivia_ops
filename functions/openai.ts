@@ -96,6 +96,8 @@ type OpenAIResponse = {
     text?: string;
     summary?: string;
   }>;
+  status?: string;
+  incomplete_details?: unknown;
   error?: { message?: string };
 };
 
@@ -146,6 +148,7 @@ function logEmptyResponse(env: Env, data: OpenAIResponse, extra?: Record<string,
   const contentTypes = output.flatMap((item) =>
     Array.isArray(item?.content) ? item.content.map((part) => part?.type ?? 'unknown') : []
   );
+  const summaryLengths = output.map((item) => (typeof item?.summary === 'string' ? item.summary.length : 0));
   const info = {
     has_output_text: typeof data.output_text === 'string',
     output_text_length: typeof data.output_text === 'string' ? data.output_text.length : 0,
@@ -153,6 +156,9 @@ function logEmptyResponse(env: Env, data: OpenAIResponse, extra?: Record<string,
     output_item_keys: output.map((item) => Object.keys(item ?? {})),
     output_content_types: contentTypes,
     output_content_count: contentTypes.length,
+    output_summary_lengths: summaryLengths,
+    status: data.status ?? null,
+    incomplete_details: data.incomplete_details ?? null,
     ...extra
   };
   console.warn(JSON.stringify({ level: 'warn', event: 'openai_empty_response', ...info }));
