@@ -99,24 +99,6 @@ const drawPageHeader = (
     });
   }
 
-  const label = 'Team Name:';
-  const labelSize = 9;
-  const labelWidth = fonts.regular.widthOfTextAtSize(label, labelSize);
-  const lineWidth = 200;
-  const lineStartX = PAGE_WIDTH - PAGE_MARGIN - lineWidth;
-  const labelX = lineStartX - labelWidth - 6;
-  page.drawText(label, {
-    x: labelX,
-    y: titleY,
-    size: labelSize,
-    font: fonts.regular
-  });
-  page.drawLine({
-    start: { x: lineStartX, y: titleY - 2 },
-    end: { x: PAGE_WIDTH - PAGE_MARGIN, y: titleY - 2 },
-    thickness: 1,
-    color: rgb(0, 0, 0)
-  });
 };
 
 const drawGridLines = (page: any) => {
@@ -311,6 +293,7 @@ const renderTeamBlock = (
   }
 
   const teamName = extras.teamName?.trim() ?? '';
+  cursorY -= textSize * 2;
   if (teamName && !extras.teamPlaceholder) {
     page.drawText(`Team: ${teamName}`, {
       x: cell.x + padding,
@@ -318,15 +301,26 @@ const renderTeamBlock = (
       size: textSize,
       font: fonts.bold
     });
-    cursorY -= textSize + 6;
+    cursorY -= textSize + 12;
   } else {
-    page.drawText('Team Name: ____________________', {
+    const label = 'Team Name:';
+    const labelWidth = fonts.bold.widthOfTextAtSize(label, textSize);
+    const baseY = cursorY - textSize;
+    const lineStartX = cell.x + padding + labelWidth + 6;
+    const lineEndX = cell.x + cell.width - padding;
+    page.drawText(label, {
       x: cell.x + padding,
-      y: cursorY - textSize,
+      y: baseY,
       size: textSize,
       font: fonts.bold
     });
-    cursorY -= textSize + 6;
+    page.drawLine({
+      start: { x: lineStartX, y: baseY - 2 },
+      end: { x: lineEndX, y: baseY - 2 },
+      thickness: 1,
+      color: rgb(0, 0, 0)
+    });
+    cursorY -= textSize + 12;
   }
 
   const codeText = extras.eventCode ? `Event Code: ${extras.eventCode}` : 'Event Code: —';
