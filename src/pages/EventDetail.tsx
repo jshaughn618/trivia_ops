@@ -274,7 +274,7 @@ const renderTeamBlock = (
       size: textSize,
       font: fonts.bold
     });
-    cursorY -= textSize + 12;
+    cursorY -= textSize + 30;
   } else {
     const label = 'Team Name:';
     const labelWidth = fonts.bold.widthOfTextAtSize(label, textSize);
@@ -293,7 +293,7 @@ const renderTeamBlock = (
       thickness: 1,
       color: rgb(0, 0, 0)
     });
-    cursorY -= textSize + 12;
+    cursorY -= textSize + 30;
   }
 
   if (extras.logoImage) {
