@@ -9,7 +9,7 @@ const variants: Record<string, string> = {
 export function StampBadge({ label, variant = 'inspected' }: { label: string; variant?: keyof typeof variants }) {
   return (
     <span
-      className={`inline-flex items-center rounded-sm border px-3 py-1 text-[10px] font-display uppercase tracking-[0.35em] ${
+      className={`inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold tracking-[0.1em] ${
         variants[variant]
       }`}
     >

@@ -54,6 +54,7 @@ export function DashboardPage() {
   const liveCount = events.filter((event) => event.status === 'live').length;
   const plannedCount = events.filter((event) => event.status === 'planned').length;
   const draftCount = editions.filter((edition) => edition.status === 'draft').length;
+  const statusLabel = (status: string) => status.charAt(0).toUpperCase() + status.slice(1);
 
   return (
     <AppShell title="Dashboard">
@@ -62,85 +63,119 @@ export function DashboardPage() {
           {error}
         </div>
       )}
-      <div className={`grid gap-4 ${isAdmin ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
-        <Link to="/events?status=live">
-          <StatTile label="Live Events" value={String(liveCount)} helper="On Air" />
-        </Link>
-        <Link to="/events?status=planned">
-          <StatTile label="Planned Events" value={String(plannedCount)} helper="Scheduled" />
-        </Link>
-        {isAdmin && (
-          <Link to="/editions?status=draft">
-            <StatTile label="Draft Editions" value={String(draftCount)} helper="Build Queue" />
+      <div className="space-y-6">
+        <section className={`grid gap-4 ${isAdmin ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
+          <Link
+            to="/events?status=live"
+            className="group block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+          >
+            <StatTile
+              label="Live events"
+              value={String(liveCount)}
+              helper="On air now"
+              className="transition-transform duration-150 group-hover:-translate-y-0.5"
+            />
           </Link>
-        )}
-      </div>
+          <Link
+            to="/events?status=planned"
+            className="group block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+          >
+            <StatTile
+              label="Planned events"
+              value={String(plannedCount)}
+              helper="Scheduled"
+              className="transition-transform duration-150 group-hover:-translate-y-0.5"
+            />
+          </Link>
+          {isAdmin && (
+            <Link
+              to="/editions?status=draft"
+              className="group block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+            >
+              <StatTile
+                label="Draft editions"
+                value={String(draftCount)}
+                helper="In progress"
+                className="transition-transform duration-150 group-hover:-translate-y-0.5"
+              />
+            </Link>
+          )}
+        </section>
 
-      <div className={`mt-6 grid gap-4 ${isAdmin ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
-        <Panel title="Quick Actions">
-          <div className="flex flex-col gap-3">
-            {isAdmin && (
-              <ButtonLink to="/events/new" variant="primary">
-                Create Event
-              </ButtonLink>
-            )}
-            {isAdmin && (
-              <ButtonLink to="/editions/new" variant="secondary">
-                Build Edition
-              </ButtonLink>
-            )}
-            {isAdmin && (
-              <ButtonLink to="/games" variant="secondary">
-                Games
-              </ButtonLink>
-            )}
-            <ButtonLink to="/events" variant="secondary">
-              Run Event
-            </ButtonLink>
-          </div>
-        </Panel>
-
-        <Panel title="Upcoming Events">
-          <div className="flex flex-col gap-3">
-            {upcoming.length === 0 && (
-              <div className="text-xs uppercase tracking-[0.2em] text-muted">No scheduled events.</div>
-            )}
-            {upcoming.map((event) => (
-              <Link key={event.id} to={`/events/${event.id}`} className="border-2 border-border bg-panel2 p-3">
-                <div className="text-sm font-display uppercase tracking-[0.25em]">{event.title}</div>
-                <div className="mt-2 flex items-center justify-between text-xs text-muted uppercase tracking-[0.2em]">
-                  <span>{new Date(event.starts_at).toLocaleString()}</span>
-                  <StampBadge label={event.status.toUpperCase()} variant="verified" />
-                </div>
-              </Link>
-            ))}
-          </div>
-        </Panel>
-
-        {isAdmin && (
-          <Panel title="Draft Editions">
-            <div className="flex flex-col gap-3">
-              {drafts.length === 0 && (
-                <div className="text-xs uppercase tracking-[0.2em] text-muted">No draft editions.</div>
+        <section className={`grid gap-4 ${isAdmin ? 'lg:grid-cols-3' : 'lg:grid-cols-2'}`}>
+          <Panel title="Quick actions" className="p-5">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+              {isAdmin && (
+                <ButtonLink to="/events/new" variant="primary" className="h-11">
+                  Create event
+                </ButtonLink>
               )}
-              {drafts.map((edition) => (
+              {isAdmin && (
+                <ButtonLink to="/editions/new" variant="secondary" className="h-11">
+                  Build edition
+                </ButtonLink>
+              )}
+              {isAdmin && (
+                <ButtonLink to="/games" variant="secondary" className="h-11">
+                  Games
+                </ButtonLink>
+              )}
+              <ButtonLink to="/events" variant="secondary" className="h-11">
+                Run event
+              </ButtonLink>
+            </div>
+          </Panel>
+
+          <Panel title="Upcoming events" className="p-5">
+            <div className="flex flex-col gap-3">
+              {upcoming.length === 0 && (
+                <div className="text-sm text-muted">No scheduled events.</div>
+              )}
+              {upcoming.map((event) => (
                 <Link
-                  key={edition.id}
-                  to={`/editions/${edition.id}`}
-                  className="border-2 border-border bg-panel2 p-3"
+                  key={event.id}
+                  to={`/events/${event.id}`}
+                  className="surface-inset flex flex-col gap-2 p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
                 >
-                  <div className="text-sm font-display uppercase tracking-[0.25em]">
-                    {edition.theme ?? 'Untitled Theme'}
-                  </div>
-                  <div className="mt-2 flex items-center justify-between text-xs text-muted uppercase tracking-[0.2em]">
-                    <span>Updated {new Date(edition.updated_at).toLocaleDateString()}</span>
-                    <StampBadge label="DRAFT" variant="inspected" />
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-semibold text-text">{event.title}</div>
+                      <div className="mt-1 text-xs text-muted">{new Date(event.starts_at).toLocaleString()}</div>
+                    </div>
+                    <StampBadge label={statusLabel(event.status)} variant="verified" />
                   </div>
                 </Link>
               ))}
             </div>
           </Panel>
-        )}
+
+          {isAdmin && (
+            <Panel title="Draft editions" className="p-5">
+              <div className="flex flex-col gap-3">
+                {drafts.length === 0 && <div className="text-sm text-muted">No draft editions.</div>}
+                {drafts.map((edition) => (
+                  <Link
+                  key={edition.id}
+                  to={`/editions/${edition.id}`}
+                  className="surface-inset flex flex-col gap-2 p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+                >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-semibold text-text">
+                          {edition.theme ?? 'Untitled theme'}
+                        </div>
+                        <div className="mt-1 text-xs text-muted">
+                          Updated {new Date(edition.updated_at).toLocaleDateString()}
+                        </div>
+                      </div>
+                      <StampBadge label="Draft" variant="inspected" />
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </Panel>
+          )}
+        </section>
       </div>
     </AppShell>
   );

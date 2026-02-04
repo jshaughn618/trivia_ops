@@ -1,11 +1,21 @@
 import type { ReactNode } from 'react';
 
-export function Panel({ title, action, children }: { title?: string; action?: ReactNode; children: ReactNode }) {
+export function Panel({
+  title,
+  action,
+  children,
+  className
+}: {
+  title?: string;
+  action?: ReactNode;
+  children: ReactNode;
+  className?: string;
+}) {
   return (
-    <section className="rounded-lg border border-border bg-panel p-4 shadow-sm">
+    <section className={`surface-card p-4 ${className ?? ''}`}>
       {(title || action) && (
-        <div className="mb-4 flex items-center justify-between border-b border-border pb-2">
-          <h2 className="ui-label">{title}</h2>
+        <div className="mb-4 flex items-center justify-between border-b border-border pb-3">
+          <h2 className="panel-title">{title}</h2>
           {action}
         </div>
       )}

@@ -7,6 +7,7 @@ module.exports = {
         bg: "var(--bg)",
         panel: "var(--panel)",
         panel2: "var(--panel2)",
+        panel3: "var(--panel3)",
         text: "var(--text)",
         muted: "var(--muted)",
         border: "var(--border)",
@@ -20,8 +21,8 @@ module.exports = {
         "danger-ink": "var(--danger-ink)"
       },
       fontFamily: {
-        display: ["Oswald", "ui-sans-serif", "system-ui"],
-        body: ["ui-sans-serif", "system-ui", "-apple-system", "Segoe UI", "Roboto", "Helvetica", "Arial", "sans-serif"]
+        display: ["Space Grotesk", "ui-sans-serif", "system-ui"],
+        body: ["IBM Plex Sans", "ui-sans-serif", "system-ui", "-apple-system", "Segoe UI", "Roboto", "Helvetica", "Arial", "sans-serif"]
       }
     }
   },
