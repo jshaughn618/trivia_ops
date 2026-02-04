@@ -201,7 +201,7 @@ export async function getPublicEventPayload(env: Env, rawCode: string, view?: Pu
        FROM teams t
        LEFT JOIN event_round_scores s ON s.team_id = t.id AND COALESCE(s.deleted, 0) = 0
        LEFT JOIN event_rounds r ON r.id = s.event_round_id
-       WHERE t.event_id = ? AND COALESCE(t.deleted, 0) = 0
+       WHERE t.event_id = ? AND COALESCE(t.deleted, 0) = 0 AND COALESCE(t.team_placeholder, 0) = 0
        GROUP BY t.id
        ORDER BY total DESC, t.name ASC`,
       [event.id]
