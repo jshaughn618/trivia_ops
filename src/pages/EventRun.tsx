@@ -647,9 +647,14 @@ export function EventRunPage() {
                     {timerButtonLabel}
                   </SecondaryButton>
                 )}
-                <SecondaryButton onClick={clearRoundResponses} disabled={!activeRound || clearResponsesStatus === 'clearing'}>
-                  {clearResponsesStatus === 'clearing' ? 'Clearing…' : 'Clear Responses'}
-                </SecondaryButton>
+                {item?.question_type === 'multiple_choice' && (
+                  <SecondaryButton
+                    onClick={clearRoundResponses}
+                    disabled={!activeRound || clearResponsesStatus === 'clearing'}
+                  >
+                    {clearResponsesStatus === 'clearing' ? 'Clearing…' : 'Clear Responses'}
+                  </SecondaryButton>
+                )}
                 <SecondaryButton
                   onClick={() => {
                     const next = !showAnswer;
