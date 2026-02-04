@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { PrimaryButton, SecondaryButton } from '../components/Buttons';
+import { PromptHero } from '../components/play/PromptHero';
 import { api, formatApiError } from '../api';
 import { useAuth } from '../auth';
 import { useTheme } from '../lib/theme';
@@ -226,119 +227,122 @@ export function LoginPage() {
             </>
           ) : (
             <>
-              <div className="mt-2 text-sm text-muted">
-                {eventInfo?.title ? `Event: ${eventInfo.title}` : 'Enter the 4-digit team code from your scoresheet'}
-              </div>
-              <div className="mt-3 flex flex-col gap-3">
-                <div className="text-center text-xs uppercase tracking-[0.25em] text-muted">Enter Team Code</div>
-                <div className="flex justify-center gap-3">
-                  {teamCode.map((value, index) => (
-                    <input
-                      key={`team-code-${index}`}
-                      ref={(el) => {
-                        teamRefs.current[index] = el;
+              <div className="mt-4 flex w-full flex-col items-center gap-6 text-center">
+                <div className="text-xs uppercase tracking-[0.35em] text-muted">Join your team</div>
+                <PromptHero>Enter the team code from your scoresheet.</PromptHero>
+                <div className="w-full rounded-2xl bg-panel/40 p-4 text-left">
+                  <div className="text-xs uppercase tracking-[0.3em] text-muted">Team code</div>
+                  <div className="mt-4 flex flex-col gap-3">
+                    <div className="flex flex-col gap-2">
+                      <div className="flex justify-center gap-3">
+                        {teamCode.map((value, index) => (
+                          <input
+                            key={`team-code-${index}`}
+                            ref={(el) => {
+                              teamRefs.current[index] = el;
+                            }}
+                            type="tel"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            maxLength={1}
+                            className="h-14 w-14 border-2 border-strong bg-panel2 text-center text-2xl font-display tracking-[0.2em] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+                            value={value}
+                            onChange={(event) => {
+                              const next = sanitized(event.target.value).slice(0, 1);
+                              setTeamCode((prev) => {
+                                const updated = [...prev];
+                                updated[index] = next;
+                                const nextCode = updated.join('');
+                                if (requireTeamName && requireTeamNameCode && nextCode !== requireTeamNameCode) {
+                                  setRequireTeamName(false);
+                                  setRequireTeamNameCode('');
+                                }
+                                if (updated.every((digit) => digit) && (!requireTeamName || teamNameInput.trim())) {
+                                  attemptTeamJoin(updated.join(''));
+                                }
+                                return updated;
+                              });
+                              if (next && index < teamRefs.current.length - 1) {
+                                teamRefs.current[index + 1]?.focus();
+                              }
+                            }}
+                            onKeyDown={(event) => {
+                              if (event.key === 'Backspace' && !teamCode[index] && index > 0) {
+                                teamRefs.current[index - 1]?.focus();
+                              }
+                              if (event.key === 'Enter' && teamReady) {
+                                attemptTeamJoin(teamValue);
+                              }
+                            }}
+                            onPaste={(event) => {
+                              event.preventDefault();
+                              const paste = sanitized(event.clipboardData.getData('text'));
+                              if (!paste) return;
+                              setTeamCode((prev) => {
+                                const updated = [...prev];
+                                for (let i = 0; i < paste.length && index + i < updated.length; i += 1) {
+                                  updated[index + i] = paste[i];
+                                }
+                                const nextCode = updated.join('');
+                                if (requireTeamName && requireTeamNameCode && nextCode !== requireTeamNameCode) {
+                                  setRequireTeamName(false);
+                                  setRequireTeamNameCode('');
+                                }
+                                if (updated.every((digit) => digit) && (!requireTeamName || teamNameInput.trim())) {
+                                  attemptTeamJoin(updated.join(''));
+                                }
+                                return updated;
+                              });
+                              const nextIndex = Math.min(index + paste.length, teamRefs.current.length - 1);
+                              teamRefs.current[nextIndex]?.focus();
+                            }}
+                            aria-label={`Team code digit ${index + 1}`}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                    {requireTeamName && (
+                      <label className="flex flex-col gap-2">
+                        <span className="text-xs uppercase tracking-[0.25em] text-muted">Team name required</span>
+                        <input
+                          className="h-10 px-3"
+                          value={teamNameInput}
+                          onChange={(event) => setTeamNameInput(event.target.value)}
+                          placeholder="Enter your team name"
+                        />
+                      </label>
+                    )}
+                    {teamError && (
+                      <div className="border border-danger bg-panel2 px-3 py-2 text-xs text-danger-ink" aria-live="polite">
+                        {teamError}
+                      </div>
+                    )}
+                    <PrimaryButton
+                      type="button"
+                      onClick={() => {
+                        if (teamReady) attemptTeamJoin(teamValue);
                       }}
-                      type="tel"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      maxLength={1}
-                      className="h-16 w-16 border-2 border-strong bg-panel2 text-center text-2xl font-display tracking-[0.2em] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
-                      value={value}
-                      onChange={(event) => {
-                        const next = sanitized(event.target.value).slice(0, 1);
-                        setTeamCode((prev) => {
-                          const updated = [...prev];
-                          updated[index] = next;
-                          const nextCode = updated.join('');
-                          if (requireTeamName && requireTeamNameCode && nextCode !== requireTeamNameCode) {
-                            setRequireTeamName(false);
-                            setRequireTeamNameCode('');
-                          }
-                          if (updated.every((digit) => digit) && (!requireTeamName || teamNameInput.trim())) {
-                            attemptTeamJoin(updated.join(''));
-                          }
-                          return updated;
-                        });
-                        if (next && index < teamRefs.current.length - 1) {
-                          teamRefs.current[index + 1]?.focus();
-                        }
+                      disabled={!teamReady || teamLoading || (requireTeamName && !teamNameInput.trim())}
+                    >
+                      {teamLoading ? 'Joining…' : 'Join'}
+                    </PrimaryButton>
+                    <SecondaryButton
+                      type="button"
+                      onClick={() => {
+                        setStep('event');
+                        setEventInfo(null);
+                        setEventCode(['', '', '', '']);
+                        setTeamCode(['', '', '', '']);
+                        setTeamNameInput('');
+                        setRequireTeamName(false);
+                        setRequireTeamNameCode('');
+                        setEventError(null);
+                        setTeamError(null);
                       }}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Backspace' && !teamCode[index] && index > 0) {
-                          teamRefs.current[index - 1]?.focus();
-                        }
-                        if (event.key === 'Enter' && teamReady) {
-                          attemptTeamJoin(teamValue);
-                        }
-                      }}
-                      onPaste={(event) => {
-                        event.preventDefault();
-                        const paste = sanitized(event.clipboardData.getData('text'));
-                        if (!paste) return;
-                        setTeamCode((prev) => {
-                          const updated = [...prev];
-                          for (let i = 0; i < paste.length && index + i < updated.length; i += 1) {
-                            updated[index + i] = paste[i];
-                          }
-                          const nextCode = updated.join('');
-                          if (requireTeamName && requireTeamNameCode && nextCode !== requireTeamNameCode) {
-                            setRequireTeamName(false);
-                            setRequireTeamNameCode('');
-                          }
-                          if (updated.every((digit) => digit) && (!requireTeamName || teamNameInput.trim())) {
-                            attemptTeamJoin(updated.join(''));
-                          }
-                          return updated;
-                        });
-                        const nextIndex = Math.min(index + paste.length, teamRefs.current.length - 1);
-                        teamRefs.current[nextIndex]?.focus();
-                      }}
-                      aria-label={`Team code digit ${index + 1}`}
-                    />
-                  ))}
-                </div>
-                {requireTeamName && (
-                  <label className="flex flex-col gap-2">
-                    <span className="text-xs uppercase tracking-[0.25em] text-muted">Team name required</span>
-                    <input
-                      className="h-10 px-3"
-                      value={teamNameInput}
-                      onChange={(event) => setTeamNameInput(event.target.value)}
-                      placeholder="Enter your team name"
-                    />
-                  </label>
-                )}
-                {teamError && (
-                  <div className="border border-danger bg-panel2 px-3 py-2 text-xs text-danger-ink" aria-live="polite">
-                    {teamError}
+                    >
+                      Change event code
+                    </SecondaryButton>
                   </div>
-                )}
-                <div className="flex flex-col gap-2">
-                  <PrimaryButton
-                    type="button"
-                    onClick={() => {
-                      if (teamReady) attemptTeamJoin(teamValue);
-                    }}
-                    disabled={!teamReady || teamLoading || (requireTeamName && !teamNameInput.trim())}
-                  >
-                    {teamLoading ? 'Joining…' : 'Join game'}
-                  </PrimaryButton>
-                  <SecondaryButton
-                    type="button"
-                    onClick={() => {
-                      setStep('event');
-                      setEventInfo(null);
-                      setEventCode(['', '', '', '']);
-                      setTeamCode(['', '', '', '']);
-                      setTeamNameInput('');
-                      setRequireTeamName(false);
-                      setRequireTeamNameCode('');
-                      setEventError(null);
-                      setTeamError(null);
-                    }}
-                  >
-                    Change event code
-                  </SecondaryButton>
                 </div>
               </div>
             </>
