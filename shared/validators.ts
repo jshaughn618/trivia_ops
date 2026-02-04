@@ -250,6 +250,12 @@ export const publicJoinSchema = z.object({
   team_name: z.string().min(1).optional()
 });
 
+export const publicTeamNameSchema = z.object({
+  team_id: idSchema,
+  team_name: z.string().min(1),
+  session_token: z.string().min(1)
+});
+
 export const roundScoreSchema = z.object({
   team_id: idSchema,
   score: z.number()

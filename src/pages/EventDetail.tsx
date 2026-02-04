@@ -1132,7 +1132,7 @@ export function EventDetailPage() {
           eventCode: event.public_code ?? undefined,
           teamCode: team?.team_code ?? undefined,
           teamName: team?.name ?? undefined,
-          teamPlaceholder: Boolean(team?.team_placeholder),
+          teamPlaceholder: Number(team?.team_placeholder ?? 0) === 1,
           upcomingLines,
           locationName,
           logoBytes
@@ -1487,7 +1487,7 @@ export function EventDetailPage() {
                     </label>
                   </div>
                   <div className="text-xs text-muted">Team code: {team.team_code ?? '—'}</div>
-                  {team.team_placeholder ? (
+                  {Number(team.team_placeholder ?? 0) === 1 ? (
                     <div className="text-xs text-muted">Status: Unclaimed</div>
                   ) : null}
                   <div className="flex flex-wrap gap-2">
@@ -1508,7 +1508,7 @@ export function EventDetailPage() {
                     <div className="text-sm font-display tracking-[0.12em]">{team.name}</div>
                     <div className="mt-1 text-xs text-muted">{team.table_label ?? 'No table label'}</div>
                     <div className="mt-1 text-xs text-muted">Team code: {team.team_code ?? '—'}</div>
-                    {team.team_placeholder ? (
+                    {Number(team.team_placeholder ?? 0) === 1 ? (
                       <div className="mt-1 text-xs text-muted">Status: Unclaimed</div>
                     ) : null}
                   </div>

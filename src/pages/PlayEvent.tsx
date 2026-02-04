@@ -705,6 +705,37 @@ export function PlayEventPage() {
             </button>
             <button
               type="button"
+              onClick={async () => {
+                if (!data?.event?.public_code || !teamId || !teamSession) {
+                  handleSessionExpired('Your team session expired. Re-enter the team code to continue.');
+                  return;
+                }
+                const nextName = window.prompt('Enter a new team name', teamNameLabel ?? '')?.trim() ?? '';
+                if (!nextName || nextName.toLowerCase() === (teamNameLabel ?? '').toLowerCase()) {
+                  return;
+                }
+                const res = await api.publicUpdateTeamName(data.event.public_code, {
+                  team_id: teamId,
+                  team_name: nextName,
+                  session_token: teamSession
+                });
+                if (res.ok) {
+                  setTeamNameLabel(res.data.team.name);
+                  localStorage.setItem(`player_team_name_${data.event.public_code}`, res.data.team.name);
+                  return;
+                }
+                if (res.error?.code === 'team_session_invalid') {
+                  handleSessionExpired(res.error.message ?? 'Your team session expired. Re-enter the team code to continue.');
+                  return;
+                }
+                window.alert(formatApiError(res, 'Unable to update team name.'));
+              }}
+              className="mb-2 w-full rounded-md border border-border bg-panel2 px-3 py-2 text-xs font-medium text-text"
+            >
+              Change Team Name
+            </button>
+            <button
+              type="button"
               onClick={handleChangeTeam}
               className="w-full rounded-md border border-border bg-panel2 px-3 py-2 text-xs font-medium text-text"
             >
@@ -735,7 +766,7 @@ export function PlayEventPage() {
               <div className="text-xs uppercase tracking-[0.3em] text-muted">Team code</div>
               <div className="mt-4 flex flex-col gap-3">
                 <label className="flex flex-col gap-2">
-                  <span className="text-xs uppercase tracking-[0.25em] text-muted">Enter code</span>
+                  <span className="text-xs uppercase tracking-[0.25em] text-muted text-center">Enter Team Code</span>
                   <div className="flex justify-center gap-3">
                     {teamCode.map((value, index) => (
                       <input
@@ -803,17 +834,17 @@ export function PlayEventPage() {
                     ))}
                   </div>
                 </label>
-                <label className="flex flex-col gap-2">
-                  <span className="text-xs uppercase tracking-[0.25em] text-muted">
-                    {requireTeamName ? 'Team name required' : 'Team name (only for new teams)'}
-                  </span>
-                  <input
-                    className="h-10 px-3"
-                    value={teamNameInput}
-                    onChange={(event) => setTeamNameInput(event.target.value)}
-                    placeholder="Enter your team name"
-                  />
-                </label>
+                {requireTeamName && (
+                  <label className="flex flex-col gap-2">
+                    <span className="text-xs uppercase tracking-[0.25em] text-muted">Team name required</span>
+                    <input
+                      className="h-10 px-3"
+                      value={teamNameInput}
+                      onChange={(event) => setTeamNameInput(event.target.value)}
+                      placeholder="Enter your team name"
+                    />
+                  </label>
+                )}
                 {joinError && (
                   <div className="rounded-md border border-danger bg-panel2 px-3 py-2 text-xs text-danger-ink" aria-live="polite">
                     {joinError}

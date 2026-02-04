@@ -80,7 +80,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request }
     return jsonError({ code: 'not_found', message: 'Team not found' }, 404);
   }
 
-  const placeholder = Boolean(team.team_placeholder);
+  const placeholder = Number(team.team_placeholder ?? 0) === 1;
   if (placeholder && !requestedName) {
     await recordFailure();
     return jsonError({ code: 'team_name_required', message: 'Team name required to claim this code.' }, 400);

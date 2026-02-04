@@ -107,6 +107,8 @@ export function LoginPage() {
       if (res.error?.code === 'team_name_required') {
         setRequireTeamName(true);
         setRequireTeamNameCode(normalized);
+        setTeamError(formatApiError(res, 'Team name required to claim this code.'));
+        return;
       }
       setTeamError(formatApiError(res, 'Team code not recognized. Check the code and try again.'));
       setTeamCode(['', '', '', '']);
@@ -297,17 +299,17 @@ export function LoginPage() {
                     />
                   ))}
                 </div>
-                <label className="flex flex-col gap-2">
-                  <span className="text-xs uppercase tracking-[0.25em] text-muted">
-                    {requireTeamName ? 'Team name required' : 'Team name (only for new teams)'}
-                  </span>
-                  <input
-                    className="h-10 px-3"
-                    value={teamNameInput}
-                    onChange={(event) => setTeamNameInput(event.target.value)}
-                    placeholder="Enter your team name"
-                  />
-                </label>
+                {requireTeamName && (
+                  <label className="flex flex-col gap-2">
+                    <span className="text-xs uppercase tracking-[0.25em] text-muted">Team name required</span>
+                    <input
+                      className="h-10 px-3"
+                      value={teamNameInput}
+                      onChange={(event) => setTeamNameInput(event.target.value)}
+                      placeholder="Enter your team name"
+                    />
+                  </label>
+                )}
                 {teamError && (
                   <div className="border border-danger bg-panel2 px-3 py-2 text-xs text-danger-ink" aria-live="polite">
                     {teamError}

@@ -308,6 +308,11 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(payload)
     }),
+  publicUpdateTeamName: (code: string, payload: { team_id: string; team_name: string; session_token: string }) =>
+    apiFetch<{ team: { id: string; name: string } }>(`/api/public/event/${code}/team-name`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    }),
   publicSubmitChoice: (code: string, payload: { team_id: string; item_id: string; choice_index: number; session_token: string }) =>
     apiFetch<{ ok: true; choice_index: number; choice_text: string }>(`/api/public/event/${code}/responses`, {
       method: 'POST',
