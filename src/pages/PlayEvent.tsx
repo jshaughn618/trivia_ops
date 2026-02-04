@@ -125,7 +125,7 @@ export function PlayEventPage() {
   const [error, setError] = useState<string | null>(null);
   const [teamId, setTeamId] = useState('');
   const [teamSession, setTeamSession] = useState('');
-  const [teamCodeInput, setTeamCodeInput] = useState('');
+  const [teamCode, setTeamCode] = useState(['', '', '', '']);
   const [teamNameInput, setTeamNameInput] = useState('');
   const [teamNameLabel, setTeamNameLabel] = useState<string | null>(null);
   const [teamMenuOpen, setTeamMenuOpen] = useState(false);
@@ -143,12 +143,16 @@ export function PlayEventPage() {
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
   const countdownRef = useRef<number | null>(null);
   const swipeHintRef = useRef<number | null>(null);
+  const teamCodeRefs = useRef<Array<HTMLInputElement | null>>([]);
   const [showSwipeHint, setShowSwipeHint] = useState(false);
   const lastResponseTotalRef = useRef(0);
   const [responseSync, setResponseSync] = useState<{ expectedTotal: number; expiresAt: number } | null>(null);
   const [graphDelayUntil, setGraphDelayUntil] = useState<number | null>(null);
   const graphDelayItemRef = useRef<string | null>(null);
   const normalizedCode = useMemo(() => (code ?? '').trim().toUpperCase(), [code]);
+  const sanitizedDigits = (value: string) => value.replace(/\D/g, '');
+  const teamCodeValue = teamCode.join('');
+  const teamCodeReady = teamCode.every((digit) => digit.length === 1);
 
   const load = async () => {
     if (!normalizedCode) return;
@@ -444,7 +448,7 @@ export function PlayEventPage() {
 
   const handleJoin = async () => {
     if (!data) return;
-    const normalized = teamCodeInput.replace(/\D/g, '');
+    const normalized = sanitizedDigits(teamCodeValue);
     if (!normalized) {
       setJoinError('Enter the team code from your scoresheet.');
       return;
@@ -465,7 +469,7 @@ export function PlayEventPage() {
       localStorage.setItem(`player_team_code_${data.event.public_code}`, res.data.team.id);
       localStorage.setItem(`player_team_name_${data.event.public_code}`, res.data.team.name);
       localStorage.setItem(`player_team_session_${data.event.public_code}`, res.data.session_token);
-      setTeamCodeInput('');
+      setTeamCode(['', '', '', '']);
       setTeamNameInput('');
       setJoinError(null);
     } else {
@@ -484,7 +488,7 @@ export function PlayEventPage() {
     setTeamId('');
     setTeamSession('');
     setTeamNameLabel(null);
-    setTeamCodeInput('');
+    setTeamCode(['', '', '', '']);
     setTeamNameInput('');
     setTeamMenuOpen(false);
   };
@@ -722,14 +726,62 @@ export function PlayEventPage() {
               <div className="mt-4 flex flex-col gap-3">
                 <label className="flex flex-col gap-2">
                   <span className="text-xs uppercase tracking-[0.25em] text-muted">Enter code</span>
-                  <input
-                    className="h-10 px-3 tracking-[0.35em]"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    maxLength={4}
-                    value={teamCodeInput}
-                    onChange={(event) => setTeamCodeInput(event.target.value.replace(/\D/g, '').slice(0, 4))}
-                  />
+                  <div className="flex justify-center gap-3">
+                    {teamCode.map((value, index) => (
+                      <input
+                        key={`team-code-${index}`}
+                        ref={(el) => {
+                          teamCodeRefs.current[index] = el;
+                        }}
+                        type="tel"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        maxLength={1}
+                        className="h-14 w-14 border-2 border-strong bg-panel2 text-center text-2xl font-display tracking-[0.2em] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+                        value={value}
+                        onChange={(event) => {
+                          const next = sanitizedDigits(event.target.value).slice(0, 1);
+                          setTeamCode((prev) => {
+                            const updated = [...prev];
+                            updated[index] = next;
+                            if (updated.every((digit) => digit) && teamNameInput.trim()) {
+                              handleJoin();
+                            }
+                            return updated;
+                          });
+                          if (next && index < teamCodeRefs.current.length - 1) {
+                            teamCodeRefs.current[index + 1]?.focus();
+                          }
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Backspace' && !teamCode[index] && index > 0) {
+                            teamCodeRefs.current[index - 1]?.focus();
+                          }
+                          if (event.key === 'Enter' && teamCodeReady) {
+                            handleJoin();
+                          }
+                        }}
+                        onPaste={(event) => {
+                          event.preventDefault();
+                          const paste = sanitizedDigits(event.clipboardData.getData('text'));
+                          if (!paste) return;
+                          setTeamCode((prev) => {
+                            const updated = [...prev];
+                            for (let i = 0; i < paste.length && index + i < updated.length; i += 1) {
+                              updated[index + i] = paste[i];
+                            }
+                            if (updated.every((digit) => digit) && teamNameInput.trim()) {
+                              handleJoin();
+                            }
+                            return updated;
+                          });
+                          const nextIndex = Math.min(index + paste.length, teamCodeRefs.current.length - 1);
+                          teamCodeRefs.current[nextIndex]?.focus();
+                        }}
+                        aria-label={`Team code digit ${index + 1}`}
+                      />
+                    ))}
+                  </div>
                 </label>
                 <label className="flex flex-col gap-2">
                   <span className="text-xs uppercase tracking-[0.25em] text-muted">Team name (required for new teams)</span>
@@ -747,7 +799,7 @@ export function PlayEventPage() {
                 )}
                 <PrimaryButton
                   onClick={handleJoin}
-                  disabled={joinLoading || teamCodeInput.replace(/\D/g, '').length !== 4}
+                  disabled={joinLoading || !teamCodeReady || !teamNameInput.trim()}
                 >
                   {joinLoading ? 'Joining…' : 'Join'}
                 </PrimaryButton>
