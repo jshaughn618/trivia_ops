@@ -312,10 +312,10 @@ const renderTeamBlock = (
       width: logoWidth,
       height: logoHeight
     });
-    cursorY -= logoHeight + 12;
+    cursorY -= logoHeight + 4;
   }
 
-  cursorY -= textSize * 2;
+  cursorY -= textSize * 0.5;
 
   const codeText = extras.eventCode ? `Event Code: ${extras.eventCode}` : 'Event Code: —';
   page.drawText(codeText, {
