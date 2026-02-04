@@ -228,11 +228,9 @@ export function LoginPage() {
           ) : (
             <>
               <div className="mt-4 flex w-full flex-col items-center gap-6 text-center">
-                <div className="text-xs uppercase tracking-[0.35em] text-muted">Join your team</div>
                 <PromptHero>Enter the team code from your scoresheet.</PromptHero>
                 <div className="w-full rounded-2xl bg-panel/40 p-4 text-left">
-                  <div className="text-xs uppercase tracking-[0.3em] text-muted">Team code</div>
-                  <div className="mt-4 flex flex-col gap-3">
+                  <div className="flex flex-col gap-3">
                     <div className="flex flex-col gap-2">
                       <div className="flex justify-center gap-3">
                         {teamCode.map((value, index) => (
