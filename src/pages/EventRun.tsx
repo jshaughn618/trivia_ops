@@ -7,7 +7,7 @@ import { Panel } from '../components/Panel';
 import { AccordionSection } from '../components/AccordionSection';
 import { ButtonLink, PrimaryButton, SecondaryButton } from '../components/Buttons';
 import { StampBadge } from '../components/StampBadge';
-import { logError, logInfo } from '../lib/log';
+import { createRequestId, logError, logInfo } from '../lib/log';
 import type { EditionItem, Event, EventRound, Game, GameEdition, Team, EventRoundScore } from '../types';
 
 function useQuery() {
@@ -197,55 +197,20 @@ export function EventRunPage() {
 
   useEffect(() => {
     setAudioError(null);
-  }, [item?.id, effectiveAudioKey]);
-
-  useEffect(() => {
-    let cancelled = false;
-    if (audioUrl) {
-      URL.revokeObjectURL(audioUrl);
-      setAudioUrl(null);
-    }
-    setAudioError(null);
     setAudioRequestId(null);
     if (!isAudioItem || !effectiveAudioKey) {
       setAudioLoading(false);
-      return () => {};
+      setAudioUrl(null);
+      return;
     }
+    const requestId = createRequestId();
+    const base = api.mediaUrl(effectiveAudioKey);
+    const joiner = base.includes('?') ? '&' : '?';
+    const retryParam = audioRetryToken ? `&retry=${audioRetryToken}` : '';
+    setAudioRequestId(requestId);
+    setAudioUrl(`${base}${joiner}request_id=${encodeURIComponent(requestId)}${retryParam}`);
     setAudioLoading(true);
-    api.fetchMedia(effectiveAudioKey).then((res) => {
-      if (cancelled) return;
-      setAudioLoading(false);
-      if (res.ok) {
-        let blob = res.data.blob;
-        if (!blob.type || blob.type === 'application/octet-stream') {
-          const ext = effectiveAudioKey.split('.').pop()?.toLowerCase();
-          const typeMap: Record<string, string> = {
-            mp3: 'audio/mpeg',
-            wav: 'audio/wav',
-            ogg: 'audio/ogg'
-          };
-          if (ext && typeMap[ext]) {
-            blob = blob.slice(0, blob.size, typeMap[ext]);
-          }
-        }
-        const url = URL.createObjectURL(blob);
-        setAudioUrl(url);
-        setAudioRequestId(res.requestId ?? null);
-      } else {
-        setAudioError('Failed to load audio.');
-        setAudioRequestId(res.requestId ?? null);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
   }, [effectiveAudioKey, isAudioItem, audioRetryToken]);
-
-  useEffect(() => {
-    return () => {
-      if (audioUrl) URL.revokeObjectURL(audioUrl);
-    };
-  }, [audioUrl]);
 
   const handleAudioEvent = (event: string) => {
     const error = audioRef.current?.error;
@@ -272,7 +237,13 @@ export function EventRunPage() {
       errorCode: error?.code ?? null,
       errorMessage: error?.message ?? null
     });
+    setAudioLoading(false);
     setAudioError('Audio unavailable.');
+  };
+
+  const handleAudioReady = (event: string) => {
+    setAudioLoading(false);
+    handleAudioEvent(event);
   };
 
   useEffect(() => {
@@ -582,8 +553,9 @@ export function EventRunPage() {
                         className="w-full"
                         controls
                         src={audioUrl ?? undefined}
-                        onLoadedMetadata={() => handleAudioEvent('loadedmetadata')}
-                        onCanPlay={() => handleAudioEvent('canplay')}
+                        onLoadStart={() => setAudioLoading(true)}
+                        onLoadedMetadata={() => handleAudioReady('loadedmetadata')}
+                        onCanPlay={() => handleAudioReady('canplay')}
                         onPlay={() => handleAudioEvent('audio_play_click')}
                         onPause={() => handleAudioEvent('pause')}
                         onError={handleAudioError}

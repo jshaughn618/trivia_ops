@@ -30,5 +30,16 @@ export function logError(env: { DEBUG?: string } | undefined, event: string, pay
 }
 
 export function getRequestId(request: Request) {
-  return request.headers.get('x-request-id') ?? crypto.randomUUID();
+  const headerId = request.headers.get('x-request-id');
+  if (headerId) return headerId;
+  try {
+    const url = new URL(request.url);
+    const queryId = url.searchParams.get('request_id');
+    if (queryId && /^[a-zA-Z0-9._-]{8,80}$/.test(queryId)) {
+      return queryId;
+    }
+  } catch {
+    // Ignore malformed URLs and fall back to a random id.
+  }
+  return crypto.randomUUID();
 }
