@@ -765,8 +765,8 @@ export function PlayEventPage() {
             <div className="w-full rounded-2xl bg-panel/40 p-4 text-left">
               <div className="text-xs uppercase tracking-[0.3em] text-muted">Team code</div>
               <div className="mt-4 flex flex-col gap-3">
-                <label className="flex flex-col gap-2">
-                  <span className="text-xs uppercase tracking-[0.25em] text-muted text-center">Enter Team Code</span>
+                <div className="flex flex-col gap-2">
+                  <div className="text-center text-xs uppercase tracking-[0.25em] text-muted">Enter Team Code</div>
                   <div className="flex justify-center gap-3">
                     {teamCode.map((value, index) => (
                       <input
@@ -833,7 +833,7 @@ export function PlayEventPage() {
                       />
                     ))}
                   </div>
-                </label>
+                </div>
                 {requireTeamName && (
                   <label className="flex flex-col gap-2">
                     <span className="text-xs uppercase tracking-[0.25em] text-muted">Team name required</span>
