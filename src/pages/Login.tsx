@@ -229,10 +229,8 @@ export function LoginPage() {
               <div className="mt-2 text-sm text-muted">
                 {eventInfo?.title ? `Event: ${eventInfo.title}` : 'Enter the 4-digit team code from your scoresheet'}
               </div>
-              <div className="mt-1 text-xs text-muted">
-                Event code {eventInfo?.public_code ?? eventValue}
-              </div>
               <div className="mt-3 flex flex-col gap-3">
+                <div className="text-center text-xs uppercase tracking-[0.25em] text-muted">Enter Team Code</div>
                 <div className="flex justify-center gap-3">
                   {teamCode.map((value, index) => (
                     <input
