@@ -75,7 +75,8 @@ const drawPageHeader = (
   page: any,
   event: Event,
   locationName: string,
-  fonts: { regular: any; bold: any }
+  fonts: { regular: any; bold: any },
+  options?: { showEventCode?: boolean }
 ) => {
   const titleSize = 14;
   const metaSize = 9;
@@ -99,6 +100,17 @@ const drawPageHeader = (
     });
   }
 
+  if (options?.showEventCode && event.public_code) {
+    const codeText = `Event Code: ${event.public_code}`;
+    const codeSize = 10;
+    const codeWidth = fonts.bold.widthOfTextAtSize(codeText, codeSize);
+    page.drawText(codeText, {
+      x: PAGE_WIDTH - PAGE_MARGIN - codeWidth,
+      y: titleY,
+      size: codeSize,
+      font: fonts.bold
+    });
+  }
 };
 
 const drawGridLines = (page: any) => {
@@ -317,15 +329,6 @@ const renderTeamBlock = (
 
   cursorY -= textSize * 0.5;
 
-  const codeText = extras.eventCode ? `Event Code: ${extras.eventCode}` : 'Event Code: —';
-  page.drawText(codeText, {
-    x: cell.x + padding,
-    y: cursorY - textSize,
-    size: textSize,
-    font: fonts.bold
-  });
-  cursorY -= textSize + 6;
-
   const teamCodeText = extras.teamCode ? `Team Code: ${extras.teamCode}` : 'Team Code: —';
   page.drawText(teamCodeText, {
     x: cell.x + padding,
@@ -436,9 +439,9 @@ const buildPdf = async (
   const cellHeight = gridHeight / 2;
 
   const pageCount = () => pdfDoc.getPages().length;
-  const createPage = () => {
+  const createPage = (showEventCode = false) => {
     const page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
-    drawPageHeader(page, event, locationName, fonts);
+    drawPageHeader(page, event, locationName, fonts, { showEventCode });
     drawGridLines(page);
     return page;
   };
@@ -455,7 +458,7 @@ const buildPdf = async (
 
   if (mode === 'scoresheet') {
     let pageIndex = -1;
-    let page = createPage();
+    let page = createPage(true);
     pageIndex = 0;
     let positionIndex = 0;
     const positionsForPage = (index: number) => {
@@ -467,7 +470,7 @@ const buildPdf = async (
     for (let index = 0; index < rounds.length; index += 1) {
       let positions = positionsForPage(pageIndex);
       if (positionIndex >= positions.length) {
-        page = createPage();
+        page = createPage(false);
         pageIndex += 1;
         positionIndex = 0;
         positions = positionsForPage(pageIndex);
@@ -477,7 +480,7 @@ const buildPdf = async (
       renderRoundBlock(page, rounds[index], getCell(cellIndex), fonts, mode);
     }
 
-    const firstPage = pdfDoc.getPages()[0] ?? createPage();
+    const firstPage = pdfDoc.getPages()[0] ?? createPage(true);
     renderTeamBlock(firstPage, getCell(0), fonts, {
       qrImage: qrImage ?? undefined,
       logoImage: logoImage ?? undefined,
@@ -489,7 +492,7 @@ const buildPdf = async (
 
     if (hasUpcoming) {
       while (pageCount() < 2) {
-        createPage();
+        createPage(false);
       }
       const upcomingPage = pdfDoc.getPages()[1];
       renderUpcomingBlock(upcomingPage, getCell(3), fonts, {
@@ -500,7 +503,7 @@ const buildPdf = async (
   } else {
     for (let index = 0; index < rounds.length; index += 1) {
       if (index % 4 === 0) {
-        createPage();
+        createPage(pageCount() === 0);
       }
       const page = pdfDoc.getPages()[pdfDoc.getPages().length - 1];
       const cellIndex = index % 4;
