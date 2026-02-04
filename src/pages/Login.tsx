@@ -18,6 +18,8 @@ export function LoginPage() {
   const [teamNameInput, setTeamNameInput] = useState('');
   const [eventInfo, setEventInfo] = useState<{ id: string; title: string; public_code: string } | null>(null);
   const [step, setStep] = useState<'event' | 'team'>('event');
+  const [requireTeamName, setRequireTeamName] = useState(false);
+  const [requireTeamNameCode, setRequireTeamNameCode] = useState('');
   const [eventError, setEventError] = useState<string | null>(null);
   const [teamError, setTeamError] = useState<string | null>(null);
   const [eventLoading, setEventLoading] = useState(false);
@@ -63,6 +65,8 @@ export function LoginPage() {
         setStep('team');
         setTeamCode(['', '', '', '']);
         setTeamNameInput('');
+        setRequireTeamName(false);
+        setRequireTeamNameCode('');
         if (autoTeamCode && autoTeamCode.length === 4) {
           const digits = autoTeamCode.split('');
           setTeamCode(digits);
@@ -99,6 +103,10 @@ export function LoginPage() {
         localStorage.setItem(`player_team_session_${eventData.public_code}`, res.data.session_token);
         navigate(`/play/${eventData.public_code}`);
         return;
+      }
+      if (res.error?.code === 'team_name_required') {
+        setRequireTeamName(true);
+        setRequireTeamNameCode(normalized);
       }
       setTeamError(formatApiError(res, 'Team code not recognized. Check the code and try again.'));
       setTeamCode(['', '', '', '']);
@@ -241,7 +249,12 @@ export function LoginPage() {
                         setTeamCode((prev) => {
                           const updated = [...prev];
                           updated[index] = next;
-                          if (updated.every((digit) => digit)) {
+                          const nextCode = updated.join('');
+                          if (requireTeamName && requireTeamNameCode && nextCode !== requireTeamNameCode) {
+                            setRequireTeamName(false);
+                            setRequireTeamNameCode('');
+                          }
+                          if (updated.every((digit) => digit) && (!requireTeamName || teamNameInput.trim())) {
                             attemptTeamJoin(updated.join(''));
                           }
                           return updated;
@@ -267,7 +280,12 @@ export function LoginPage() {
                           for (let i = 0; i < paste.length && index + i < updated.length; i += 1) {
                             updated[index + i] = paste[i];
                           }
-                          if (updated.every((digit) => digit)) {
+                          const nextCode = updated.join('');
+                          if (requireTeamName && requireTeamNameCode && nextCode !== requireTeamNameCode) {
+                            setRequireTeamName(false);
+                            setRequireTeamNameCode('');
+                          }
+                          if (updated.every((digit) => digit) && (!requireTeamName || teamNameInput.trim())) {
                             attemptTeamJoin(updated.join(''));
                           }
                           return updated;
@@ -280,7 +298,9 @@ export function LoginPage() {
                   ))}
                 </div>
                 <label className="flex flex-col gap-2">
-                  <span className="text-xs uppercase tracking-[0.25em] text-muted">Team name (required for new teams)</span>
+                  <span className="text-xs uppercase tracking-[0.25em] text-muted">
+                    {requireTeamName ? 'Team name required' : 'Team name (only for new teams)'}
+                  </span>
                   <input
                     className="h-10 px-3"
                     value={teamNameInput}
@@ -299,7 +319,7 @@ export function LoginPage() {
                     onClick={() => {
                       if (teamReady) attemptTeamJoin(teamValue);
                     }}
-                    disabled={!teamReady || teamLoading}
+                    disabled={!teamReady || teamLoading || (requireTeamName && !teamNameInput.trim())}
                   >
                     {teamLoading ? 'Joining…' : 'Join game'}
                   </PrimaryButton>
@@ -311,6 +331,8 @@ export function LoginPage() {
                       setEventCode(['', '', '', '']);
                       setTeamCode(['', '', '', '']);
                       setTeamNameInput('');
+                      setRequireTeamName(false);
+                      setRequireTeamNameCode('');
                       setEventError(null);
                       setTeamError(null);
                     }}

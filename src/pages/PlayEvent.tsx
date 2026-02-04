@@ -127,6 +127,8 @@ export function PlayEventPage() {
   const [teamSession, setTeamSession] = useState('');
   const [teamCode, setTeamCode] = useState(['', '', '', '']);
   const [teamNameInput, setTeamNameInput] = useState('');
+  const [requireTeamName, setRequireTeamName] = useState(false);
+  const [requireTeamNameCode, setRequireTeamNameCode] = useState('');
   const [teamNameLabel, setTeamNameLabel] = useState<string | null>(null);
   const [teamMenuOpen, setTeamMenuOpen] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
@@ -471,8 +473,14 @@ export function PlayEventPage() {
       localStorage.setItem(`player_team_session_${data.event.public_code}`, res.data.session_token);
       setTeamCode(['', '', '', '']);
       setTeamNameInput('');
+      setRequireTeamName(false);
+      setRequireTeamNameCode('');
       setJoinError(null);
     } else {
+      if (res.error?.code === 'team_name_required') {
+        setRequireTeamName(true);
+        setRequireTeamNameCode(normalized);
+      }
       setJoinError(formatApiError(res, 'Unable to join team.'));
     }
     setJoinLoading(false);
@@ -490,6 +498,8 @@ export function PlayEventPage() {
     setTeamNameLabel(null);
     setTeamCode(['', '', '', '']);
     setTeamNameInput('');
+    setRequireTeamName(false);
+    setRequireTeamNameCode('');
     setTeamMenuOpen(false);
   };
 
@@ -744,7 +754,12 @@ export function PlayEventPage() {
                           setTeamCode((prev) => {
                             const updated = [...prev];
                             updated[index] = next;
-                            if (updated.every((digit) => digit) && teamNameInput.trim()) {
+                            const nextCode = updated.join('');
+                            if (requireTeamName && requireTeamNameCode && nextCode !== requireTeamNameCode) {
+                              setRequireTeamName(false);
+                              setRequireTeamNameCode('');
+                            }
+                            if (updated.every((digit) => digit) && (!requireTeamName || teamNameInput.trim())) {
                               handleJoin();
                             }
                             return updated;
@@ -770,7 +785,12 @@ export function PlayEventPage() {
                             for (let i = 0; i < paste.length && index + i < updated.length; i += 1) {
                               updated[index + i] = paste[i];
                             }
-                            if (updated.every((digit) => digit) && teamNameInput.trim()) {
+                            const nextCode = updated.join('');
+                            if (requireTeamName && requireTeamNameCode && nextCode !== requireTeamNameCode) {
+                              setRequireTeamName(false);
+                              setRequireTeamNameCode('');
+                            }
+                            if (updated.every((digit) => digit) && (!requireTeamName || teamNameInput.trim())) {
                               handleJoin();
                             }
                             return updated;
@@ -784,7 +804,9 @@ export function PlayEventPage() {
                   </div>
                 </label>
                 <label className="flex flex-col gap-2">
-                  <span className="text-xs uppercase tracking-[0.25em] text-muted">Team name (required for new teams)</span>
+                  <span className="text-xs uppercase tracking-[0.25em] text-muted">
+                    {requireTeamName ? 'Team name required' : 'Team name (only for new teams)'}
+                  </span>
                   <input
                     className="h-10 px-3"
                     value={teamNameInput}
@@ -799,7 +821,7 @@ export function PlayEventPage() {
                 )}
                 <PrimaryButton
                   onClick={handleJoin}
-                  disabled={joinLoading || !teamCodeReady || !teamNameInput.trim()}
+                  disabled={joinLoading || !teamCodeReady || (requireTeamName && !teamNameInput.trim())}
                 >
                   {joinLoading ? 'Joining…' : 'Join'}
                 </PrimaryButton>
