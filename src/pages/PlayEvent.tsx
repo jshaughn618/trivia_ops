@@ -914,9 +914,9 @@ export function PlayEventPage() {
           displayItem ? (
             <div className="flex w-full flex-col items-center gap-3 text-center sm:gap-4">
               {activeRound?.label && (
-                <div className="text-[10px] uppercase tracking-[0.22em] text-muted">{activeRound.label}</div>
+                <div className="text-xs uppercase tracking-[0.24em] text-muted">{activeRound.label}</div>
               )}
-              <div className="text-[10px] uppercase tracking-[0.22em] text-muted">{questionLabel}</div>
+              <div className="text-xs uppercase tracking-[0.24em] text-muted">{questionLabel}</div>
               {displayItem.media_type === 'image' && displayItem.media_key ? (
                 <div className="w-full">
                   <div className="flex w-full flex-col gap-3 landscape:flex-row landscape:items-start">
