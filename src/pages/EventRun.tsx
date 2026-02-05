@@ -544,7 +544,7 @@ export function EventRunPage() {
   return (
     <AppShell title="Round Runner">
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr),360px]">
-        <Panel title="Active question" className="p-5">
+        <Panel title="Active Question" className="p-5">
           {activeRound ? (
             <div className="flex flex-col gap-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
@@ -808,7 +808,7 @@ export function EventRunPage() {
               })}
             </div>
           </AccordionSection>
-          <AccordionSection title="Waiting room">
+          <AccordionSection title="Waiting Room">
             <div className="flex flex-col gap-3">
               <div className="flex items-center justify-between gap-3">
                 <div className="ui-label">Leaderboard</div>
@@ -855,7 +855,7 @@ export function EventRunPage() {
               </PrimaryButton>
             </div>
           </AccordionSection>
-          <AccordionSection title="Round control" defaultOpen>
+          <AccordionSection title="Round Control" defaultOpen>
             <div className="flex flex-col gap-4">
               <div className="ui-label">Event</div>
               <div className="text-base font-semibold text-text">{event.title}</div>

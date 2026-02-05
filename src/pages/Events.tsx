@@ -73,7 +73,7 @@ export function EventsPage() {
           </div>
         </PageHeader>
 
-        <Section title="Event log">
+        <Section title="Event Log">
           {filtered.length === 0 && (
             <div className="text-xs uppercase tracking-[0.2em] text-muted">No events.</div>
           )}

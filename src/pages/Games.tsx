@@ -308,7 +308,7 @@ export function GamesPage() {
           </div>
         )}
         <div className="grid gap-4 lg:grid-cols-[1fr,320px]">
-          <Section title="Edition library" actions={categoryTabs}>
+          <Section title="Edition Library" actions={categoryTabs}>
             {categoryGames.length > 0 && (
               <div className="mb-2 text-xs uppercase tracking-[0.2em] text-muted">
                 Select a game to view editions.
@@ -467,7 +467,7 @@ export function GamesPage() {
           <div className="space-y-4">
             {createMode && (
               <Section
-                title="New game"
+                title="New Game"
                 actions={
                   <button
                     type="button"

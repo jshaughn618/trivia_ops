@@ -1826,7 +1826,7 @@ export function EventDetailPage() {
   );
 
   return (
-    <AppShell title="Event detail" showTitle={false}>
+    <AppShell title="Event Detail" showTitle={false}>
       <div className="space-y-4">
         <div className="sticky top-0 z-20 -mx-4 border-b border-border bg-bg/95 px-4 pb-4 pt-3 backdrop-blur sm:static sm:mx-0 sm:border-none sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-0 sm:backdrop-blur-0">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -1926,15 +1926,15 @@ export function EventDetailPage() {
               <AccordionSection title="Teams" defaultOpen>
                 {teamsContent}
               </AccordionSection>
-              <AccordionSection title="Round scores">
+              <AccordionSection title="Round Scores">
                 {scoresContent}
               </AccordionSection>
             </div>
             <div className="space-y-4">
-              <AccordionSection title="Documents & share" defaultOpen>
+              <AccordionSection title="Documents & Share" defaultOpen>
                 {documentsContent}
               </AccordionSection>
-              <AccordionSection title="Event settings">
+              <AccordionSection title="Event Settings">
                 {settingsContent}
               </AccordionSection>
             </div>
@@ -1946,9 +1946,9 @@ export function EventDetailPage() {
             {roundsContent}
           </AccordionSection>
           <AccordionSection title="Teams">{teamsContent}</AccordionSection>
-          <AccordionSection title="Round scores">{scoresContent}</AccordionSection>
-          <AccordionSection title="Documents & share">{documentsContent}</AccordionSection>
-          <AccordionSection title="Event settings">{settingsContent}</AccordionSection>
+          <AccordionSection title="Round Scores">{scoresContent}</AccordionSection>
+          <AccordionSection title="Documents & Share">{documentsContent}</AccordionSection>
+          <AccordionSection title="Event Settings">{settingsContent}</AccordionSection>
         </div>
       </div>
     </AppShell>

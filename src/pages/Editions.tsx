@@ -116,7 +116,7 @@ export function EditionsPage() {
           </div>
         )}
         <div className="grid gap-4 lg:grid-cols-[1fr,320px]">
-          <Section title="Edition library">
+          <Section title="Edition Library">
             {editions.length > 0 && (
               <div className="mb-2 text-xs uppercase tracking-[0.2em] text-muted">
                 Select a game to view editions.

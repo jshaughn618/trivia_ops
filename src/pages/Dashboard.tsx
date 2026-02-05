@@ -70,7 +70,7 @@ export function DashboardPage() {
             className="group block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
           >
             <StatTile
-              label="Live events"
+              label="Live Events"
               value={String(liveCount)}
               helper="On air now"
               className="transition-transform duration-150 group-hover:-translate-y-0.5"
@@ -81,7 +81,7 @@ export function DashboardPage() {
             className="group block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
           >
             <StatTile
-              label="Planned events"
+              label="Planned Events"
               value={String(plannedCount)}
               helper="Scheduled"
               className="transition-transform duration-150 group-hover:-translate-y-0.5"
@@ -93,7 +93,7 @@ export function DashboardPage() {
               className="group block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
             >
               <StatTile
-                label="Draft editions"
+                label="Draft Editions"
                 value={String(draftCount)}
                 helper="In progress"
                 className="transition-transform duration-150 group-hover:-translate-y-0.5"
@@ -103,7 +103,7 @@ export function DashboardPage() {
         </section>
 
         <section className={`grid gap-4 ${isAdmin ? 'lg:grid-cols-3' : 'lg:grid-cols-2'}`}>
-          <Panel title="Quick actions" className="p-5">
+          <Panel title="Quick Actions" className="p-5">
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
               {isAdmin && (
                 <ButtonLink to="/events/new" variant="primary" className="h-11">
@@ -126,7 +126,7 @@ export function DashboardPage() {
             </div>
           </Panel>
 
-          <Panel title="Upcoming events" className="p-5">
+          <Panel title="Upcoming Events" className="p-5">
             <div className="flex flex-col gap-3">
               {upcoming.length === 0 && (
                 <div className="text-sm text-muted">No scheduled events.</div>
@@ -150,7 +150,7 @@ export function DashboardPage() {
           </Panel>
 
           {isAdmin && (
-            <Panel title="Draft editions" className="p-5">
+            <Panel title="Draft Editions" className="p-5">
               <div className="flex flex-col gap-3">
                 {drafts.length === 0 && <div className="text-sm text-muted">No draft editions.</div>}
                 {drafts.map((edition) => (
