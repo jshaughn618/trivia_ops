@@ -912,19 +912,19 @@ export function PlayEventPage() {
           </div>
         ) : isLive ? (
           displayItem ? (
-            <div className="flex w-full flex-col items-center gap-6 text-center">
+            <div className="flex w-full flex-col items-center gap-3 text-center sm:gap-4">
               {activeRound?.label && (
-                <div className="text-xs uppercase tracking-[0.35em] text-muted">{activeRound.label}</div>
+                <div className="text-[10px] uppercase tracking-[0.22em] text-muted">{activeRound.label}</div>
               )}
-              <div className="text-xs uppercase tracking-[0.35em] text-muted">{questionLabel}</div>
+              <div className="text-[10px] uppercase tracking-[0.22em] text-muted">{questionLabel}</div>
               {displayItem.media_type === 'image' && displayItem.media_key ? (
                 <div className="w-full">
-                  <div className="flex w-full flex-col gap-6 landscape:flex-row landscape:items-center">
+                  <div className="flex w-full flex-col gap-3 landscape:flex-row landscape:items-start">
                     <div className="order-2 w-full landscape:order-1 landscape:w-[58%]">
                       <MediaFrame>
                         <div onTouchStart={handleSwipeStart} onTouchEnd={handleSwipeEnd} onClick={triggerSwipeHint}>
                           <img
-                            className="max-h-[55vh] w-full object-contain landscape:max-h-[50vh]"
+                            className="max-h-[44vh] w-full object-contain landscape:max-h-[42vh]"
                             src={api.publicMediaUrl(data.event.public_code, displayItem.media_key)}
                             alt="Media"
                             onError={() => {
@@ -974,13 +974,24 @@ export function PlayEventPage() {
                       )}
                     </div>
                     <div className="order-1 w-full landscape:order-2 landscape:w-[42%]">
-                      {promptText && <PromptHero align="left">{promptText}</PromptHero>}
+                      {promptText && (
+                        <PromptHero
+                          align="left"
+                          className="text-[clamp(1.5rem,6.8vw,2.8rem)] leading-[1.1] landscape:text-[clamp(1.2rem,3.4vw,2.2rem)]"
+                        >
+                          {promptText}
+                        </PromptHero>
+                      )}
                     </div>
                   </div>
                 </div>
               ) : (
                 <>
-                  {promptText && <PromptHero>{promptText}</PromptHero>}
+                  {promptText && (
+                    <PromptHero className="text-[clamp(1.65rem,8.2vw,3.2rem)] leading-[1.12] landscape:text-[clamp(1.35rem,4.2vw,2.4rem)]">
+                      {promptText}
+                    </PromptHero>
+                  )}
                   {mediaError && (
                     <div className="rounded-md bg-panel px-3 py-2 text-xs text-danger-ink">{mediaError}</div>
                   )}
@@ -1012,7 +1023,7 @@ export function PlayEventPage() {
               )}
               {displayItem.question_type === 'multiple_choice' && choiceOptions.length > 0 && (
                 <div className="w-full max-w-3xl text-left">
-                  <div className="mb-3 flex items-center justify-between text-xs uppercase tracking-[0.3em] text-muted">
+                  <div className="mb-2 flex items-center justify-between text-[11px] uppercase tracking-[0.2em] text-muted">
                     <span>Multiple choice</span>
                     {!suppressItemTimer && (
                       <span className={timerActive ? 'text-accent-ink' : 'text-muted'}>
@@ -1061,7 +1072,7 @@ export function PlayEventPage() {
                       );
                     })}
                   </ChoiceList>
-                  <div className="mt-5 flex flex-col items-center gap-3">
+                  <div className="mt-4 flex flex-col items-center gap-2.5">
                     <PrimaryCTA
                       onClick={handleSubmitChoice}
                       disabled={timerBlocked || submitStatus === 'submitting' || selectedChoiceIndex === null}
@@ -1078,7 +1089,7 @@ export function PlayEventPage() {
                     {submitError && <PlayFooterHint className="text-danger">{submitError}</PlayFooterHint>}
                   </div>
                   {timerExpired && (awaitingResponseSync || awaitingGraphDelay) && (
-                    <div className="mt-6">
+                    <div className="mt-4">
                       <PlayFooterHint>Collecting responses…</PlayFooterHint>
                     </div>
                   )}
@@ -1088,7 +1099,7 @@ export function PlayEventPage() {
                     !awaitingResponseSync &&
                     !awaitingGraphDelay &&
                     submitStatus !== 'submitting' && (
-                    <div className="mt-6 space-y-3">
+                    <div className="mt-4 space-y-2.5">
                       <div className="text-xs uppercase tracking-[0.3em] text-muted">Team answers</div>
                       <div className="space-y-2">
                         {choiceOptions.map((choice, idx) => {

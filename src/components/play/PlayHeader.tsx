@@ -14,7 +14,7 @@ export function PlayHeader({
   menu?: ReactNode;
 }) {
   return (
-    <header className="px-4 pb-2 pt-3 sm:px-6">
+    <header className="px-4 pb-1.5 pt-2 sm:px-6 sm:pt-2.5">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <div className="text-sm font-display tracking-tight sm:text-base">{title}</div>
