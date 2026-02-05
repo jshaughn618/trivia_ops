@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type React from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api, formatApiError } from '../api';
-import { PrimaryButton, SecondaryButton } from '../components/Buttons';
+import { PrimaryButton } from '../components/Buttons';
 import { logError } from '../lib/log';
 import { useTheme } from '../lib/theme';
 import { PlayShell } from '../components/play/PlayShell';
@@ -656,30 +656,7 @@ export function PlayEventPage() {
 
   if (isClosed) {
     const closedLabel = data.event.status === 'canceled' ? 'Canceled' : 'Closed';
-    return (
-      <PlayShell>
-        {showHeader && (
-          <PlayHeader
-            title={data.event.title}
-            code={data.event.public_code}
-            meta={headerMeta}
-          />
-        )}
-        <PlayStage scrollable>
-          <div className="flex w-full max-w-2xl flex-col items-center gap-4 text-center">
-            <div className="text-xs uppercase tracking-[0.35em] text-muted">Event {closedLabel}</div>
-            <PromptHero>This event is {closedLabel.toLowerCase()}.</PromptHero>
-            <div className="text-sm text-muted">Check with the host for the next session.</div>
-            <SecondaryButton onClick={() => navigate('/login')}>Back to login</SecondaryButton>
-          </div>
-        </PlayStage>
-      </PlayShell>
-    );
-  }
-
-  const headerTeam = teamId && teamNameLabel ? <div className="text-xs font-medium">{teamNameLabel}</div> : null;
-  const headerMenu =
-    teamId && teamNameLabel ? (
+    const closedMenu = (
       <div className="relative" ref={menuRef}>
         <button
           type="button"
@@ -705,6 +682,67 @@ export function PlayEventPage() {
             </button>
             <button
               type="button"
+              onClick={() => {
+                setTeamMenuOpen(false);
+                navigate('/login');
+              }}
+              className="w-full rounded-md border border-border bg-panel2 px-3 py-2 text-xs font-medium text-text"
+            >
+              Back to Login
+            </button>
+          </div>
+        )}
+      </div>
+    );
+    return (
+      <PlayShell>
+        {showHeader && (
+          <PlayHeader
+            title={data.event.title}
+            code={data.event.public_code}
+            meta={headerMeta}
+            menu={closedMenu}
+          />
+        )}
+        <PlayStage scrollable>
+          <div className="flex w-full max-w-2xl flex-col items-center gap-4 text-center">
+            <div className="text-xs uppercase tracking-[0.35em] text-muted">Event {closedLabel}</div>
+            <PromptHero>This event is {closedLabel.toLowerCase()}.</PromptHero>
+            <div className="text-sm text-muted">Check with the host for the next session.</div>
+          </div>
+        </PlayStage>
+      </PlayShell>
+    );
+  }
+
+  const headerTeam = teamId && teamNameLabel ? <div className="text-xs font-medium">{teamNameLabel}</div> : null;
+  const headerMenu = (
+    <div className="relative" ref={menuRef}>
+      <button
+        type="button"
+        aria-label="Team menu"
+        aria-haspopup="menu"
+        aria-expanded={teamMenuOpen}
+        onClick={() => setTeamMenuOpen((open) => !open)}
+        className="flex h-8 w-8 flex-col items-center justify-center gap-1 rounded-md border border-border bg-panel2"
+      >
+        <span className="h-0.5 w-4 bg-text" />
+        <span className="h-0.5 w-4 bg-text" />
+        <span className="h-0.5 w-4 bg-text" />
+      </button>
+      {teamMenuOpen && (
+        <div className="absolute right-0 mt-2 min-w-[180px] rounded-md border border-border bg-panel p-2 text-left shadow-sm">
+          <button
+            type="button"
+            aria-pressed={theme === 'light'}
+            onClick={toggleTheme}
+            className={`${teamId && teamNameLabel ? 'mb-2' : ''} w-full rounded-md border border-border bg-panel2 px-3 py-2 text-xs font-medium text-text`}
+          >
+            {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+          </button>
+          {teamId && teamNameLabel && (
+            <button
+              type="button"
               onClick={async () => {
                 if (!data?.event?.public_code || !teamId || !teamSession) {
                   handleSessionExpired('Your team session expired. Re-enter the team code to continue.');
@@ -722,6 +760,7 @@ export function PlayEventPage() {
                 if (res.ok) {
                   setTeamNameLabel(res.data.team.name);
                   localStorage.setItem(`player_team_name_${data.event.public_code}`, res.data.team.name);
+                  setTeamMenuOpen(false);
                   return;
                 }
                 if (res.error?.code === 'team_session_invalid') {
@@ -734,17 +773,30 @@ export function PlayEventPage() {
             >
               Change Team Name
             </button>
+          )}
+          {teamId && teamNameLabel && (
             <button
               type="button"
               onClick={handleChangeTeam}
-              className="w-full rounded-md border border-border bg-panel2 px-3 py-2 text-xs font-medium text-text"
+              className="mb-2 w-full rounded-md border border-border bg-panel2 px-3 py-2 text-xs font-medium text-text"
             >
               Change Team
             </button>
-          </div>
-        )}
-      </div>
-    ) : null;
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              setTeamMenuOpen(false);
+              navigate('/login');
+            }}
+            className="w-full rounded-md border border-border bg-panel2 px-3 py-2 text-xs font-medium text-text"
+          >
+            Back to Login
+          </button>
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <PlayShell>
@@ -1102,11 +1154,6 @@ export function PlayEventPage() {
           </div>
         )}
       </PlayStage>
-      {showHeader && (
-        <div className="px-4 pb-6 pt-2 sm:px-6">
-          <SecondaryButton onClick={() => navigate('/login')}>Back to login</SecondaryButton>
-        </div>
-      )}
     </PlayShell>
   );
 }
