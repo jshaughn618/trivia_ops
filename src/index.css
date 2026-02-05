@@ -112,7 +112,8 @@ a:hover {
     transition: box-shadow 150ms ease, transform 150ms ease, border-color 150ms ease;
   }
 
-  .surface-inset:hover {
+  a.surface-inset:hover,
+  button.surface-inset:hover {
     box-shadow: var(--shadow-float);
     border-color: var(--border-strong);
     transform: translateY(-1px);

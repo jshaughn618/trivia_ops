@@ -174,8 +174,11 @@ export function EventRunPage() {
     };
   };
 
-  const roundStatusLabel = (status: EventRound['status']) =>
-    status === 'locked' ? 'COMPLETED' : status.toUpperCase();
+  const roundStatusLabel = (status: EventRound['status']) => {
+    if (status === 'locked' || status === 'completed') return 'Completed';
+    if (status === 'live') return 'Live';
+    return 'Planned';
+  };
 
   const activeRound = useMemo(() => rounds.find((round) => round.id === roundId) ?? null, [rounds, roundId]);
   const item = items[index];
@@ -496,35 +499,54 @@ export function EventRunPage() {
   if (!event) {
     return (
       <AppShell title="Round Runner">
-        <div className="text-xs uppercase tracking-[0.2em] text-muted">Loading...</div>
+        <div className="text-sm text-muted">Loading...</div>
       </AppShell>
     );
   }
 
   return (
     <AppShell title="Round Runner">
-      <div className="grid gap-4 lg:grid-cols-[1fr,320px]">
-        <Panel title="Active Question">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr),360px]">
+        <Panel title="Active question" className="p-5">
           {activeRound ? (
             <div className="flex flex-col gap-4">
-              <div className="flex items-center justify-between">
-                <div className="text-xs uppercase tracking-[0.2em] text-muted">
-                  {roundDisplay(activeRound).title} — {roundDisplay(activeRound).detail}
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="ui-label">Now running</div>
+                  <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <div className="text-sm font-semibold text-text">{roundDisplay(activeRound).title}</div>
+                    <div className="text-sm text-muted">{roundDisplay(activeRound).detail}</div>
+                  </div>
                 </div>
-                <StampBadge label={roundStatusLabel(activeRound.status)} variant="verified" />
+                <div className="flex items-center gap-2">
+                  <StampBadge
+                    label={roundStatusLabel(activeRound.status)}
+                    variant={activeRound.status === 'live' ? 'approved' : 'inspected'}
+                  />
+                  <div className="text-xs tabular-nums text-muted">
+                    Item {items.length === 0 ? 0 : index + 1} / {items.length}
+                  </div>
+                </div>
               </div>
               {item ? (
-                <div className="relative border-2 border-border bg-panel2 p-4">
-                  <div className="text-xs uppercase tracking-[0.2em] text-muted">
-                    {item.media_type === 'audio'
-                      ? `Clip ${index + 1}`
-                      : item.media_type === 'image'
-                        ? `Image ${index + 1}`
-                        : `Question ${index + 1}`}
+                <div className="surface-inset p-5">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="ui-label">
+                      {item.media_type === 'audio'
+                        ? `Clip ${index + 1}`
+                        : item.media_type === 'image'
+                          ? `Image ${index + 1}`
+                          : `Question ${index + 1}`}
+                    </div>
+                    {!isImageItem && (
+                      <div className="rounded-full border border-border bg-panel px-3 py-1 text-xs font-medium tabular-nums text-muted">
+                        {timerLabel}
+                      </div>
+                    )}
                   </div>
-                  <div className="mt-2 text-lg font-display uppercase tracking-[0.2em]">{questionLabel}</div>
+                  <div className="mt-3 text-xl font-semibold leading-snug text-text">{questionLabel}</div>
                   {item.media_type === 'image' && item.media_key && (
-                    <div className="mt-4 border-2 border-border bg-panel p-2">
+                    <div className="mt-4 rounded-lg border border-border bg-panel p-2">
                       <img
                         className="max-h-[60vh] w-full object-contain"
                         src={api.mediaUrl(item.media_key)}
@@ -535,15 +557,15 @@ export function EventRunPage() {
                   {item.media_type === 'audio' && effectiveAudioKey && (
                     <div className="mt-4 flex flex-col gap-2">
                       {usesRoundAudio && (
-                        <div className="text-xs uppercase tracking-[0.2em] text-muted">
+                        <div className="ui-label">
                           Round clip{roundAudioName ? ` • ${roundAudioName}` : ''}
                         </div>
                       )}
                       {audioLoading && (
-                        <div className="text-xs uppercase tracking-[0.2em] text-muted">Loading audio…</div>
+                        <div className="text-sm text-muted">Loading audio...</div>
                       )}
                       {audioError && (
-                        <div className="border-2 border-danger bg-panel px-3 py-2 text-xs uppercase tracking-[0.2em] text-danger">
+                        <div className="rounded-lg border border-danger bg-panel px-3 py-2 text-sm text-danger-ink">
                           {audioError}
                           {audioRequestId ? ` (ref ${audioRequestId})` : ''}
                         </div>
@@ -561,94 +583,94 @@ export function EventRunPage() {
                         onError={handleAudioError}
                       />
                       {audioError && (
-                        <SecondaryButton onClick={() => setAudioRetryToken((prev) => prev + 1)}>
+                        <SecondaryButton className="h-11" onClick={() => setAudioRetryToken((prev) => prev + 1)}>
                           Retry Audio
                         </SecondaryButton>
                       )}
                     </div>
                   )}
                   {item.media_type === 'audio' && !effectiveAudioKey && (
-                    <div className="mt-4 border-2 border-danger bg-panel px-3 py-2 text-xs uppercase tracking-[0.2em] text-danger">
+                    <div className="mt-4 rounded-lg border border-danger bg-panel px-3 py-2 text-sm text-danger-ink">
                       No audio clip attached to this round.
-                    </div>
-                  )}
-                  {!isImageItem && (
-                    <div className="absolute bottom-3 right-3 border-2 border-border bg-panel px-2 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted">
-                      {timerLabel}
                     </div>
                   )}
                 </div>
               ) : (
-                <div className="text-xs uppercase tracking-[0.2em] text-muted">No items in this round.</div>
+                <div className="text-sm text-muted">No items in this round.</div>
               )}
-              {item && showAnswer && (
-                <div className="border-2 border-border bg-panel p-4">
-                  <div className="text-xs uppercase tracking-[0.2em] text-muted">Answer</div>
-                  {(() => {
-                    const answerParts = parseAnswerParts(item.answer_parts_json);
-                    if (answerParts.length > 0) {
-                      return (
-                        <div className="mt-2 flex flex-col gap-2 text-base font-display uppercase tracking-[0.2em]">
-                          {answerParts.map((part) => (
-                            <div key={`${item.id}-${part.label}`}>
-                              {part.label}: {part.answer}
+              {item && (showAnswer || showFact) && (
+                <div className="grid gap-4 lg:grid-cols-2">
+                  {showAnswer && (
+                    <div className="surface-inset p-5">
+                      <div className="ui-label">Answer</div>
+                      {(() => {
+                        const answerParts = parseAnswerParts(item.answer_parts_json);
+                        if (answerParts.length > 0) {
+                          return (
+                            <div className="mt-2 flex flex-col gap-2 text-base font-semibold leading-snug">
+                              {answerParts.map((part) => (
+                                <div key={`${item.id}-${part.label}`}>
+                                  <span className="text-muted">{part.label}:</span> {part.answer}
+                                </div>
+                              ))}
                             </div>
-                          ))}
+                          );
+                        }
+                        if (item.answer && !item.answer_a && !item.answer_b) {
+                          return <div className="mt-2 text-base font-semibold leading-snug">{item.answer}</div>;
+                        }
+                        return (
+                          <div className="mt-2 flex flex-col gap-2 text-base font-semibold leading-snug">
+                            <div>
+                              <span className="text-muted">{item.answer_a_label ? item.answer_a_label : 'A'}:</span>{' '}
+                              {item.answer_a || 'N/A'}
+                            </div>
+                            <div>
+                              <span className="text-muted">{item.answer_b_label ? item.answer_b_label : 'B'}:</span>{' '}
+                              {item.answer_b || 'N/A'}
+                            </div>
+                          </div>
+                        );
+                      })()}
+                      {item.audio_answer_key && (
+                        <div className="mt-3">
+                          <audio className="w-full" controls src={api.mediaUrl(item.audio_answer_key)} />
                         </div>
-                      );
-                    }
-                    if (item.answer && !item.answer_a && !item.answer_b) {
-                      return (
-                        <div className="mt-2 text-base font-display uppercase tracking-[0.2em]">{item.answer}</div>
-                      );
-                    }
-                    return (
-                      <div className="mt-2 flex flex-col gap-2 text-base font-display uppercase tracking-[0.2em]">
-                        <div>
-                          {item.answer_a_label ? `${item.answer_a_label}: ` : 'A: '}
-                          {item.answer_a || 'N/A'}
-                        </div>
-                        <div>
-                          {item.answer_b_label ? `${item.answer_b_label}: ` : 'B: '}
-                          {item.answer_b || 'N/A'}
-                        </div>
+                      )}
+                    </div>
+                  )}
+                  {showFact && (
+                    <div className="surface-inset p-5">
+                      <div className="ui-label">Factoid</div>
+                      <div className="mt-2 text-sm leading-relaxed text-text">
+                        {item.fun_fact || 'No factoid provided.'}
                       </div>
-                    );
-                  })()}
-                  {item.audio_answer_key && (
-                    <div className="mt-3">
-                      <audio className="w-full" controls src={api.mediaUrl(item.audio_answer_key)} />
                     </div>
                   )}
                 </div>
               )}
-              {item && showFact && (
-                <div className="border-2 border-border bg-panel p-4">
-                  <div className="text-xs uppercase tracking-[0.2em] text-muted">Factoid</div>
-                  <div className="mt-2 text-sm text-text">{item.fun_fact || 'No factoid provided.'}</div>
-                </div>
-              )}
-              <div className="flex flex-wrap gap-2">
-                <SecondaryButton onClick={prevItem} disabled={index === 0}>
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <SecondaryButton className="h-11" onClick={prevItem} disabled={index === 0}>
                   Back
                 </SecondaryButton>
                 {activeRound?.status !== 'live' && (
-                  <PrimaryButton onClick={setLive} disabled={!activeRound}>
+                  <PrimaryButton className="h-11" onClick={setLive} disabled={!activeRound}>
                     Display
                   </PrimaryButton>
                 )}
                 {activeRound?.status === 'live' && (
-                  <PrimaryButton onClick={setPlanned} disabled={!activeRound}>
+                  <PrimaryButton className="h-11" onClick={setPlanned} disabled={!activeRound}>
                     Standby
                   </PrimaryButton>
                 )}
                 {!isImageItem && (
-                  <SecondaryButton onClick={startTimer} disabled={!item}>
+                  <SecondaryButton className="h-11" onClick={startTimer} disabled={!item}>
                     {timerButtonLabel}
                   </SecondaryButton>
                 )}
                 {item?.question_type === 'multiple_choice' && (
                   <SecondaryButton
+                    className="h-11"
                     onClick={clearRoundResponses}
                     disabled={!activeRound || clearResponsesStatus === 'clearing'}
                   >
@@ -656,6 +678,7 @@ export function EventRunPage() {
                   </SecondaryButton>
                 )}
                 <SecondaryButton
+                  className="h-11"
                   onClick={() => {
                     const next = !showAnswer;
                     setShowAnswer(next);
@@ -663,9 +686,10 @@ export function EventRunPage() {
                   }}
                   disabled={!item}
                 >
-                  {showAnswer ? 'Hide Answer' : 'Reveal Answer'}
+                  {showAnswer ? 'Hide answer' : 'Reveal answer'}
                 </SecondaryButton>
                 <SecondaryButton
+                  className="h-11"
                   onClick={() => {
                     const next = !showFact;
                     setShowFact(next);
@@ -673,55 +697,49 @@ export function EventRunPage() {
                   }}
                   disabled={!item}
                 >
-                  {showFact ? 'Hide Fact' : 'Reveal Fact'}
+                  {showFact ? 'Hide fact' : 'Reveal fact'}
                 </SecondaryButton>
-                <SecondaryButton onClick={nextItem} disabled={!item} className="py-4 text-sm">
+                <SecondaryButton className="h-11" onClick={nextItem} disabled={!item}>
                   Next
                 </SecondaryButton>
                 {(activeRound?.status === 'completed' || activeRound?.status === 'locked') && (
-                  <SecondaryButton onClick={reopenRound} disabled={!activeRound} className="py-4 text-sm">
+                  <SecondaryButton className="h-11" onClick={reopenRound} disabled={!activeRound}>
                     Reopen Round
                   </SecondaryButton>
                 )}
                 {(activeRound?.status === 'completed' || activeRound?.status === 'locked') && (
-                  <SecondaryButton onClick={openScores} disabled={!activeRound}>
+                  <SecondaryButton className="h-11" onClick={openScores} disabled={!activeRound}>
                     Enter Scores
                   </SecondaryButton>
                 )}
                 {activeRound?.status !== 'completed' && activeRound?.status !== 'locked' && item && index === items.length - 1 && (
-                  <SecondaryButton onClick={setCompleted} disabled={!activeRound}>
+                  <SecondaryButton className="h-11" onClick={setCompleted} disabled={!activeRound}>
                     Mark Completed
                   </SecondaryButton>
                 )}
               </div>
-              <div className="text-xs uppercase tracking-[0.2em] text-muted">
-                Item {items.length === 0 ? 0 : index + 1} / {items.length}
-              </div>
               {clearResponsesMessage && (
                 <div
-                  className={`text-xs uppercase tracking-[0.2em] ${
-                    clearResponsesStatus === 'error' ? 'text-danger' : 'text-muted'
-                  }`}
+                  className={`text-sm ${clearResponsesStatus === 'error' ? 'text-danger-ink' : 'text-muted'}`}
                 >
                   {clearResponsesMessage}
                 </div>
               )}
             </div>
           ) : (
-            <div className="text-xs uppercase tracking-[0.2em] text-muted">Select a round to begin.</div>
+            <div className="text-sm text-muted">Select a round to begin.</div>
           )}
         </Panel>
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-4 lg:sticky lg:top-24 lg:self-start">
           <AccordionSection title="Rounds" defaultOpen>
-            <div className="flex flex-col gap-3">
+            <div className="flex max-h-[460px] flex-col gap-2 overflow-auto pr-1">
               {rounds.length === 0 && (
-                <div className="text-xs uppercase tracking-[0.2em] text-muted">No rounds yet.</div>
+                <div className="text-sm text-muted">No rounds yet.</div>
               )}
               {rounds.map((round) => {
                 const display = roundDisplay(round);
                 const selected = round.id === roundId;
                 const isCompleted = round.status === 'completed' || round.status === 'locked';
-                const statusLabel = round.status === 'locked' ? 'COMPLETED' : round.status.toUpperCase();
                 return (
                   <button
                     key={round.id}
@@ -730,53 +748,54 @@ export function EventRunPage() {
                       preselectRef.current = true;
                       setRoundId(round.id);
                     }}
-                    className={`flex w-full flex-col gap-2 border-2 px-3 py-2 text-left ${
-                      selected
-                        ? 'border-accent-ink bg-panel text-text'
-                        : isCompleted
-                          ? 'border-border bg-panel2 text-muted'
-                          : 'border-border bg-panel2'
-                    }`}
+                    className={`surface-inset w-full p-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg ${
+                      selected ? 'bg-panel3 ring-2 ring-accent-ink' : ''
+                    } ${isCompleted ? 'opacity-80' : ''}`}
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="text-xs font-display uppercase tracking-[0.2em]">{display.title}</div>
-                      <StampBadge label={statusLabel} variant="inspected" />
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold text-text">{display.title}</div>
+                        <div className="mt-1 text-xs leading-snug text-muted">{display.detail}</div>
+                      </div>
+                      <StampBadge
+                        label={roundStatusLabel(round.status)}
+                        variant={round.status === 'live' ? 'approved' : isCompleted ? 'locked' : 'inspected'}
+                      />
                     </div>
-                    <div className="text-[10px] uppercase tracking-[0.2em] text-muted">{display.detail}</div>
                   </button>
                 );
               })}
             </div>
           </AccordionSection>
-          <AccordionSection title="Round Control" defaultOpen>
+          <AccordionSection title="Round control" defaultOpen>
             <div className="flex flex-col gap-4">
-              <div className="text-xs uppercase tracking-[0.2em] text-muted">Event</div>
-              <div className="text-sm font-display uppercase tracking-[0.2em]">{event.title}</div>
-              <ButtonLink to={`/events/${event.id}`} variant="secondary">
+              <div className="ui-label">Event</div>
+              <div className="text-base font-semibold text-text">{event.title}</div>
+              <ButtonLink to={`/events/${event.id}`} variant="secondary" className="h-11">
                 Back to Event
               </ButtonLink>
-              <div className="border-2 border-border bg-panel2 p-3 text-xs uppercase tracking-[0.2em] text-muted">
+              <div className="surface-inset p-3 text-sm text-muted">
                 {activeRound ? `Status: ${roundStatusLabel(activeRound.status)}` : 'Awaiting round selection'}
               </div>
             </div>
           </AccordionSection>
-          <AccordionSection title="Waiting Room">
+          <AccordionSection title="Waiting room">
             <div className="flex flex-col gap-3">
               <div className="flex items-center justify-between gap-3">
-                <div className="text-xs uppercase tracking-[0.2em] text-muted">Leaderboard</div>
-                <SecondaryButton onClick={toggleFullLeaderboard} disabled={!eventId}>
+                <div className="ui-label">Leaderboard</div>
+                <SecondaryButton className="h-11" onClick={toggleFullLeaderboard} disabled={!eventId}>
                   {showFullLeaderboard ? 'Hide Full Leaderboard' : 'Show Full Leaderboard'}
                 </SecondaryButton>
               </div>
-              <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-                Message
+              <label className="flex flex-col gap-2 text-sm text-muted">
+                <span className="ui-label">Message</span>
                 <textarea
                   className="min-h-[96px] px-3 py-2"
                   value={waitingMessage}
                   onChange={(event) => setWaitingMessage(event.target.value)}
                 />
               </label>
-              <label className="flex items-center gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+              <label className="flex items-center gap-2 text-sm text-muted">
                 <input
                   type="checkbox"
                   checked={waitingShowLeaderboard}
@@ -784,7 +803,7 @@ export function EventRunPage() {
                 />
                 Show Leaderboard
               </label>
-              <label className="flex items-center gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+              <label className="flex items-center gap-2 text-sm text-muted">
                 <input
                   type="checkbox"
                   checked={waitingShowNextRound}
@@ -793,16 +812,16 @@ export function EventRunPage() {
                 Show Next Round Info
               </label>
               {waitingError && (
-                <div className="border-2 border-danger bg-panel px-3 py-2 text-xs uppercase tracking-[0.2em] text-danger">
+                <div className="rounded-lg border border-danger bg-panel px-3 py-2 text-sm text-danger-ink">
                   {waitingError}
                 </div>
               )}
               {waitingShowLeaderboard && (
-                <SecondaryButton onClick={() => window.open(`/events/${eventId}/leaderboard`, '_blank')}>
+                <SecondaryButton className="h-11" onClick={() => window.open(`/events/${eventId}/leaderboard`, '_blank')}>
                   View Full Leaderboard
                 </SecondaryButton>
               )}
-              <PrimaryButton onClick={saveWaitingRoom} disabled={waitingSaving}>
+              <PrimaryButton className="h-11" onClick={saveWaitingRoom} disabled={waitingSaving}>
                 {waitingSaving ? 'Updating…' : 'Update Waiting Room'}
               </PrimaryButton>
             </div>
