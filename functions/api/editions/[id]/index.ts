@@ -39,7 +39,9 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
   try {
     await execute(
       env,
-      `UPDATE editions SET game_id = ?, edition_number = ?, title = ?, description = ?, status = ?, tags_csv = ?, theme = ?, timer_seconds = ?, updated_at = ? WHERE id = ?`,
+      `UPDATE editions
+       SET game_id = ?, edition_number = ?, title = ?, description = ?, status = ?, tags_csv = ?, theme = ?, timer_seconds = ?, speed_round_audio_key = ?, speed_round_audio_name = ?, updated_at = ?
+       WHERE id = ?`,
       [
         merged.game_id,
         merged.edition_number ?? null,
@@ -49,6 +51,8 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
         merged.tags_csv ?? null,
         merged.theme ?? null,
         merged.timer_seconds ?? 15,
+        merged.speed_round_audio_key ?? null,
+        merged.speed_round_audio_name ?? null,
         nowIso(),
         params.id
       ]

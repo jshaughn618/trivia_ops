@@ -554,8 +554,6 @@ export function EventDetailPage() {
   const [expandedRoundId, setExpandedRoundId] = useState<string | null>(null);
   const [draggedRoundId, setDraggedRoundId] = useState<string | null>(null);
   const [scoresheetTitles, setScoresheetTitles] = useState<Record<string, string>>({});
-  const [roundAudioUploadingId, setRoundAudioUploadingId] = useState<string | null>(null);
-  const [roundAudioError, setRoundAudioError] = useState<Record<string, string>>({});
   const [roundSyncingId, setRoundSyncingId] = useState<string | null>(null);
   const [roundSyncMessage, setRoundSyncMessage] = useState<Record<string, string>>({});
   const [roundSyncError, setRoundSyncError] = useState<Record<string, string>>({});
@@ -819,12 +817,6 @@ export function EventDetailPage() {
     };
   };
 
-  const isSpeedRound = (round: EventRound) => {
-    const edition = editionById[round.edition_id];
-    const game = edition ? gameById[edition.game_id] : null;
-    return game?.subtype === 'speed_round';
-  };
-
   const updateEvent = async () => {
     if (!eventId) return;
     const startsAtIso = startsAtLocal ? new Date(startsAtLocal) : null;
@@ -871,51 +863,6 @@ export function EventDetailPage() {
       setRounds((prev) => prev.map((item) => (item.id === round.id ? res.data : item)));
       setScoresheetTitles((prev) => ({ ...prev, [round.id]: res.data.scoresheet_title ?? res.data.label }));
     }
-  };
-
-  const uploadRoundAudio = async (round: EventRound, file: File) => {
-    const isMp3 = file.type === 'audio/mpeg' || file.name.toLowerCase().endsWith('.mp3');
-    if (!isMp3) {
-      setRoundAudioError((prev) => ({ ...prev, [round.id]: 'Speed rounds require an MP3 file.' }));
-      return;
-    }
-    setRoundAudioUploadingId(round.id);
-    setRoundAudioError((prev) => ({ ...prev, [round.id]: '' }));
-    const uploadRes = await api.uploadMedia(file, 'audio');
-    if (!uploadRes.ok) {
-      setRoundAudioUploadingId(null);
-      setRoundAudioError((prev) => ({ ...prev, [round.id]: formatApiError(uploadRes, 'Upload failed.') }));
-      return;
-    }
-    const previousKey = round.audio_key;
-    const updateRes = await api.updateEventRound(round.id, {
-      audio_key: uploadRes.data.key,
-      audio_name: file.name
-    });
-    setRoundAudioUploadingId(null);
-    if (!updateRes.ok) {
-      setRoundAudioError((prev) => ({ ...prev, [round.id]: formatApiError(updateRes, 'Failed to save audio.') }));
-      await api.deleteMedia(uploadRes.data.key);
-      return;
-    }
-    setRounds((prev) => prev.map((item) => (item.id === round.id ? updateRes.data : item)));
-    if (previousKey && previousKey !== uploadRes.data.key) {
-      await api.deleteMedia(previousKey);
-    }
-  };
-
-  const removeRoundAudio = async (round: EventRound) => {
-    if (!round.audio_key) return;
-    setRoundAudioUploadingId(round.id);
-    setRoundAudioError((prev) => ({ ...prev, [round.id]: '' }));
-    const updateRes = await api.updateEventRound(round.id, { audio_key: null, audio_name: null });
-    setRoundAudioUploadingId(null);
-    if (!updateRes.ok) {
-      setRoundAudioError((prev) => ({ ...prev, [round.id]: formatApiError(updateRes, 'Failed to remove audio.') }));
-      return;
-    }
-    setRounds((prev) => prev.map((item) => (item.id === round.id ? updateRes.data : item)));
-    await api.deleteMedia(round.audio_key);
   };
 
   const syncRoundItems = async (round: EventRound) => {
@@ -1373,54 +1320,6 @@ export function EventDetailPage() {
                         </SecondaryButton>
                       </div>
                     </label>
-                    {isSpeedRound(round) && (
-                      <div className="mt-4 border-t border-border pt-3">
-                        <div className="text-sm text-muted">Speed round audio</div>
-                        <div className="mt-2 flex flex-wrap items-center gap-2">
-                          <input
-                            id={`round-audio-${round.id}`}
-                            type="file"
-                            accept="audio/mpeg,audio/mp3"
-                            className="sr-only"
-                            onChange={(event) => {
-                              const file = event.target.files?.[0];
-                              event.target.value = '';
-                              if (file) uploadRoundAudio(round, file);
-                            }}
-                            disabled={roundAudioUploadingId === round.id}
-                          />
-                          <label
-                            htmlFor={`round-audio-${round.id}`}
-                            className={`rounded-md border border-border px-3 py-1 text-xs text-muted hover:border-accent-ink hover:text-text ${roundAudioUploadingId === round.id ? 'opacity-50' : ''}`}
-                          >
-                            {roundAudioUploadingId === round.id ? 'Uploading' : 'Upload MP3'}
-                          </label>
-                          {round.audio_key && (
-                            <SecondaryButton
-                              className="px-3 py-2 text-xs"
-                              onClick={() => removeRoundAudio(round)}
-                              disabled={roundAudioUploadingId === round.id}
-                            >
-                              Remove
-                            </SecondaryButton>
-                          )}
-                          {round.audio_name && (
-                            <span className="text-xs text-muted">{round.audio_name}</span>
-                          )}
-                          {!round.audio_key && roundAudioUploadingId !== round.id && (
-                            <span className="text-xs text-muted">No clip uploaded.</span>
-                          )}
-                        </div>
-                        {round.audio_key && (
-                          <div className="mt-2">
-                            <audio className="w-full" controls src={api.mediaUrl(round.audio_key)} />
-                          </div>
-                        )}
-                        {roundAudioError[round.id] && (
-                          <div className="mt-2 text-xs text-danger-ink">{roundAudioError[round.id]}</div>
-                        )}
-                      </div>
-                    )}
                   </div>
                 )}
               </ListRow>

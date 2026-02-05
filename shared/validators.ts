@@ -49,7 +49,9 @@ export const editionCreateSchema = z.object({
   status: editionStatusSchema.default('draft'),
   tags_csv: z.string().nullable().optional(),
   theme: z.string().nullable().optional(),
-  timer_seconds: z.number().int().min(5).max(600).optional()
+  timer_seconds: z.number().int().min(5).max(600).optional(),
+  speed_round_audio_key: z.string().nullable().optional(),
+  speed_round_audio_name: z.string().nullable().optional()
 });
 
 export const editionUpdateSchema = z.object({
@@ -60,7 +62,9 @@ export const editionUpdateSchema = z.object({
   status: editionStatusSchema.optional(),
   tags_csv: z.string().nullable().optional(),
   theme: z.string().nullable().optional(),
-  timer_seconds: z.number().int().min(5).max(600).optional()
+  timer_seconds: z.number().int().min(5).max(600).optional(),
+  speed_round_audio_key: z.string().nullable().optional(),
+  speed_round_audio_name: z.string().nullable().optional()
 });
 
 const editionItemBaseSchema = z.object({

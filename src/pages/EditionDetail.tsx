@@ -158,6 +158,8 @@ export function EditionDetailPage() {
   const [musicBulkInstructions, setMusicBulkInstructions] = useState('');
   const [audioDownloadStatus, setAudioDownloadStatus] = useState<string | null>(null);
   const [audioDownloadError, setAudioDownloadError] = useState<string | null>(null);
+  const [speedRoundAudioUploading, setSpeedRoundAudioUploading] = useState(false);
+  const [speedRoundAudioError, setSpeedRoundAudioError] = useState<string | null>(null);
   const [speedRoundText, setSpeedRoundText] = useState('');
   const [speedRoundStatus, setSpeedRoundStatus] = useState<string | null>(null);
   const [speedRoundError, setSpeedRoundError] = useState<string | null>(null);
@@ -172,6 +174,7 @@ export function EditionDetailPage() {
   const editAudioRef = useRef<HTMLInputElement | null>(null);
   const newAudioRef = useRef<HTMLInputElement | null>(null);
   const musicUploadRef = useRef<HTMLInputElement | null>(null);
+  const speedRoundAudioRef = useRef<HTMLInputElement | null>(null);
 
   const load = async () => {
     if (!editionId) return;
@@ -628,6 +631,58 @@ export function EditionDetailPage() {
       return null;
     }
     return uploadRes.data.key;
+  };
+
+  const uploadSpeedRoundAudio = async (file: File) => {
+    if (!editionId || !edition) return;
+    const isMp3 = file.type === 'audio/mpeg' || file.name.toLowerCase().endsWith('.mp3');
+    if (!isMp3) {
+      setSpeedRoundAudioError('MP3 files only.');
+      return;
+    }
+    setSpeedRoundAudioUploading(true);
+    setSpeedRoundAudioError(null);
+
+    const uploadRes = await api.uploadMedia(file, 'audio');
+    if (!uploadRes.ok) {
+      setSpeedRoundAudioUploading(false);
+      setSpeedRoundAudioError(formatApiError(uploadRes, 'Upload failed.'));
+      return;
+    }
+
+    const previousKey = edition.speed_round_audio_key;
+    const updateRes = await api.updateEdition(editionId, {
+      speed_round_audio_key: uploadRes.data.key,
+      speed_round_audio_name: file.name
+    });
+    setSpeedRoundAudioUploading(false);
+    if (!updateRes.ok) {
+      await api.deleteMedia(uploadRes.data.key);
+      setSpeedRoundAudioError(formatApiError(updateRes, 'Failed to save speed round audio.'));
+      return;
+    }
+    setEdition(updateRes.data);
+    if (previousKey && previousKey !== uploadRes.data.key) {
+      await api.deleteMedia(previousKey);
+    }
+  };
+
+  const removeSpeedRoundAudio = async () => {
+    if (!editionId || !edition?.speed_round_audio_key) return;
+    setSpeedRoundAudioUploading(true);
+    setSpeedRoundAudioError(null);
+    const previousKey = edition.speed_round_audio_key;
+    const updateRes = await api.updateEdition(editionId, {
+      speed_round_audio_key: null,
+      speed_round_audio_name: null
+    });
+    setSpeedRoundAudioUploading(false);
+    if (!updateRes.ok) {
+      setSpeedRoundAudioError(formatApiError(updateRes, 'Failed to remove speed round audio.'));
+      return;
+    }
+    setEdition(updateRes.data);
+    await api.deleteMedia(previousKey);
   };
 
   const handleQuestionAudioUpload = async (item: EditionItem | null, file: File) => {
@@ -2269,7 +2324,7 @@ export function EditionDetailPage() {
         )}
         {gameTypeId === 'music' && itemDraft.item_mode === 'audio' && isMusicSpeedRound && (
           <div className="rounded-md border border-border bg-panel2 px-3 py-2 text-[10px] uppercase tracking-[0.2em] text-muted">
-            Speed round audio is uploaded per event round.
+            Speed round audio is managed at the edition level.
           </div>
         )}
         {itemValidationError && (
@@ -2785,7 +2840,7 @@ export function EditionDetailPage() {
         )}
         {gameTypeId === 'music' && itemDraft.item_mode === 'audio' && isMusicSpeedRound && (
           <div className="rounded-md border border-border bg-panel2 px-3 py-2 text-[10px] uppercase tracking-[0.2em] text-muted">
-            Speed round audio is uploaded per event round.
+            Speed round audio is managed at the edition level.
           </div>
         )}
         {itemValidationError && (
@@ -3063,7 +3118,55 @@ export function EditionDetailPage() {
               {hasMusicTemplate ? (
                 <div className="mt-3 flex flex-col gap-3">
                   <div className="text-[10px] uppercase tracking-[0.2em] text-muted">
-                    Speed rounds use one MP3 per event round. Upload the clip on the event round, then paste answer lines below.
+                    Speed rounds use one MP3 per edition. Event rounds pull this audio automatically.
+                  </div>
+                  <div className="rounded-md border border-border bg-panel p-3">
+                    <div className="text-xs font-display uppercase tracking-[0.2em] text-muted">Edition speed round audio</div>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <input
+                        ref={speedRoundAudioRef}
+                        type="file"
+                        accept="audio/mpeg,audio/mp3"
+                        className="hidden"
+                        onChange={(event) => {
+                          const file = event.target.files?.[0];
+                          event.target.value = '';
+                          if (file) uploadSpeedRoundAudio(file);
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => speedRoundAudioRef.current?.click()}
+                        className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
+                        disabled={speedRoundAudioUploading}
+                      >
+                        {speedRoundAudioUploading ? 'Uploading' : 'Upload MP3'}
+                      </button>
+                      {edition?.speed_round_audio_key && (
+                        <button
+                          type="button"
+                          onClick={removeSpeedRoundAudio}
+                          className="border-2 border-danger px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-danger hover:border-[#9d2a24]"
+                          disabled={speedRoundAudioUploading}
+                        >
+                          Remove
+                        </button>
+                      )}
+                      {edition?.speed_round_audio_name && (
+                        <span className="text-xs text-muted">{edition.speed_round_audio_name}</span>
+                      )}
+                      {!edition?.speed_round_audio_key && !speedRoundAudioUploading && (
+                        <span className="text-xs text-muted">No clip uploaded.</span>
+                      )}
+                    </div>
+                    {edition?.speed_round_audio_key && (
+                      <div className="mt-2">
+                        <audio className="w-full" controls src={api.mediaUrl(edition.speed_round_audio_key)} />
+                      </div>
+                    )}
+                    {speedRoundAudioError && (
+                      <div className="mt-2 text-xs text-danger">{speedRoundAudioError}</div>
+                    )}
                   </div>
                   <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
                     Round answers
@@ -3260,7 +3363,7 @@ export function EditionDetailPage() {
                       {gameTypeId === 'music' && (
                         <div className="mt-2 text-[10px] uppercase tracking-[0.2em] text-muted">
                           {isMusicSpeedRound
-                            ? 'Speed round audio attached per event'
+                            ? edition?.speed_round_audio_key ? 'Edition speed round audio attached' : 'No edition speed round audio'
                             : item.media_key ? 'Question audio attached' : 'No question audio'}
                           {!isMusicSpeedRound && (
                             <>

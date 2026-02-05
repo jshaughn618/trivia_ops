@@ -169,6 +169,9 @@ export function PlayLeaderboardPage() {
   }
 
   const orderedRounds = (data.rounds ?? []).slice().sort((a, b) => a.round_number - b.round_number);
+  const lastCompletedRound = [...orderedRounds]
+    .reverse()
+    .find((round) => round.status === 'completed' || round.status === 'locked');
   const scoreMap = new Map<string, Record<string, number>>();
   (data.round_scores ?? []).forEach((row) => {
     const teamScores = scoreMap.get(row.team_id) ?? {};
@@ -241,9 +244,19 @@ export function PlayLeaderboardPage() {
                     </span>
                     <span className="truncate text-sm font-medium text-text">{row.name}</span>
                   </div>
-                  <div className="text-right">
-                    <div className="text-[10px] uppercase tracking-[0.16em] text-muted">Total</div>
-                    <div className="text-base font-semibold text-text">{row.total}</div>
+                  <div className={`grid gap-3 text-right ${lastCompletedRound ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                    {lastCompletedRound && (
+                      <div>
+                        <div className="text-[10px] uppercase tracking-[0.16em] text-muted">Last round</div>
+                        <div className="text-sm font-semibold text-text">
+                          {row.roundScores[lastCompletedRound.id] ?? 0}
+                        </div>
+                      </div>
+                    )}
+                    <div>
+                      <div className="text-[10px] uppercase tracking-[0.16em] text-muted">Total</div>
+                      <div className="text-base font-semibold text-text">{row.total}</div>
+                    </div>
                   </div>
                 </div>
               ))}

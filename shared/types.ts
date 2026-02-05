@@ -68,6 +68,8 @@ export type GameEdition = {
   tags_csv: string | null;
   theme: string | null;
   timer_seconds: number;
+  speed_round_audio_key: string | null;
+  speed_round_audio_name: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -119,6 +121,8 @@ export type EventRound = {
   audio_key: string | null;
   audio_name: string | null;
   timer_seconds: number | null;
+  edition_audio_key?: string | null;
+  edition_audio_name?: string | null;
   edition_id: Id;
   status: EventRoundStatus;
   created_at: string;

@@ -187,8 +187,8 @@ export function EventRunPage() {
   const item = items[index];
   const isAudioItem = item?.media_type === 'audio';
   const isImageItem = item?.media_type === 'image';
-  const roundAudioKey = activeRound?.audio_key ?? null;
-  const roundAudioName = activeRound?.audio_name ?? null;
+  const roundAudioKey = activeRound?.edition_audio_key ?? activeRound?.audio_key ?? null;
+  const roundAudioName = activeRound?.edition_audio_name ?? activeRound?.audio_name ?? null;
   const effectiveAudioKey = isAudioItem ? item?.media_key ?? roundAudioKey : null;
   const usesRoundAudio = isAudioItem && !item?.media_key && Boolean(roundAudioKey);
   const questionLabel = item?.prompt?.trim()
@@ -599,7 +599,7 @@ export function EventRunPage() {
                     <div className="mt-4 flex flex-col gap-2">
                       {usesRoundAudio && (
                         <div className="ui-label">
-                          Round clip{roundAudioName ? ` • ${roundAudioName}` : ''}
+                          Edition clip{roundAudioName ? ` • ${roundAudioName}` : ''}
                         </div>
                       )}
                       {audioLoading && (
@@ -632,7 +632,7 @@ export function EventRunPage() {
                   )}
                   {item.media_type === 'audio' && !effectiveAudioKey && (
                     <div className="mt-4 rounded-lg border border-danger bg-panel px-3 py-2 text-sm text-danger-ink">
-                      No audio clip attached to this round.
+                      No audio clip attached to this edition.
                     </div>
                   )}
                 </div>

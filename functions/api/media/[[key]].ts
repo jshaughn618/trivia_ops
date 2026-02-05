@@ -226,6 +226,22 @@ async function hasHostMediaAccess(env: Env, userId: string, key: string) {
   );
   if (byRoundAudio) return true;
 
+  const byEditionSpeedRoundAudio = await queryFirst<{ ok: number }>(
+    env,
+    `SELECT 1 AS ok
+     FROM editions ed
+     JOIN event_rounds er ON er.edition_id = ed.id
+     JOIN events e ON e.id = er.event_id
+     WHERE e.host_user_id = ?
+       AND COALESCE(e.deleted, 0) = 0
+       AND COALESCE(er.deleted, 0) = 0
+       AND COALESCE(ed.deleted, 0) = 0
+       AND ed.speed_round_audio_key = ?
+     LIMIT 1`,
+    [userId, key]
+  );
+  if (byEditionSpeedRoundAudio) return true;
+
   const byRoundItems = await queryFirst<{ ok: number }>(
     env,
     `SELECT 1 AS ok

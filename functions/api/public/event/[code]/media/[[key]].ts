@@ -40,16 +40,27 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params, request, d
     return jsonError({ code: 'not_live', message: 'Event is not live' }, 403);
   }
 
-  const activeRound = await queryFirst<{ status: string; audio_key: string | null }>(
+  const activeRound = await queryFirst<{
+    status: string;
+    audio_key: string | null;
+    edition_audio_key: string | null;
+  }>(
     env,
-    'SELECT status, audio_key FROM event_rounds WHERE id = ? AND event_id = ? AND COALESCE(deleted, 0) = 0',
+    `SELECT er.status,
+            er.audio_key,
+            ed.speed_round_audio_key AS edition_audio_key
+     FROM event_rounds er
+     LEFT JOIN editions ed ON ed.id = er.edition_id
+     WHERE er.id = ? AND er.event_id = ? AND COALESCE(er.deleted, 0) = 0`,
     [live.active_round_id, event.id]
   );
   if (!activeRound || activeRound.status !== 'live') {
     return jsonError({ code: 'not_live', message: 'Event is not live' }, 403);
   }
 
-  const isRoundAudio = activeRound.audio_key && activeRound.audio_key === key;
+  const isRoundAudio =
+    (activeRound.audio_key && activeRound.audio_key === key) ||
+    (activeRound.edition_audio_key && activeRound.edition_audio_key === key);
   if (!isRoundAudio) {
     const mediaMatch = await queryFirst<{ media_key: string }>(
       env,

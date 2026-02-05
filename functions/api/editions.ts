@@ -96,8 +96,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, data }) 
   try {
     await execute(
       env,
-      `INSERT INTO editions (id, game_id, edition_number, title, description, status, tags_csv, theme, timer_seconds, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO editions (id, game_id, edition_number, title, description, status, tags_csv, theme, timer_seconds, speed_round_audio_key, speed_round_audio_name, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ,
       [
         id,
@@ -109,6 +109,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, data }) 
         payloadData.tags_csv ?? null,
         payloadData.theme ?? null,
         payloadData.timer_seconds ?? 15,
+        payloadData.speed_round_audio_key ?? null,
+        payloadData.speed_round_audio_name ?? null,
         createdAt,
         createdAt
       ]

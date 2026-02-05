@@ -183,7 +183,16 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
     }
   }
 
-  const row = await queryFirst(env, 'SELECT * FROM event_rounds WHERE id = ? AND COALESCE(deleted, 0) = 0', [params.roundId]);
+  const row = await queryFirst(
+    env,
+    `SELECT er.*, ed.timer_seconds,
+            ed.speed_round_audio_key AS edition_audio_key,
+            ed.speed_round_audio_name AS edition_audio_name
+     FROM event_rounds er
+     JOIN editions ed ON ed.id = er.edition_id
+     WHERE er.id = ? AND COALESCE(er.deleted, 0) = 0`,
+    [params.roundId]
+  );
   return jsonOk(row);
 };
 
