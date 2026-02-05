@@ -50,7 +50,10 @@ export function EventRunPage() {
   const [timerStartedAt, setTimerStartedAt] = useState<string | null>(null);
   const [timerDurationSeconds, setTimerDurationSeconds] = useState(15);
   const [timerRemainingSeconds, setTimerRemainingSeconds] = useState<number | null>(null);
+  const [timerJustExpired, setTimerJustExpired] = useState(false);
   const timerRef = useRef<number | null>(null);
+  const timerExpireRef = useRef<number | null>(null);
+  const timerPrevRemainingRef = useRef<number | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [audioLoading, setAudioLoading] = useState(false);
@@ -279,6 +282,39 @@ export function EventRunPage() {
     };
   }, [timerStartedAt, timerDurationSeconds]);
 
+  useEffect(() => {
+    const prev = timerPrevRemainingRef.current;
+    timerPrevRemainingRef.current = timerRemainingSeconds;
+    const expiredNow = Boolean(timerStartedAt) && timerRemainingSeconds === 0;
+    const crossedToExpired = Boolean(timerStartedAt) && prev !== null && prev > 0 && timerRemainingSeconds === 0;
+
+    if (!timerStartedAt || timerRemainingSeconds === null || timerRemainingSeconds > 0) {
+      setTimerJustExpired(false);
+      if (timerExpireRef.current) {
+        window.clearTimeout(timerExpireRef.current);
+        timerExpireRef.current = null;
+      }
+      return;
+    }
+
+    if (crossedToExpired) {
+      setTimerJustExpired(true);
+      if (timerExpireRef.current) window.clearTimeout(timerExpireRef.current);
+      timerExpireRef.current = window.setTimeout(() => setTimerJustExpired(false), 2400);
+    } else if (!expiredNow) {
+      setTimerJustExpired(false);
+    }
+  }, [timerRemainingSeconds, timerStartedAt]);
+
+  useEffect(() => {
+    return () => {
+      if (timerExpireRef.current) {
+        window.clearTimeout(timerExpireRef.current);
+        timerExpireRef.current = null;
+      }
+    };
+  }, []);
+
   const nextItem = () => {
     if (index < items.length - 1) {
       const nextIndex = index + 1;
@@ -425,6 +461,7 @@ export function EventRunPage() {
   }, [timerRemainingSeconds, timerDurationSeconds]);
 
   const timerButtonLabel = timerStartedAt ? 'Restart Timer' : 'Start Timer';
+  const timerExpired = Boolean(timerStartedAt) && timerRemainingSeconds === 0;
 
   const clearRoundResponses = async () => {
     if (!activeRound) return;
@@ -539,7 +576,11 @@ export function EventRunPage() {
                           : `Question ${index + 1}`}
                     </div>
                     {!isImageItem && (
-                      <div className="rounded-full border border-border bg-panel px-3 py-1 text-xs font-medium tabular-nums text-muted">
+                      <div
+                        className={`rounded-full border bg-panel px-3 py-1 text-xs font-medium tabular-nums ${
+                          timerExpired ? 'border-danger text-danger-ink' : 'border-border text-muted'
+                        } ${timerJustExpired ? 'timer-flash' : ''}`}
+                      >
                         {timerLabel}
                       </div>
                     )}
@@ -749,7 +790,7 @@ export function EventRunPage() {
                       setRoundId(round.id);
                     }}
                     className={`surface-inset w-full p-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg ${
-                      selected ? 'bg-panel3 ring-2 ring-accent-ink' : ''
+                      selected ? 'bg-panel3 border-accent-ink shadow-float' : ''
                     } ${isCompleted ? 'opacity-80' : ''}`}
                   >
                     <div className="flex items-start justify-between gap-3">
@@ -765,18 +806,6 @@ export function EventRunPage() {
                   </button>
                 );
               })}
-            </div>
-          </AccordionSection>
-          <AccordionSection title="Round control" defaultOpen>
-            <div className="flex flex-col gap-4">
-              <div className="ui-label">Event</div>
-              <div className="text-base font-semibold text-text">{event.title}</div>
-              <ButtonLink to={`/events/${event.id}`} variant="secondary" className="h-11">
-                Back to Event
-              </ButtonLink>
-              <div className="surface-inset p-3 text-sm text-muted">
-                {activeRound ? `Status: ${roundStatusLabel(activeRound.status)}` : 'Awaiting round selection'}
-              </div>
             </div>
           </AccordionSection>
           <AccordionSection title="Waiting room">
@@ -824,6 +853,18 @@ export function EventRunPage() {
               <PrimaryButton className="h-11" onClick={saveWaitingRoom} disabled={waitingSaving}>
                 {waitingSaving ? 'Updating…' : 'Update Waiting Room'}
               </PrimaryButton>
+            </div>
+          </AccordionSection>
+          <AccordionSection title="Round control" defaultOpen>
+            <div className="flex flex-col gap-4">
+              <div className="ui-label">Event</div>
+              <div className="text-base font-semibold text-text">{event.title}</div>
+              <ButtonLink to={`/events/${event.id}`} variant="secondary" className="h-11">
+                Back to Event
+              </ButtonLink>
+              <div className="surface-inset p-3 text-sm text-muted">
+                {activeRound ? `Status: ${roundStatusLabel(activeRound.status)}` : 'Awaiting round selection'}
+              </div>
             </div>
           </AccordionSection>
         </div>
