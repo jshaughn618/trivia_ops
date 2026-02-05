@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { api, formatApiError } from '../api';
 import { Panel } from '../components/Panel';
 import { SecondaryButton } from '../components/Buttons';
-import { Table } from '../components/Table';
 import { useTheme } from '../lib/theme';
 
 type PublicLeaderboardResponse = {
@@ -31,8 +30,10 @@ const STREAM_RETRY_MAX_MS = 30000;
 export function PlayLeaderboardPage() {
   const { code } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { theme, toggleTheme } = useTheme();
   const normalizedCode = useMemo(() => (code ?? '').trim().toUpperCase(), [code]);
+  const fromHost = useMemo(() => new URLSearchParams(location.search).get('from') === 'host', [location.search]);
   const [data, setData] = useState<PublicLeaderboardResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -208,40 +209,79 @@ export function PlayLeaderboardPage() {
               >
                 {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
               </button>
-              <SecondaryButton
-                onClick={() =>
-                  navigate(
-                    `/play/${data.event.public_code}`
-                  )
-                }
-              >
-                Back to Event
-              </SecondaryButton>
+              {!fromHost && (
+                <SecondaryButton
+                  onClick={() =>
+                    navigate(
+                      `/play/${data.event.public_code}`
+                    )
+                  }
+                >
+                  Back to Event
+                </SecondaryButton>
+              )}
             </div>
           </div>
         </div>
         <Panel title="Leaderboard">
-          <Table
-            headers={[
-              'Rank',
-              'Team',
-              ...orderedRounds.map((round) => `R${round.round_number}`),
-              'Total'
-            ]}
-          >
-            {rows.map((row, index) => (
-              <tr key={row.team_id}>
-                <td className="px-3 py-2 text-xs text-muted">{index + 1}</td>
-                <td className="px-3 py-2 text-sm font-medium text-text">{row.name}</td>
-                {orderedRounds.map((round) => (
-                  <td key={round.id} className="px-3 py-2 text-sm text-text">
-                    {row.roundScores[round.id] ?? 0}
-                  </td>
-                ))}
-                <td className="px-3 py-2 text-sm font-semibold text-text">{row.total}</td>
-              </tr>
-            ))}
-          </Table>
+          <div className="landscape:hidden">
+            <div className="mb-3 flex items-center justify-between text-xs text-muted">
+              <span>Ranked teams</span>
+              <span>{rows.length} total</span>
+            </div>
+            <div className="space-y-2">
+              {rows.map((row, index) => (
+                <div
+                  key={row.team_id}
+                  className="surface-inset flex items-center justify-between gap-3 px-3 py-2.5"
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-full border border-border bg-panel2 px-2 text-xs text-muted">
+                      #{index + 1}
+                    </span>
+                    <span className="truncate text-sm font-medium text-text">{row.name}</span>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-[10px] uppercase tracking-[0.16em] text-muted">Total</div>
+                    <div className="text-base font-semibold text-text">{row.total}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="hidden landscape:block">
+            <div className="overflow-x-auto border-2 border-border">
+              <table className="min-w-full text-left text-sm">
+                <thead className="bg-panel2">
+                  <tr>
+                    <th className="px-3 py-2 text-xs font-display uppercase tracking-[0.2em] text-muted">Rank</th>
+                    <th className="px-3 py-2 text-xs font-display uppercase tracking-[0.2em] text-muted">Team</th>
+                    {orderedRounds.map((round) => (
+                      <th key={round.id} className="px-3 py-2 text-xs font-display uppercase tracking-[0.2em] text-muted">
+                        R{round.round_number}
+                      </th>
+                    ))}
+                    <th className="px-3 py-2 text-xs font-display uppercase tracking-[0.2em] text-muted">Total</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y-2 divide-border">
+                  {rows.map((row, index) => (
+                    <tr key={row.team_id}>
+                      <td className="px-3 py-2 text-xs text-muted">{index + 1}</td>
+                      <td className="px-3 py-2 text-sm font-medium text-text">{row.name}</td>
+                      {orderedRounds.map((round) => (
+                        <td key={round.id} className="px-3 py-2 text-sm text-text">
+                          {row.roundScores[round.id] ?? 0}
+                        </td>
+                      ))}
+                      <td className="px-3 py-2 text-sm font-semibold text-text">{row.total}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </Panel>
       </div>
     </div>
