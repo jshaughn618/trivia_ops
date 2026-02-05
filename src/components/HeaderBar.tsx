@@ -6,10 +6,10 @@ import logoDark from '../assets/trivia_ops_logo_dark.png';
 import logoLight from '../assets/trivia_ops_logo_light.png';
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
-  `rounded-md px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg ${
+  `inline-flex h-9 items-center rounded-lg px-3 text-sm font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg ${
     isActive
-      ? 'border border-accent-ink text-accent-ink'
-      : 'border border-transparent text-muted hover:border-border hover:text-text'
+      ? 'border border-border-strong bg-panel2 text-text shadow-card'
+      : 'border border-transparent text-muted hover:border-border hover:bg-panel2 hover:text-text'
   }`;
 
 export function HeaderBar() {
@@ -35,10 +35,10 @@ export function HeaderBar() {
   }, [open]);
 
   return (
-    <header className="relative z-50 border-b border-border bg-panel px-4 py-3">
-      <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
+    <header className="sticky top-0 z-50 border-b border-border bg-bg px-4 py-2.5 backdrop-blur-xl">
+      <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 sm:px-2">
         <Link to={homePath} className="flex items-center">
-          <img src={logo} alt="Trivia Ops" className="h-10 w-auto" />
+          <img src={logo} alt="Trivia Ops" className="h-9 w-auto" />
         </Link>
         <div className="flex items-center gap-2">
           <nav className="hidden items-center gap-2 lg:flex">
@@ -60,7 +60,7 @@ export function HeaderBar() {
             <button
               type="button"
               onClick={() => setOpen((prev) => !prev)}
-              className="rounded-md border border-border px-3 py-2 text-sm font-medium text-muted hover:border-accent-ink hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+              className="inline-flex h-9 items-center rounded-lg border border-border bg-panel px-3 text-sm font-medium text-muted transition-all duration-150 hover:border-border-strong hover:bg-panel2 hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
               aria-expanded={open}
               aria-label="Open menu"
             >
@@ -70,7 +70,7 @@ export function HeaderBar() {
               </span>
             </button>
             {open && (
-              <div className="absolute right-0 z-50 mt-3 w-52 rounded-md border border-border bg-panel2 p-2 shadow-sm">
+              <div className="surface-card absolute right-0 z-50 mt-3 w-56 p-2">
                 <nav className="flex flex-col gap-2">
                   {isAdmin && (
                     <NavLink to="/dashboard" className={navLinkClass} onClick={() => setOpen(false)}>
@@ -107,7 +107,7 @@ export function HeaderBar() {
                       await auth.logout();
                       navigate('/login');
                     }}
-                    className="rounded-md border border-border px-3 py-2 text-left text-sm font-medium text-muted hover:border-danger hover:text-danger-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+                    className="inline-flex h-9 items-center rounded-lg border border-border px-3 text-left text-sm font-medium text-muted transition-colors hover:border-danger hover:text-danger-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
                   >
                     Logout
                   </button>

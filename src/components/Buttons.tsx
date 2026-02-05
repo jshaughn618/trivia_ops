@@ -2,13 +2,13 @@ import type { ButtonHTMLAttributes, AnchorHTMLAttributes } from 'react';
 import { Link, type LinkProps } from 'react-router-dom';
 
 const base =
-  'inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg disabled:pointer-events-none disabled:opacity-50';
+  'inline-flex h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg disabled:pointer-events-none disabled:opacity-50';
 
 export function PrimaryButton(props: ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
     <button
       {...props}
-      className={`${base} border border-transparent bg-accent text-accent-fg hover:brightness-95 active:brightness-90 ${props.className ?? ''}`}
+      className={`${base} border border-transparent bg-accent text-accent-fg shadow-card hover:-translate-y-px hover:brightness-95 active:translate-y-0 active:brightness-90 ${props.className ?? ''}`}
     />
   );
 }
@@ -17,7 +17,7 @@ export function SecondaryButton(props: ButtonHTMLAttributes<HTMLButtonElement>) 
   return (
     <button
       {...props}
-      className={`${base} border border-border bg-panel text-text hover:bg-panel2 ${props.className ?? ''}`}
+      className={`${base} border border-border bg-panel text-text hover:-translate-y-px hover:border-border-strong hover:bg-panel2 active:translate-y-0 ${props.className ?? ''}`}
     />
   );
 }
@@ -26,7 +26,7 @@ export function DangerButton(props: ButtonHTMLAttributes<HTMLButtonElement>) {
   return (
     <button
       {...props}
-      className={`${base} border border-transparent bg-danger text-danger-fg hover:brightness-95 active:brightness-90 ${props.className ?? ''}`}
+      className={`${base} border border-transparent bg-danger text-danger-fg shadow-card hover:-translate-y-px hover:brightness-95 active:translate-y-0 active:brightness-90 ${props.className ?? ''}`}
     />
   );
 }
@@ -35,12 +35,12 @@ export function ButtonLink(props: LinkProps & { variant?: 'primary' | 'secondary
   const variant = props.variant ?? 'secondary';
   const variantClass =
     variant === 'primary'
-      ? 'border border-transparent bg-accent text-accent-fg hover:brightness-95 active:brightness-90'
+      ? 'border border-transparent bg-accent text-accent-fg shadow-card hover:-translate-y-px hover:brightness-95 active:translate-y-0 active:brightness-90'
       : variant === 'ghost'
         ? 'border border-transparent bg-transparent text-text hover:bg-panel2'
         : variant === 'outline'
-          ? 'border border-accent-ink text-accent-ink hover:bg-accent-soft'
-          : 'border border-border bg-panel text-text hover:bg-panel2';
+          ? 'border border-accent-ink text-accent-ink hover:border-accent hover:bg-accent-soft'
+          : 'border border-border bg-panel text-text hover:-translate-y-px hover:border-border-strong hover:bg-panel2 active:translate-y-0';
 
   return (
     <Link

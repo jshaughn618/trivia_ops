@@ -21,8 +21,8 @@ module.exports = {
         "danger-ink": "var(--danger-ink)"
       },
       fontFamily: {
-        display: ["Space Grotesk", "ui-sans-serif", "system-ui"],
-        body: ["IBM Plex Sans", "ui-sans-serif", "system-ui", "-apple-system", "Segoe UI", "Roboto", "Helvetica", "Arial", "sans-serif"]
+        display: ["Sora", "ui-sans-serif", "system-ui", "-apple-system", "Segoe UI", "sans-serif"],
+        body: ["Manrope", "ui-sans-serif", "system-ui", "-apple-system", "Segoe UI", "sans-serif"]
       }
     }
   },

@@ -16,21 +16,25 @@ export function AccordionSection({
 
   return (
     <section className="surface-card">
-      <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+      <div className="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
         <button
           type="button"
-          className="flex flex-1 items-center justify-between gap-3 text-left"
+          className="flex flex-1 items-center justify-between gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
           onClick={() => setOpen((prev) => !prev)}
           aria-expanded={open}
           aria-controls={contentId}
         >
           <span className="panel-title">{title}</span>
-          <span className="text-sm text-muted">{open ? '−' : '+'}</span>
+          <span
+            className={`text-sm text-muted transition-all duration-150 ${open ? 'rotate-45 text-accent-ink' : ''}`}
+          >
+            +
+          </span>
         </button>
         {actions && <div className="shrink-0" onClick={(event) => event.stopPropagation()}>{actions}</div>}
       </div>
       {open && (
-        <div id={contentId} className="px-4 py-4">
+        <div id={contentId} className="px-5 py-5">
           {children}
         </div>
       )}

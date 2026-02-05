@@ -24,15 +24,19 @@
 - Reusable components under src/components
 - Keep styling consistent with index.css
 
-## UI Design Direction (Readability Pass)
-- Preserve the current "ops" feel: dark surfaces, tactical vibe, yellow accent.
-- Prioritize readability: sentence case for body copy, fewer all-caps headings, looser letter-spacing only for short labels.
-- Typography: pair a distinctive display face for headings with a highly readable sans for body. Avoid Inter/Roboto/Arial. Keep to two families.
-- Color: use 3-4 surface levels, raise text contrast, reserve yellow for primary actions/active state, avoid yellow for long paragraphs.
-- Layout: increase vertical rhythm, standardize paddings and gaps, reduce border noise in favor of spacing and subtle elevation.
-- Components: consistent radii and control heights; primary buttons filled, secondary outlined; make focus rings obvious.
-- Motion: one intentional page-load reveal and light hover transitions.
-- Accessibility: meet WCAG AA contrast for text and interactive states.
+## UI Design Direction (Readability + Linear-Inspired Cues)
+- Preserve the current "ops" identity. Take cues from Linear's polish and restraint, but do not copy layouts or branded details.
+- Core feel: near-black canvas, subtle atmospheric gradients, soft glow falloff, minimal visual noise.
+- Surface system: 3-4 dark surface tiers with low-contrast 1px borders, gentle elevation, and occasional inner highlight for premium depth.
+- Typography: use one expressive display family for major headings and one highly readable sans for UI/body text. Avoid Inter/Roboto/Arial. Keep to two families.
+- Case and hierarchy: Title Case for section headers and card titles; sentence case for body copy, helper text, statuses, and control labels.
+- Contrast discipline: bright text on dark surfaces, muted secondary text that stays AA-compliant, yellow reserved for primary actions/active states only.
+- Layout rhythm: generous vertical spacing, clean content bands, and consistent container widths; rely on spacing over heavy dividers.
+- Navigation/headers: slim, high-clarity top bars and section headers with subtle separators, not thick borders.
+- Components: unified radii and control heights; filled primary buttons, restrained secondary buttons, crisp hover/focus states.
+- Motion: intentional load-in reveal (fade/slide) and light hover transitions; avoid constant motion and decorative animation.
+- Imagery/backgrounds: use abstract gradients, grid textures, or soft vignette layers rather than flat fills.
+- Accessibility: meet WCAG AA contrast for text and interactive states, with clearly visible keyboard focus rings.
 
 ## Deployment
 - Build output: dist

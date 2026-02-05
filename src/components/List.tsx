@@ -7,7 +7,7 @@ export function List({
   ...rest
 }: { children: ReactNode; className?: string } & HTMLAttributes<HTMLDivElement>) {
   return (
-    <div {...rest} className={`-mx-4 divide-y divide-border sm:-mx-5 ${className ?? ''}`}>
+    <div {...rest} className={`-mx-5 divide-y divide-border sm:-mx-6 ${className ?? ''}`}>
       {children}
     </div>
   );
@@ -23,9 +23,9 @@ type ListRowProps = {
 
 export function ListRow({ to, href, className, interactive, children, ...rest }: ListRowProps) {
   const isInteractive = interactive ?? Boolean(to || href || rest.onClick);
-  const base = 'flex w-full items-start justify-between gap-3 px-4 py-3 text-left sm:px-5';
+  const base = 'flex w-full items-start justify-between gap-3 px-5 py-3.5 text-left sm:px-6';
   const state = isInteractive
-    ? 'cursor-pointer transition-colors hover:bg-panel2/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg'
+    ? 'cursor-pointer transition-all duration-150 hover:bg-panel2/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg'
     : '';
   const classes = `${base} ${state} ${className ?? ''}`;
 

@@ -16,18 +16,18 @@ export function Section({
   headerClassName?: string;
 }) {
   return (
-    <section className={`rounded-lg border border-border bg-panel ${className ?? ''}`}>
+    <section className={`surface-card ${className ?? ''}`}>
       {(title || actions) && (
         <div
-          className={`flex items-center justify-between gap-3 border-b border-border px-4 py-3 sm:px-5 ${
+          className={`flex items-center justify-between gap-3 border-b border-border px-5 py-4 sm:px-6 ${
             headerClassName ?? ''
           }`}
         >
-          {title ? <h2 className="ui-label">{title}</h2> : <span />}
+          {title ? <h2 className="panel-title">{title}</h2> : <span />}
           {actions}
         </div>
       )}
-      <div className={`px-4 py-4 sm:px-5 sm:py-5 ${bodyClassName ?? ''}`}>{children}</div>
+      <div className={`px-5 py-5 sm:px-6 sm:py-6 ${bodyClassName ?? ''}`}>{children}</div>
     </section>
   );
 }
