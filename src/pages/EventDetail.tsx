@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useId } from 'react';
+import { useEffect, useMemo, useState, useId, useRef } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import QRCode from 'qrcode';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
@@ -565,6 +565,7 @@ export function EventDetailPage() {
   const [answersheetError, setAnswersheetError] = useState<string | null>(null);
   const [scoresheetGenerating, setScoresheetGenerating] = useState(false);
   const [scoresheetGenerateError, setScoresheetGenerateError] = useState<string | null>(null);
+  const [openDocumentMenu, setOpenDocumentMenu] = useState<'scoresheet' | 'answersheet' | null>(null);
   const [showQr, setShowQr] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
   const [editingTitle, setEditingTitle] = useState(false);
@@ -575,6 +576,7 @@ export function EventDetailPage() {
   const [startsAtError, setStartsAtError] = useState<string | null>(null);
   const scoresheetInputId = useId();
   const answersheetInputId = useId();
+  const documentMenuRef = useRef<HTMLDivElement | null>(null);
 
   const loadCore = async (isActive: () => boolean = () => true) => {
     if (!eventId) return;
@@ -689,6 +691,25 @@ export function EventDetailPage() {
       return next;
     });
   }, [rounds]);
+
+  useEffect(() => {
+    if (!openDocumentMenu) return;
+    const handlePointerDown = (event: MouseEvent) => {
+      const target = event.target as Node | null;
+      if (documentMenuRef.current && target && !documentMenuRef.current.contains(target)) {
+        setOpenDocumentMenu(null);
+      }
+    };
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpenDocumentMenu(null);
+    };
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [openDocumentMenu]);
 
   const publicUrl = useMemo(() => {
     if (!event?.public_code) return '';
@@ -1174,7 +1195,7 @@ export function EventDetailPage() {
   if (!event) {
     return (
       <AppShell title="Event Detail">
-        <div className="text-xs uppercase tracking-[0.2em] text-muted">Loading...</div>
+        <div className="text-sm text-muted">Loading...</div>
       </AppShell>
     );
   }
@@ -1187,7 +1208,7 @@ export function EventDetailPage() {
             title={event.title}
             actions={
               <ButtonLink to={`/events/${event.id}/run`} variant="primary">
-                Open runner
+                Present
               </ButtonLink>
             }
           >
@@ -1199,7 +1220,7 @@ export function EventDetailPage() {
           </Section>
           <Section title="Rounds">
             {rounds.length === 0 && (
-              <div className="text-xs uppercase tracking-[0.2em] text-muted">No rounds yet.</div>
+              <div className="text-sm text-muted">No rounds yet.</div>
             )}
             {rounds.length > 0 && (
               <List>
@@ -1211,11 +1232,10 @@ export function EventDetailPage() {
                   >
                     <div className="flex-1">
                       <div className="text-sm font-display tracking-[0.12em]">Round {round.round_number}</div>
-                      <div className="mt-1 text-xs text-muted">
+                    <div className="mt-1 text-xs text-muted">
                         {round.scoresheet_title?.trim() || round.label}
                       </div>
                     </div>
-                    <StatusPill status={round.status} label={round.status} />
                   </ListRow>
                 ))}
               </List>
@@ -1226,17 +1246,18 @@ export function EventDetailPage() {
     );
   }
 
-  const fileButtonClass =
-    'inline-flex items-center justify-center gap-2 rounded-md border border-border bg-panel px-3 py-2 text-xs font-medium text-text transition-colors hover:bg-panel2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg disabled:pointer-events-none disabled:opacity-50';
+  const documentMenuButtonClass =
+    'inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-panel px-3 text-xs font-medium text-text transition-colors hover:bg-panel2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg';
+  const documentMenuItemClass =
+    'block w-full rounded-md px-3 py-2 text-left text-xs text-text transition-colors hover:bg-panel2';
 
   const roundsContent = (
     <div className="space-y-3">
-      {rounds.length === 0 && <div className="text-xs uppercase tracking-[0.2em] text-muted">No rounds yet.</div>}
+      {rounds.length === 0 && <div className="text-sm text-muted">No rounds yet.</div>}
       {rounds.length > 0 && (
         <List>
           {rounds.map((round) => {
             const display = roundDisplay(round);
-            const statusLabel = round.status === 'locked' ? 'completed' : round.status;
             const title = `${display.title} — ${round.scoresheet_title?.trim() || round.label}`;
             return (
               <ListRow
@@ -1276,7 +1297,7 @@ export function EventDetailPage() {
                       className="text-xs font-medium text-accent-ink"
                       onClick={(event) => event.stopPropagation()}
                     >
-                      Open runner
+                      Present
                     </Link>
                     <div className="relative">
                       <IconButton
@@ -1318,7 +1339,6 @@ export function EventDetailPage() {
                         </div>
                       )}
                     </div>
-                    <StatusPill status={statusLabel} label={statusLabel} />
                   </div>
                 </div>
                 {roundSyncMessage[round.id] && (
@@ -1332,8 +1352,8 @@ export function EventDetailPage() {
                     className="mt-2 w-full border-t border-border pt-3"
                     onClick={(event) => event.stopPropagation()}
                   >
-                    <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.2em] text-muted">
-                      Scoresheet title
+                    <label className="flex flex-col gap-2 text-sm text-muted">
+                      <span>Scoresheet title</span>
                       <div className="flex flex-wrap items-center gap-2">
                         <input
                           className="h-9 flex-1 px-2 text-xs"
@@ -1355,9 +1375,7 @@ export function EventDetailPage() {
                     </label>
                     {isSpeedRound(round) && (
                       <div className="mt-4 border-t border-border pt-3">
-                        <div className="text-xs font-display uppercase tracking-[0.2em] text-muted">
-                          Speed round audio
-                        </div>
+                        <div className="text-sm text-muted">Speed round audio</div>
                         <div className="mt-2 flex flex-wrap items-center gap-2">
                           <input
                             id={`round-audio-${round.id}`}
@@ -1373,7 +1391,7 @@ export function EventDetailPage() {
                           />
                           <label
                             htmlFor={`round-audio-${round.id}`}
-                            className={`border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text ${roundAudioUploadingId === round.id ? 'opacity-50' : ''}`}
+                            className={`rounded-md border border-border px-3 py-1 text-xs text-muted hover:border-accent-ink hover:text-text ${roundAudioUploadingId === round.id ? 'opacity-50' : ''}`}
                           >
                             {roundAudioUploadingId === round.id ? 'Uploading' : 'Upload MP3'}
                           </label>
@@ -1411,10 +1429,10 @@ export function EventDetailPage() {
         </List>
       )}
       <div className="border-t border-border pt-4">
-        <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">Add round</div>
+        <div className="text-sm font-medium text-muted">Add round</div>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-            Game
+          <label className="flex flex-col gap-2 text-sm text-muted">
+            <span>Game</span>
             <select
               className="h-10 px-3"
               value={roundGameId}
@@ -1431,8 +1449,8 @@ export function EventDetailPage() {
               ))}
             </select>
           </label>
-          <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-            Edition
+          <label className="flex flex-col gap-2 text-sm text-muted">
+            <span>Edition</span>
             <select
               className="h-10 px-3"
               value={roundEditionId}
@@ -1449,11 +1467,11 @@ export function EventDetailPage() {
           </label>
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted">
-          <span className="uppercase tracking-[0.2em]">Round number</span>
+          <span>Round number</span>
           <span>{roundNumber}</span>
         </div>
         <div className="mt-3">
-          <PrimaryButton onClick={createRound}>Add round</PrimaryButton>
+          <PrimaryButton onClick={createRound}>Add Round</PrimaryButton>
         </div>
       </div>
     </div>
@@ -1461,7 +1479,7 @@ export function EventDetailPage() {
 
   const teamsContent = (
     <div className="space-y-3">
-      {teams.length === 0 && <div className="text-xs uppercase tracking-[0.2em] text-muted">No teams yet.</div>}
+      {teams.length === 0 && <div className="text-sm text-muted">No teams yet.</div>}
       {teams.length > 0 && (
         <List>
           {teams.map((team) => (
@@ -1469,16 +1487,16 @@ export function EventDetailPage() {
               {editingTeamId === team.id ? (
                 <>
                   <div className="grid w-full gap-2 sm:grid-cols-[2fr,1fr]">
-                    <label className="flex flex-col gap-1 text-xs font-display uppercase tracking-[0.25em] text-muted">
-                      Name
+                    <label className="flex flex-col gap-1 text-sm text-muted">
+                      <span>Name</span>
                       <input
                         className="h-10 px-3"
                         value={editingTeamName}
                         onChange={(event) => setEditingTeamName(event.target.value)}
                       />
                     </label>
-                    <label className="flex flex-col gap-1 text-xs font-display uppercase tracking-[0.25em] text-muted">
-                      Table label
+                    <label className="flex flex-col gap-1 text-sm text-muted">
+                      <span>Table label</span>
                       <input
                         className="h-10 px-3"
                         value={editingTeamTable}
@@ -1532,18 +1550,18 @@ export function EventDetailPage() {
         </div>
       )}
       <div className="border-t border-border pt-4">
-        <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">Add team</div>
+        <div className="text-sm font-medium text-muted">Add team</div>
         <div className="mt-3 grid gap-3 sm:grid-cols-[2fr,1fr,auto] sm:items-end">
-          <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-            Name
+          <label className="flex flex-col gap-2 text-sm text-muted">
+            <span>Name</span>
             <input className="h-10 px-3" value={teamName} onChange={(event) => setTeamName(event.target.value)} />
           </label>
-          <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-            Table label
+          <label className="flex flex-col gap-2 text-sm text-muted">
+            <span>Table label</span>
             <input className="h-10 px-3" value={teamTable} onChange={(event) => setTeamTable(event.target.value)} />
           </label>
           <SecondaryButton className="h-10" onClick={createTeam}>
-            Add team
+            Add Team
           </SecondaryButton>
         </div>
         {teamError && (
@@ -1553,10 +1571,10 @@ export function EventDetailPage() {
         )}
       </div>
       <div className="border-t border-border pt-4">
-        <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">Prepopulate teams</div>
+        <div className="text-sm font-medium text-muted">Prepopulate teams</div>
         <div className="mt-3 flex flex-wrap items-end gap-3">
-          <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-            Count
+          <label className="flex flex-col gap-2 text-sm text-muted">
+            <span>Count</span>
             <input
               className="h-10 w-24 px-3"
               type="number"
@@ -1584,8 +1602,8 @@ export function EventDetailPage() {
 
   const scoresContent = (
     <div className="space-y-3">
-      <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-        Select round
+      <label className="flex flex-col gap-2 text-sm text-muted">
+        <span>Select round</span>
         <select
           className="h-10 px-3"
           value={scoreRoundId}
@@ -1603,7 +1621,7 @@ export function EventDetailPage() {
           ))}
         </select>
       </label>
-      {teams.length === 0 && <div className="text-xs uppercase tracking-[0.2em] text-muted">Add teams to score.</div>}
+      {teams.length === 0 && <div className="text-sm text-muted">Add teams to score.</div>}
       {teams.length > 0 && (
         <List>
           {teams.map((team) => (
@@ -1630,7 +1648,7 @@ export function EventDetailPage() {
   );
 
   const documentsContent = (
-    <div className="space-y-3">
+    <div className="space-y-3" ref={documentMenuRef}>
       <div className="flex flex-wrap items-center gap-2">
         <SecondaryButton onClick={generateScoresheets} disabled={scoresheetGenerating}>
           {scoresheetGenerating ? 'Generating…' : 'Generate scoresheets'}
@@ -1646,14 +1664,6 @@ export function EventDetailPage() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {event.scoresheet_key && (
-              <TextLink href={api.mediaUrl(event.scoresheet_key)} download={event.scoresheet_name ?? 'scoresheet.pdf'}>
-                Download
-              </TextLink>
-            )}
-            <label htmlFor={scoresheetInputId} className={fileButtonClass}>
-              Replace
-            </label>
             <input
               id={scoresheetInputId}
               type="file"
@@ -1666,13 +1676,55 @@ export function EventDetailPage() {
               }}
               disabled={scoresheetUploading}
             />
-            <DangerButton
-              className="px-2 py-1 text-xs"
-              onClick={() => removeDocument('scoresheet')}
-              disabled={!event.scoresheet_key || scoresheetUploading}
-            >
-              Remove
-            </DangerButton>
+            <div className="relative">
+              <button
+                type="button"
+                className={documentMenuButtonClass}
+                aria-haspopup="menu"
+                aria-expanded={openDocumentMenu === 'scoresheet'}
+                onClick={() =>
+                  setOpenDocumentMenu((current) => (current === 'scoresheet' ? null : 'scoresheet'))
+                }
+              >
+                Actions
+                <span aria-hidden>▾</span>
+              </button>
+              {openDocumentMenu === 'scoresheet' && (
+                <div className="surface-card absolute right-0 z-10 mt-2 w-40 p-1" role="menu">
+                  {event.scoresheet_key && (
+                    <a
+                      href={api.mediaUrl(event.scoresheet_key)}
+                      download={event.scoresheet_name ?? 'scoresheet.pdf'}
+                      className={documentMenuItemClass}
+                      role="menuitem"
+                      onClick={() => setOpenDocumentMenu(null)}
+                    >
+                      Download
+                    </a>
+                  )}
+                  <label
+                    htmlFor={scoresheetInputId}
+                    className={`${documentMenuItemClass} cursor-pointer`}
+                    role="menuitem"
+                    onClick={() => setOpenDocumentMenu(null)}
+                  >
+                    Replace
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOpenDocumentMenu(null);
+                      removeDocument('scoresheet');
+                    }}
+                    className={`${documentMenuItemClass} text-danger-ink`}
+                    disabled={!event.scoresheet_key || scoresheetUploading}
+                    role="menuitem"
+                  >
+                    Remove
+                  </button>
+                </div>
+              )}
+            </div>
             {scoresheetUploading && <span className="text-xs text-muted">Uploading…</span>}
           </div>
         </ListRow>
@@ -1685,14 +1737,6 @@ export function EventDetailPage() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {event.answersheet_key && (
-              <TextLink href={api.mediaUrl(event.answersheet_key)} download={event.answersheet_name ?? 'answersheet.pdf'}>
-                Download
-              </TextLink>
-            )}
-            <label htmlFor={answersheetInputId} className={fileButtonClass}>
-              Replace
-            </label>
             <input
               id={answersheetInputId}
               type="file"
@@ -1705,13 +1749,55 @@ export function EventDetailPage() {
               }}
               disabled={answersheetUploading}
             />
-            <DangerButton
-              className="px-2 py-1 text-xs"
-              onClick={() => removeDocument('answersheet')}
-              disabled={!event.answersheet_key || answersheetUploading}
-            >
-              Remove
-            </DangerButton>
+            <div className="relative">
+              <button
+                type="button"
+                className={documentMenuButtonClass}
+                aria-haspopup="menu"
+                aria-expanded={openDocumentMenu === 'answersheet'}
+                onClick={() =>
+                  setOpenDocumentMenu((current) => (current === 'answersheet' ? null : 'answersheet'))
+                }
+              >
+                Actions
+                <span aria-hidden>▾</span>
+              </button>
+              {openDocumentMenu === 'answersheet' && (
+                <div className="surface-card absolute right-0 z-10 mt-2 w-40 p-1" role="menu">
+                  {event.answersheet_key && (
+                    <a
+                      href={api.mediaUrl(event.answersheet_key)}
+                      download={event.answersheet_name ?? 'answersheet.pdf'}
+                      className={documentMenuItemClass}
+                      role="menuitem"
+                      onClick={() => setOpenDocumentMenu(null)}
+                    >
+                      Download
+                    </a>
+                  )}
+                  <label
+                    htmlFor={answersheetInputId}
+                    className={`${documentMenuItemClass} cursor-pointer`}
+                    role="menuitem"
+                    onClick={() => setOpenDocumentMenu(null)}
+                  >
+                    Replace
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOpenDocumentMenu(null);
+                      removeDocument('answersheet');
+                    }}
+                    className={`${documentMenuItemClass} text-danger-ink`}
+                    disabled={!event.answersheet_key || answersheetUploading}
+                    role="menuitem"
+                  >
+                    Remove
+                  </button>
+                </div>
+              )}
+            </div>
             {answersheetUploading && <span className="text-xs text-muted">Uploading…</span>}
           </div>
         </ListRow>
@@ -1720,7 +1806,7 @@ export function EventDetailPage() {
       {event.public_code && (
         <div className="border-t border-border pt-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">Share event</div>
+            <div className="text-sm font-medium text-muted">Share event</div>
             <SecondaryButton className="px-3 py-2 text-xs" onClick={() => setShowQr((prev) => !prev)}>
               {showQr ? 'Hide QR' : 'Show QR'}
             </SecondaryButton>
@@ -1745,13 +1831,13 @@ export function EventDetailPage() {
   );
 
   const settingsContent = (
-      <div className="space-y-3">
-      <div className="grid gap-3">
-        <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-          Start date/time
+    <div className="min-w-0 space-y-3">
+      <div className="grid min-w-0 gap-4">
+        <label className="flex min-w-0 flex-col gap-2 text-sm text-muted">
+          <span>Start date/time</span>
           <input
             type="datetime-local"
-            className="h-10 px-3"
+            className="h-10 w-full min-w-0 px-3"
             value={startsAtLocal}
             onChange={(event) => {
               setStartsAtLocal(event.target.value);
@@ -1760,9 +1846,9 @@ export function EventDetailPage() {
           />
           {startsAtError && <span className="text-xs text-danger-ink">{startsAtError}</span>}
         </label>
-        <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-          Location
-          <select className="h-10 px-3" value={locationId} onChange={(event) => setLocationId(event.target.value)}>
+        <label className="flex min-w-0 flex-col gap-2 text-sm text-muted">
+          <span>Location</span>
+          <select className="h-10 w-full min-w-0 px-3" value={locationId} onChange={(event) => setLocationId(event.target.value)}>
             <option value="">No location</option>
             {locations.map((location) => (
               <option key={location.id} value={location.id}>
@@ -1771,9 +1857,9 @@ export function EventDetailPage() {
             ))}
           </select>
         </label>
-        <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-          Host
-          <select className="h-10 px-3" value={hostUserId} onChange={(event) => setHostUserId(event.target.value)}>
+        <label className="flex min-w-0 flex-col gap-2 text-sm text-muted">
+          <span>Host</span>
+          <select className="h-10 w-full min-w-0 px-3" value={hostUserId} onChange={(event) => setHostUserId(event.target.value)}>
             <option value="">Select host</option>
             {hosts.map((host) => (
               <option key={host.id} value={host.id}>
@@ -1785,19 +1871,19 @@ export function EventDetailPage() {
             ))}
           </select>
         </label>
-        <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-          Status
-          <select className="h-10 px-3" value={status} onChange={(event) => setStatus(event.target.value)}>
+        <label className="flex min-w-0 flex-col gap-2 text-sm text-muted">
+          <span>Status</span>
+          <select className="h-10 w-full min-w-0 px-3" value={status} onChange={(event) => setStatus(event.target.value)}>
             <option value="planned">Planned</option>
             <option value="live">Live</option>
             <option value="completed">Completed</option>
             <option value="canceled">Canceled</option>
           </select>
         </label>
-        <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-          Event type
+        <label className="flex min-w-0 flex-col gap-2 text-sm text-muted">
+          <span>Event type</span>
           <select
-            className="h-10 px-3"
+            className="h-10 w-full min-w-0 px-3"
             value={eventType}
             onChange={(event) => setEventType(event.target.value as 'Pub Trivia' | 'Music Trivia')}
           >
@@ -1805,21 +1891,21 @@ export function EventDetailPage() {
             <option value="Music Trivia">Music Trivia</option>
           </select>
         </label>
-        <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-          Notes
+        <label className="flex min-w-0 flex-col gap-2 text-sm text-muted">
+          <span>Notes</span>
           <textarea
-            className="min-h-[80px] px-3 py-2"
+            className="min-h-[80px] w-full min-w-0 px-3 py-2"
             value={notes}
             onChange={(event) => setNotes(event.target.value)}
           />
         </label>
       </div>
-      <SecondaryButton onClick={updateEvent}>Update event</SecondaryButton>
+      <SecondaryButton onClick={updateEvent}>Update Event</SecondaryButton>
       <div className="border-t border-border pt-4">
-        <div className="text-xs font-display uppercase tracking-[0.3em] text-danger-ink">Danger zone</div>
+        <div className="text-sm font-medium text-danger-ink">Danger zone</div>
         <div className="mt-2 text-xs text-muted">Deleting an event cannot be undone.</div>
         <div className="mt-3">
-          <DangerButton onClick={deleteEvent}>Delete event</DangerButton>
+          <DangerButton onClick={deleteEvent}>Delete Event</DangerButton>
         </div>
       </div>
     </div>
@@ -1833,19 +1919,18 @@ export function EventDetailPage() {
             <div className="space-y-2">
               {!editingTitle && (
                 <div className="flex flex-wrap items-center gap-2">
-                  <h1
-                    className={`text-2xl font-display tracking-tight ${isAdmin ? 'cursor-pointer' : ''}`}
-                    onDoubleClick={() => {
-                      if (!isAdmin) return;
-                      setTitleDraft(event.title);
-                      setTitleError(null);
-                      setEditingTitle(true);
-                    }}
-                  >
-                    {event.title}
-                  </h1>
+                  <h1 className="text-2xl font-display tracking-tight">{event.title}</h1>
                   {isAdmin && (
-                    <span className="text-[11px] uppercase tracking-[0.2em] text-muted">Double-click to edit</span>
+                    <IconButton
+                      label="Edit event title"
+                      onClick={() => {
+                        setTitleDraft(event.title);
+                        setTitleError(null);
+                        setEditingTitle(true);
+                      }}
+                    >
+                      ✎
+                    </IconButton>
                   )}
                 </div>
               )}
@@ -1897,7 +1982,7 @@ export function EventDetailPage() {
               </div>
               {event.public_code && (
                 <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
-                  <span className="uppercase tracking-[0.2em]">Code</span>
+                  <span>Code</span>
                   <span className="font-display tracking-[0.2em] text-text">{event.public_code}</span>
                   <SecondaryButton className="h-8 px-2 text-xs" onClick={copyEventCode}>
                     Copy

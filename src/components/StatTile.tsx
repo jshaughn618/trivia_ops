@@ -2,17 +2,19 @@ export function StatTile({
   label,
   value,
   helper,
-  className
+  className,
+  labelClassName
 }: {
   label: string;
   value: string;
   helper?: string;
   className?: string;
+  labelClassName?: string;
 }) {
   return (
     <div className={`surface-card relative overflow-hidden p-5 sm:p-6 ${className ?? ''}`}>
       <div className="flex items-center justify-between">
-        <div className="ui-label">{label}</div>
+        <div className={labelClassName ?? 'ui-label'}>{label}</div>
         <span className="h-2 w-2 rounded-full bg-accent opacity-70" aria-hidden />
       </div>
       <div className="mt-4 text-4xl font-display tracking-tight">{value}</div>

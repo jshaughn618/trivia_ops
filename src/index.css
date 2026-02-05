@@ -70,6 +70,10 @@
   color-scheme: light;
 }
 
+html {
+  scrollbar-gutter: stable;
+}
+
 body {
   @apply bg-bg font-body text-text;
   font-size: 16px;

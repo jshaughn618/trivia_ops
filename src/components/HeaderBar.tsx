@@ -5,7 +5,14 @@ import { useTheme } from '../lib/theme';
 import logoDark from '../assets/trivia_ops_logo_dark.png';
 import logoLight from '../assets/trivia_ops_logo_light.png';
 
-const navLinkClass = ({ isActive }: { isActive: boolean }) =>
+const topNavLinkClass = ({ isActive }: { isActive: boolean }) =>
+  `inline-flex h-9 w-[112px] items-center justify-center rounded-lg px-3 text-sm font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg ${
+    isActive
+      ? 'border border-border-strong bg-panel2 text-text shadow-card'
+      : 'border border-transparent text-muted hover:border-border hover:bg-panel2 hover:text-text'
+  }`;
+
+const menuNavLinkClass = ({ isActive }: { isActive: boolean }) =>
   `inline-flex h-9 items-center rounded-lg px-3 text-sm font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg ${
     isActive
       ? 'border border-border-strong bg-panel2 text-text shadow-card'
@@ -43,16 +50,16 @@ export function HeaderBar() {
         <div className="flex items-center gap-2">
           <nav className="hidden items-center gap-2 lg:flex">
             {isAdmin && (
-              <NavLink to="/dashboard" className={navLinkClass}>
+              <NavLink to="/dashboard" className={topNavLinkClass}>
                 Dashboard
               </NavLink>
             )}
             {isAdmin && (
-              <NavLink to="/games" className={navLinkClass}>
+              <NavLink to="/games" className={topNavLinkClass}>
                 Games
               </NavLink>
             )}
-            <NavLink to="/events" className={navLinkClass}>
+            <NavLink to="/events" className={topNavLinkClass}>
               Events
             </NavLink>
           </nav>
@@ -73,30 +80,30 @@ export function HeaderBar() {
               <div className="surface-card absolute right-0 z-50 mt-3 w-56 p-2">
                 <nav className="flex flex-col gap-2">
                   {isAdmin && (
-                    <NavLink to="/dashboard" className={navLinkClass} onClick={() => setOpen(false)}>
+                    <NavLink to="/dashboard" className={menuNavLinkClass} onClick={() => setOpen(false)}>
                       Dashboard
                     </NavLink>
                   )}
                   {isAdmin && (
-                    <NavLink to="/games" className={navLinkClass} onClick={() => setOpen(false)}>
+                    <NavLink to="/games" className={menuNavLinkClass} onClick={() => setOpen(false)}>
                       Games
                     </NavLink>
                   )}
-                  <NavLink to="/events" className={navLinkClass} onClick={() => setOpen(false)}>
+                  <NavLink to="/events" className={menuNavLinkClass} onClick={() => setOpen(false)}>
                     Events
                   </NavLink>
                   {isAdmin && (
-                    <NavLink to="/locations" className={navLinkClass} onClick={() => setOpen(false)}>
+                    <NavLink to="/locations" className={menuNavLinkClass} onClick={() => setOpen(false)}>
                       Locations
                     </NavLink>
                   )}
                   {isAdmin && (
-                    <NavLink to="/settings" className={navLinkClass} onClick={() => setOpen(false)}>
+                    <NavLink to="/settings" className={menuNavLinkClass} onClick={() => setOpen(false)}>
                       Settings
                     </NavLink>
                   )}
                   {isAdmin && (
-                    <NavLink to="/settings/users" className={navLinkClass} onClick={() => setOpen(false)}>
+                    <NavLink to="/settings/users" className={menuNavLinkClass} onClick={() => setOpen(false)}>
                       User Admin
                     </NavLink>
                   )}

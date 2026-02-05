@@ -6,7 +6,6 @@ import { AppShell } from '../components/AppShell';
 import { ButtonLink } from '../components/Buttons';
 import { Panel } from '../components/Panel';
 import { StatTile } from '../components/StatTile';
-import { StampBadge } from '../components/StampBadge';
 import { logError } from '../lib/log';
 import type { Event, GameEdition } from '../types';
 
@@ -54,16 +53,16 @@ export function DashboardPage() {
   const liveCount = events.filter((event) => event.status === 'live').length;
   const plannedCount = events.filter((event) => event.status === 'planned').length;
   const draftCount = editions.filter((edition) => edition.status === 'draft').length;
-  const statusLabel = (status: string) => status.charAt(0).toUpperCase() + status.slice(1);
 
   return (
-    <AppShell title="Dashboard">
+    <AppShell title="Dashboard" showTitle={false}>
       {error && (
         <div className="mb-4 border border-danger bg-panel2 px-3 py-2 text-xs text-danger-ink">
           {error}
         </div>
       )}
       <div className="space-y-6">
+        <h1 className="text-[1.75rem] font-display tracking-tight sm:text-[1.95rem]">Dashboard</h1>
         <section className={`grid gap-4 ${isAdmin ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
           <Link
             to="/events?status=live"
@@ -71,6 +70,7 @@ export function DashboardPage() {
           >
             <StatTile
               label="Live Events"
+              labelClassName="text-sm font-semibold tracking-[0.02em] text-text sm:text-base"
               value={String(liveCount)}
               helper="On air now"
               className="transition-transform duration-150 group-hover:-translate-y-0.5"
@@ -82,6 +82,7 @@ export function DashboardPage() {
           >
             <StatTile
               label="Planned Events"
+              labelClassName="text-sm font-semibold tracking-[0.02em] text-text sm:text-base"
               value={String(plannedCount)}
               helper="Scheduled"
               className="transition-transform duration-150 group-hover:-translate-y-0.5"
@@ -94,6 +95,7 @@ export function DashboardPage() {
             >
               <StatTile
                 label="Draft Editions"
+                labelClassName="text-sm font-semibold tracking-[0.02em] text-text sm:text-base"
                 value={String(draftCount)}
                 helper="In progress"
                 className="transition-transform duration-150 group-hover:-translate-y-0.5"
@@ -103,16 +105,16 @@ export function DashboardPage() {
         </section>
 
         <section className={`grid gap-4 ${isAdmin ? 'lg:grid-cols-3' : 'lg:grid-cols-2'}`}>
-          <Panel title="Quick Actions" className="p-5">
+          <Panel title="Quick Actions" className="p-5" headerDivider={false}>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
               {isAdmin && (
                 <ButtonLink to="/events/new" variant="primary" className="h-11">
-                  Create event
+                  Create Event
                 </ButtonLink>
               )}
               {isAdmin && (
                 <ButtonLink to="/editions/new" variant="secondary" className="h-11">
-                  Build edition
+                  Build Edition
                 </ButtonLink>
               )}
               {isAdmin && (
@@ -121,12 +123,12 @@ export function DashboardPage() {
                 </ButtonLink>
               )}
               <ButtonLink to="/events" variant="secondary" className="h-11">
-                Run event
+                Run Event
               </ButtonLink>
             </div>
           </Panel>
 
-          <Panel title="Upcoming Events" className="p-5">
+          <Panel title="Upcoming Events" className="p-5" headerDivider={false}>
             <div className="flex flex-col gap-3">
               {upcoming.length === 0 && (
                 <div className="text-sm text-muted">No scheduled events.</div>
@@ -137,12 +139,9 @@ export function DashboardPage() {
                   to={`/events/${event.id}`}
                   className="surface-inset flex flex-col gap-2 p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="text-sm font-semibold text-text">{event.title}</div>
-                      <div className="mt-1 text-xs text-muted">{new Date(event.starts_at).toLocaleString()}</div>
-                    </div>
-                    <StampBadge label={statusLabel(event.status)} variant="verified" />
+                  <div>
+                    <div className="text-sm font-semibold text-text">{event.title}</div>
+                    <div className="mt-1 text-xs text-muted">{new Date(event.starts_at).toLocaleString()}</div>
                   </div>
                 </Link>
               ))}
@@ -150,7 +149,7 @@ export function DashboardPage() {
           </Panel>
 
           {isAdmin && (
-            <Panel title="Draft Editions" className="p-5">
+            <Panel title="Draft Editions" className="p-5" headerDivider={false}>
               <div className="flex flex-col gap-3">
                 {drafts.length === 0 && <div className="text-sm text-muted">No draft editions.</div>}
                 {drafts.map((edition) => (
@@ -159,16 +158,13 @@ export function DashboardPage() {
                   to={`/editions/${edition.id}`}
                   className="surface-inset flex flex-col gap-2 p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
                 >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="text-sm font-semibold text-text">
-                          {edition.theme ?? 'Untitled theme'}
-                        </div>
-                        <div className="mt-1 text-xs text-muted">
-                          Updated {new Date(edition.updated_at).toLocaleDateString()}
-                        </div>
+                    <div>
+                      <div className="text-sm font-semibold text-text">
+                        {edition.theme ?? 'Untitled theme'}
                       </div>
-                      <StampBadge label="Draft" variant="inspected" />
+                      <div className="mt-1 text-xs text-muted">
+                        Updated {new Date(edition.updated_at).toLocaleDateString()}
+                      </div>
                     </div>
                   </Link>
                 ))}
