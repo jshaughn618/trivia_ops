@@ -1043,9 +1043,7 @@ export function PlayEventPage() {
                           </div>
                         </div>
                       </div>
-                      <div className="rounded-2xl border border-border bg-panel/40 p-3">
-                        <AudioVisualizer active={Boolean(data.live?.audio_playing)} />
-                      </div>
+                      <AudioVisualizer active={Boolean(data.live?.audio_playing)} />
                     </div>
                   )}
                 </>

@@ -169,9 +169,9 @@ a:hover {
   }
 
   .audio-visualizer {
-    @apply grid items-end gap-1 rounded-xl border border-border bg-panel2 px-3 py-2;
+    @apply grid items-end gap-1 bg-bg px-1 py-1;
     grid-template-columns: repeat(18, minmax(0, 1fr));
-    height: 56px;
+    height: 68px;
   }
 
   .audio-visualizer__bar {

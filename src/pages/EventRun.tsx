@@ -755,7 +755,16 @@ export function EventRunPage() {
                       })()}
                       {item.audio_answer_key && (
                         <div className="mt-3">
-                          <audio className="w-full" controls src={api.mediaUrl(item.audio_answer_key)} />
+                          <audio
+                            className="w-full"
+                            controls
+                            src={api.mediaUrl(item.audio_answer_key)}
+                            onPlay={() => syncAudioPlaying(true)}
+                            onPause={() => syncAudioPlaying(false)}
+                            onEnded={() => syncAudioPlaying(false)}
+                            onEmptied={() => syncAudioPlaying(false)}
+                            onError={() => syncAudioPlaying(false)}
+                          />
                         </div>
                       )}
                     </div>
