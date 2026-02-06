@@ -12,12 +12,12 @@ export function PlayStage({
   fullBleed?: boolean;
 }) {
   const minHeight = fullBleed
-    ? 'min-h-[calc(100svh-3.25rem)]'
-    : 'min-h-[calc(70svh-2.5rem)]';
+    ? 'min-h-[calc(100dvh-4.25rem)]'
+    : 'min-h-[calc(76dvh-2.5rem)]';
   return (
     <section className={`flex-1 ${scrollable ? 'overflow-y-auto' : ''} ${className ?? ''}`}>
       <div
-        className={`mx-auto flex w-full max-w-5xl flex-col items-center justify-start gap-5 px-4 py-3 sm:px-5 sm:py-4 landscape:py-2 ${minHeight}`}
+        className={`mx-auto flex w-full max-w-5xl flex-col items-center justify-start gap-5 px-3 py-2.5 sm:px-5 sm:py-3 ${minHeight}`}
       >
         {children}
       </div>

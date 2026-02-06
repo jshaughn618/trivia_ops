@@ -579,7 +579,7 @@ export function PlayEventPage() {
     return (
       <PlayShell>
         <PlayStage fullBleed scrollable>
-          <div className="text-sm font-medium text-muted">Invalid code</div>
+          <div className="play-panel rounded-sm px-4 py-3 text-sm font-medium text-muted">Invalid code</div>
         </PlayStage>
       </PlayShell>
     );
@@ -589,7 +589,7 @@ export function PlayEventPage() {
     return (
       <PlayShell>
         <PlayStage fullBleed scrollable>
-          <div className="text-sm font-medium text-muted">Loading event</div>
+          <div className="play-panel rounded-sm px-4 py-3 text-sm font-medium text-muted">Loading event</div>
         </PlayStage>
       </PlayShell>
     );
@@ -599,7 +599,7 @@ export function PlayEventPage() {
     return (
       <PlayShell>
         <PlayStage fullBleed scrollable>
-          <div className="rounded-2xl border border-danger bg-panel2 px-6 py-4 text-sm text-danger-ink">
+          <div className="play-panel rounded-sm border-danger px-6 py-4 text-sm text-danger-ink">
             {error ?? 'Event not found'}
           </div>
         </PlayStage>
@@ -661,10 +661,10 @@ export function PlayEventPage() {
 
   const waitingRoom = (
     <div className="flex w-full flex-col items-center gap-5 text-center">
-      <div className="text-xs uppercase tracking-[0.35em] text-muted">Waiting room</div>
+      <div className="play-chip">Waiting room</div>
       <PromptHero>{waitingMessage || 'Stand by for the next round.'}</PromptHero>
       {waitingShowNextRound && nextRound && (
-        <div className="text-sm text-muted">
+        <div className="play-panel rounded-sm px-3 py-2 text-sm text-muted">
           Up next: Round {nextRound.round_number}
           {nextRound.label ? ` — ${nextRound.label}` : ''}
         </div>
@@ -682,19 +682,19 @@ export function PlayEventPage() {
           aria-haspopup="menu"
           aria-expanded={teamMenuOpen}
           onClick={() => setTeamMenuOpen((open) => !open)}
-          className="flex h-8 w-8 flex-col items-center justify-center gap-1 rounded-md border border-border bg-panel2"
+          className="play-touch flex h-10 w-10 flex-col items-center justify-center gap-1 rounded-md border border-border bg-panel2"
         >
           <span className="h-0.5 w-4 bg-text" />
           <span className="h-0.5 w-4 bg-text" />
           <span className="h-0.5 w-4 bg-text" />
         </button>
         {teamMenuOpen && (
-          <div className="absolute right-0 mt-2 min-w-[180px] rounded-md border border-border bg-panel p-2 text-left shadow-sm">
+          <div className="play-panel absolute right-0 mt-2 min-w-[190px] rounded-sm p-2 text-left shadow-sm">
             <button
               type="button"
               aria-pressed={theme === 'light'}
               onClick={toggleTheme}
-              className="mb-2 w-full rounded-md border border-border bg-panel2 px-3 py-2 text-xs font-medium text-text"
+              className="play-touch mb-2 w-full rounded-md border border-border bg-panel2 px-3 py-2 text-xs font-medium text-text"
             >
               {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
             </button>
@@ -704,7 +704,7 @@ export function PlayEventPage() {
                 setTeamMenuOpen(false);
                 navigate('/login');
               }}
-              className="w-full rounded-md border border-border bg-panel2 px-3 py-2 text-xs font-medium text-text"
+              className="play-touch w-full rounded-md border border-border bg-panel2 px-3 py-2 text-xs font-medium text-text"
             >
               Back to Login
             </button>
@@ -724,7 +724,7 @@ export function PlayEventPage() {
         )}
         <PlayStage scrollable>
           <div className="flex w-full max-w-2xl flex-col items-center gap-4 text-center">
-            <div className="text-xs uppercase tracking-[0.35em] text-muted">Event {closedLabel}</div>
+            <div className="play-chip">Event {closedLabel}</div>
             <PromptHero>This event is {closedLabel.toLowerCase()}.</PromptHero>
             <div className="text-sm text-muted">Check with the host for the next session.</div>
           </div>
@@ -742,19 +742,19 @@ export function PlayEventPage() {
         aria-haspopup="menu"
         aria-expanded={teamMenuOpen}
         onClick={() => setTeamMenuOpen((open) => !open)}
-        className="flex h-8 w-8 flex-col items-center justify-center gap-1 rounded-md border border-border bg-panel2"
+        className="play-touch flex h-10 w-10 flex-col items-center justify-center gap-1 rounded-md border border-border bg-panel2"
       >
         <span className="h-0.5 w-4 bg-text" />
         <span className="h-0.5 w-4 bg-text" />
         <span className="h-0.5 w-4 bg-text" />
       </button>
       {teamMenuOpen && (
-        <div className="absolute right-0 mt-2 min-w-[180px] rounded-md border border-border bg-panel p-2 text-left shadow-sm">
+        <div className="play-panel absolute right-0 mt-2 min-w-[190px] rounded-sm p-2 text-left shadow-sm">
           <button
             type="button"
             aria-pressed={theme === 'light'}
             onClick={toggleTheme}
-            className={`${teamId && teamNameLabel ? 'mb-2' : ''} w-full rounded-md border border-border bg-panel2 px-3 py-2 text-xs font-medium text-text`}
+            className={`${teamId && teamNameLabel ? 'mb-2' : ''} play-touch w-full rounded-md border border-border bg-panel2 px-3 py-2 text-xs font-medium text-text`}
           >
             {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
           </button>
@@ -787,7 +787,7 @@ export function PlayEventPage() {
                 }
                 window.alert(formatApiError(res, 'Unable to update team name.'));
               }}
-              className="mb-2 w-full rounded-md border border-border bg-panel2 px-3 py-2 text-xs font-medium text-text"
+              className="play-touch mb-2 w-full rounded-md border border-border bg-panel2 px-3 py-2 text-xs font-medium text-text"
             >
               Change Team Name
             </button>
@@ -796,7 +796,7 @@ export function PlayEventPage() {
             <button
               type="button"
               onClick={handleChangeTeam}
-              className="mb-2 w-full rounded-md border border-border bg-panel2 px-3 py-2 text-xs font-medium text-text"
+              className="play-touch mb-2 w-full rounded-md border border-border bg-panel2 px-3 py-2 text-xs font-medium text-text"
             >
               Change Team
             </button>
@@ -807,7 +807,7 @@ export function PlayEventPage() {
               setTeamMenuOpen(false);
               navigate('/login');
             }}
-            className="w-full rounded-md border border-border bg-panel2 px-3 py-2 text-xs font-medium text-text"
+            className="play-touch w-full rounded-md border border-border bg-panel2 px-3 py-2 text-xs font-medium text-text"
           >
             Back to Login
           </button>
@@ -830,10 +830,10 @@ export function PlayEventPage() {
       <PlayStage fullBleed={isQuestionActive} scrollable>
         {!teamId ? (
           <div className="flex w-full max-w-lg flex-col items-center gap-6 text-center">
-            <div className="text-xs uppercase tracking-[0.35em] text-muted">Join your team</div>
+            <div className="play-chip">Join your team</div>
             <PromptHero>Enter the team code from your scoresheet.</PromptHero>
-            <div className="w-full rounded-2xl bg-panel/40 p-4 text-left">
-              <div className="text-xs uppercase tracking-[0.3em] text-muted">Team code</div>
+            <div className="play-panel w-full rounded-md p-4 text-left">
+              <div className="text-xs font-medium text-muted">Team code</div>
               <div className="mt-4 flex flex-col gap-3">
                 <div className="flex flex-col gap-2">
                 <div className="flex justify-center gap-3">
@@ -847,7 +847,7 @@ export function PlayEventPage() {
                         inputMode="numeric"
                         pattern="[0-9]*"
                         maxLength={1}
-                        className="h-14 w-14 border-2 border-strong bg-panel2 text-center text-2xl font-display tracking-[0.2em] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+                        className="play-touch h-14 w-14 rounded-md border border-border-strong bg-panel2 text-center text-2xl font-display tracking-[0.12em] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
                         value={value}
                         onChange={(event) => {
                           const next = sanitizedDigits(event.target.value).slice(0, 1);
@@ -905,9 +905,9 @@ export function PlayEventPage() {
                 </div>
                 {requireTeamName && (
                   <label className="flex flex-col gap-2">
-                    <span className="text-xs uppercase tracking-[0.25em] text-muted">Team name required</span>
+                    <span className="text-xs font-medium text-muted">Team name required</span>
                     <input
-                      className="h-10 px-3"
+                      className="play-touch h-12 rounded-md px-3"
                       value={teamNameInput}
                       onChange={(event) => setTeamNameInput(event.target.value)}
                       placeholder="Enter your team name"
@@ -915,13 +915,14 @@ export function PlayEventPage() {
                   </label>
                 )}
                 {joinError && (
-                  <div className="rounded-md border border-danger bg-panel2 px-3 py-2 text-xs text-danger-ink" aria-live="polite">
+                  <div className="play-panel rounded-sm border-danger px-3 py-2 text-xs text-danger-ink" aria-live="polite">
                     {joinError}
                   </div>
                 )}
                 <PrimaryButton
                   onClick={handleJoin}
                   disabled={joinLoading || !teamCodeReady || (requireTeamName && !teamNameInput.trim())}
+                  className="play-touch h-12 rounded-md"
                 >
                   {joinLoading ? 'Joining…' : 'Join'}
                 </PrimaryButton>
@@ -931,10 +932,10 @@ export function PlayEventPage() {
         ) : isLive ? (
           displayItem ? (
             <div className="flex w-full flex-col items-center gap-3 text-center sm:gap-4">
-              {activeRound?.label && (
-                <div className="text-xs uppercase tracking-[0.24em] text-muted">{activeRound.label}</div>
-              )}
-              <div className="text-xs uppercase tracking-[0.24em] text-muted">{questionLabel}</div>
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                {activeRound?.label && <div className="play-chip">{activeRound.label}</div>}
+                <div className="play-chip">{questionLabel}</div>
+              </div>
               {displayItem.media_type === 'image' && displayItem.media_key ? (
                 <div className="w-full">
                   <div className="flex w-full flex-col gap-3 landscape:flex-row landscape:items-start">
@@ -956,18 +957,18 @@ export function PlayEventPage() {
                         </div>
                       </MediaFrame>
                       {mediaError && (
-                        <div className="mt-3 rounded-md bg-panel px-3 py-2 text-xs text-danger-ink">
+                        <div className="play-panel mt-3 rounded-sm border-danger px-3 py-2 text-xs text-danger-ink">
                           {mediaError}
                         </div>
                       )}
                       {visualMode && (
-                        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs uppercase tracking-[0.2em] text-muted">
+                        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
                           <div className="flex items-center gap-2">
                             <button
                               type="button"
                               onClick={() => setVisualIndex((prev) => Math.max(prev - 1, 0))}
                               disabled={visualIndex === 0}
-                              className="rounded-full border border-border px-3 py-1 disabled:opacity-50"
+                              className="play-touch inline-flex h-10 min-w-10 items-center justify-center rounded-md border border-border bg-panel2 px-3 py-1 disabled:opacity-50"
                             >
                               ‹
                             </button>
@@ -975,7 +976,7 @@ export function PlayEventPage() {
                               type="button"
                               onClick={() => setVisualIndex((prev) => Math.min(prev + 1, visualItems.length - 1))}
                               disabled={visualIndex >= visualItems.length - 1}
-                              className="rounded-full border border-border px-3 py-1 disabled:opacity-50"
+                              className="play-touch inline-flex h-10 min-w-10 items-center justify-center rounded-md border border-border bg-panel2 px-3 py-1 disabled:opacity-50"
                             >
                               ›
                             </button>
@@ -1011,12 +1012,12 @@ export function PlayEventPage() {
                     </PromptHero>
                   )}
                   {mediaError && (
-                    <div className="rounded-md bg-panel px-3 py-2 text-xs text-danger-ink">{mediaError}</div>
+                    <div className="play-panel rounded-sm border-danger px-3 py-2 text-xs text-danger-ink">{mediaError}</div>
                   )}
                   {showAudioClue && (
                     <div className="w-full max-w-3xl space-y-3">
-                      <div className="flex items-center gap-3 rounded-2xl bg-panel/40 px-4 py-3 text-left">
-                        <span className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border bg-panel2">
+                      <div className="play-panel flex items-center gap-3 rounded-md px-4 py-3 text-left">
+                        <span className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border bg-panel2">
                           <svg
                             viewBox="0 0 24 24"
                             aria-hidden="true"
@@ -1033,7 +1034,7 @@ export function PlayEventPage() {
                           </svg>
                         </span>
                         <div>
-                          <div className="text-xs uppercase tracking-[0.3em] text-muted">Audio clue</div>
+                          <div className="text-xs font-medium text-muted">Audio clue</div>
                           <div className="text-sm text-muted">
                             {data.live?.audio_playing
                               ? speedRoundMode
@@ -1050,7 +1051,7 @@ export function PlayEventPage() {
               )}
               {displayItem.question_type === 'multiple_choice' && choiceOptions.length > 0 && (
                 <div className="w-full max-w-3xl text-left">
-                  <div className="mb-2 flex items-center justify-between text-[11px] uppercase tracking-[0.2em] text-muted">
+                  <div className="mb-2 flex items-center justify-between text-[11px] font-medium text-muted">
                     <span>Multiple choice</span>
                     {!suppressItemTimer && (
                       <span className={timerActive ? 'text-accent-ink' : 'text-muted'}>
@@ -1079,17 +1080,17 @@ export function PlayEventPage() {
                             setSubmitError(null);
                           }}
                           disabled={timerBlocked || submitStatus === 'submitting'}
-                          className={`flex w-full items-start gap-3 rounded-2xl border px-4 py-3 text-left text-base transition ${
+                          className={`play-touch flex w-full items-start gap-3 rounded-md border px-4 py-3 text-left text-base transition ${
                             submitted
-                              ? 'border-accent-ink bg-accent-soft text-text'
+                              ? 'border-accent-ink/70 bg-accent-soft/50 text-text'
                               : selected
-                                ? 'border-accent-ink bg-panel text-text'
-                                : 'border-border bg-panel/40 text-text'
+                                ? 'border-accent-ink/70 bg-panel2 text-text'
+                                : 'border-border bg-panel3/60 text-text'
                           }`}
                         >
                           <span
-                            className={`mt-0.5 inline-flex h-8 w-8 items-center justify-center rounded-full border text-xs font-semibold ${
-                              highlight ? 'border-accent-ink text-accent-ink' : 'border-border text-muted'
+                            className={`mt-0.5 inline-flex h-8 w-8 items-center justify-center rounded-md border text-xs font-semibold ${
+                              highlight ? 'border-accent-ink/70 text-accent-ink' : 'border-border text-muted'
                             }`}
                           >
                             {String.fromCharCode(65 + idx)}
@@ -1127,25 +1128,25 @@ export function PlayEventPage() {
                     !awaitingGraphDelay &&
                     submitStatus !== 'submitting' && (
                     <div className="mt-4 space-y-2.5">
-                      <div className="text-xs uppercase tracking-[0.3em] text-muted">Team answers</div>
+                      <div className="text-xs font-medium text-muted">Team answers</div>
                       <div className="space-y-2">
                         {choiceOptions.map((choice, idx) => {
                           const count = responseCounts.counts[idx] ?? 0;
                           const width = Math.round((count / maxResponseCount) * 100);
                           return (
                             <div key={`${choice}-${idx}`} className="flex items-center gap-3">
-                              <div className="w-6 text-xs uppercase tracking-[0.3em] text-muted">
+                              <div className="w-6 text-xs font-medium text-muted">
                                 {String.fromCharCode(65 + idx)}
                               </div>
-                              <div className="flex-1 rounded-full bg-panel/40 p-1">
-                                <div className="h-3 rounded-full bg-accent-ink" style={{ width: `${width}%` }} />
+                              <div className="flex-1 rounded-sm border border-border bg-panel2 p-1">
+                                <div className="h-3 rounded-sm bg-accent-ink" style={{ width: `${width}%` }} />
                               </div>
                               <div className="w-8 text-right text-xs text-muted">{count}</div>
                             </div>
                           );
                         })}
                       </div>
-                      <div className="text-xs uppercase tracking-[0.2em] text-muted">
+                      <div className="text-xs font-medium text-muted">
                         Total responses: {responseCounts.total}
                       </div>
                     </div>
@@ -1153,8 +1154,8 @@ export function PlayEventPage() {
                 </div>
               )}
               {data.live?.reveal_answer && (speedRoundMode ? (data.speed_round_answers ?? []).length > 0 : Boolean(answerText)) && (
-                <div className="w-full max-w-4xl pt-4 text-center">
-                  <div className="text-xs uppercase tracking-[0.3em] text-muted">
+                <div className="play-panel-strong w-full max-w-4xl rounded-md px-4 py-4 text-center">
+                  <div className="text-xs font-medium text-muted">
                     {speedRoundMode ? 'Answers' : 'Answer'}
                   </div>
                   {speedRoundMode ? (
@@ -1171,8 +1172,8 @@ export function PlayEventPage() {
                 </div>
               )}
               {data.live?.reveal_fun_fact && displayItem.fun_fact && (
-                <div className="w-full max-w-4xl pt-4 text-center">
-                  <div className="text-xs uppercase tracking-[0.3em] text-muted">Factoid</div>
+                <div className="play-panel w-full max-w-4xl rounded-md px-4 py-4 text-center">
+                  <div className="text-xs font-medium text-muted">Factoid</div>
                   <div className="mt-2 text-lg text-text">{displayItem.fun_fact}</div>
                 </div>
               )}
@@ -1185,19 +1186,21 @@ export function PlayEventPage() {
         )}
         {!isLive && waitingShowLeaderboard && (
           <div className="w-full max-w-2xl space-y-3 text-left">
-            <div className="text-xs uppercase tracking-[0.35em] text-muted">Leaderboard</div>
+            <div className="play-chip">Leaderboard</div>
             {data.leaderboard.length === 0 && <div className="text-sm text-muted">No scores yet.</div>}
-            <div className="divide-y divide-border rounded-2xl bg-panel/40">
+            <div className="play-panel divide-y divide-border rounded-md">
               {data.leaderboard.map((entry, index) => (
                 <div
                   key={entry.team_id}
-                  className={`flex items-center justify-between px-4 py-2 ${
+                  className={`play-list-row rounded-none border-x-0 border-t-0 first:border-t ${
                     teamId && entry.team_id === teamId ? 'text-accent-ink' : 'text-text'
                   }`}
                 >
-                  <div className="text-xs text-muted">#{index + 1}</div>
-                  <div className="text-sm font-medium">{entry.name}</div>
-                  <div className="text-xs text-muted">{entry.total}</div>
+                  <div className="flex items-center gap-3">
+                    <span className={`play-rank ${index < 3 ? 'play-rank-top' : ''}`}>#{index + 1}</span>
+                    <div className="text-sm font-semibold">{entry.name}</div>
+                  </div>
+                  <div className="text-sm font-semibold">{entry.total}</div>
                 </div>
               ))}
             </div>

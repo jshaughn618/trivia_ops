@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 
 export function MediaFrame({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`w-full rounded-2xl bg-panel/40 p-3 shadow-lg ${className ?? ''}`}>
+    <div className={`play-panel w-full rounded-md p-2.5 ${className ?? ''}`}>
       {children}
     </div>
   );

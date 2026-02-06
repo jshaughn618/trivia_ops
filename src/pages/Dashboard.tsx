@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { CalendarDays, ChevronRight, FilePenLine, Gamepad2, Plus, Radio, PlayCircle, Sparkles } from 'lucide-react';
+import { CalendarDays, ChevronRight, FilePenLine, Gamepad2, Plus, Radio, PlayCircle } from 'lucide-react';
 import { api, formatApiError } from '../api';
 import { useAuth } from '../auth';
 import { AppShell } from '../components/AppShell';
@@ -75,15 +75,6 @@ export function DashboardPage() {
 
         <div className="flex items-center justify-between">
           <h1 className="text-[1.85rem] font-display tracking-tight sm:text-[2rem]">Dashboard</h1>
-          {isAdmin && (
-            <Link
-              to="/events/new"
-              className="fab-create"
-            >
-              <Plus className="h-4 w-4" />
-              Create Event
-            </Link>
-          )}
         </div>
 
         <section className={`grid gap-3 ${isAdmin ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
@@ -116,9 +107,13 @@ export function DashboardPage() {
           <div className="glass-card p-4 md:p-5">
             <div className="mb-3 flex items-center justify-between">
               <h2 className="panel-title">Quick Actions</h2>
-              <Sparkles className="h-4 w-4 text-accent-ink" />
             </div>
             <div className="grid gap-2.5">
+              {isAdmin && (
+                <ActionLink to="/events/new" icon={<Plus className="h-4 w-4" />}>
+                  Create Event
+                </ActionLink>
+              )}
               {isAdmin && (
                 <ActionLink to="/editions/new" icon={<FilePenLine className="h-4 w-4" />}>
                   Build Edition

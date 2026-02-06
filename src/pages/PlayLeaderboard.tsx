@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { api, formatApiError } from '../api';
-import { Panel } from '../components/Panel';
 import { SecondaryButton } from '../components/Buttons';
 import { useTheme } from '../lib/theme';
 
@@ -140,8 +139,8 @@ export function PlayLeaderboardPage() {
 
   if (!normalizedCode) {
     return (
-      <div className="min-h-screen bg-bg text-text flex items-center justify-center">
-        <div className="rounded-lg border border-border bg-panel px-6 py-4 text-sm font-medium text-muted">
+      <div className="play-shell min-h-[100dvh] bg-bg text-text flex items-center justify-center px-4">
+        <div className="play-panel rounded-sm px-6 py-4 text-sm font-medium text-muted">
           Invalid Code
         </div>
       </div>
@@ -150,8 +149,8 @@ export function PlayLeaderboardPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-bg text-text flex items-center justify-center">
-        <div className="rounded-lg border border-border bg-panel px-6 py-4 text-sm font-medium text-muted">
+      <div className="play-shell min-h-[100dvh] bg-bg text-text flex items-center justify-center px-4">
+        <div className="play-panel rounded-sm px-6 py-4 text-sm font-medium text-muted">
           Loading Leaderboard
         </div>
       </div>
@@ -160,8 +159,8 @@ export function PlayLeaderboardPage() {
 
   if (error || !data) {
     return (
-      <div className="min-h-screen bg-bg text-text flex items-center justify-center">
-        <div className="rounded-lg border border-danger bg-panel2 px-6 py-4 text-sm text-danger-ink">
+      <div className="play-shell min-h-[100dvh] bg-bg text-text flex items-center justify-center px-4">
+        <div className="play-panel rounded-sm border-danger px-6 py-4 text-sm text-danger-ink">
           {error ?? 'Leaderboard unavailable'}
         </div>
       </div>
@@ -186,17 +185,17 @@ export function PlayLeaderboardPage() {
     .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
 
   return (
-    <div className="min-h-screen bg-bg text-text">
-      <div className="mx-auto max-w-4xl px-6 py-8">
+    <div className="play-shell min-h-[100dvh] bg-bg text-text">
+      <div className="mx-auto max-w-4xl px-3 py-3 sm:px-5 sm:py-4">
         {redirecting && (
-          <div className="mb-4 rounded-md border border-border bg-panel2 px-3 py-2 text-xs uppercase tracking-[0.2em] text-muted" aria-live="polite">
+          <div className="play-panel mb-4 rounded-sm px-3 py-2 text-xs font-medium text-muted" aria-live="polite">
             Returning to game…
           </div>
         )}
-        <div className="mb-6 border-b border-border pb-3">
+        <div className="play-panel mb-4 rounded-sm px-3 py-3">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <div className="ui-label">Event Code</div>
+              <div className="text-xs font-medium text-muted">Event Code</div>
               <div className="text-3xl font-display tracking-tight">{data.event.public_code}</div>
               <div className="mt-1 text-sm text-muted">{data.event.title}</div>
               <div className="mt-1 text-sm text-muted">
@@ -208,7 +207,7 @@ export function PlayLeaderboardPage() {
                 type="button"
                 aria-pressed={theme === 'light'}
                 onClick={toggleTheme}
-                className="rounded-md border border-border bg-panel2 px-3 py-1 text-xs font-medium text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+                className="play-touch rounded-md border border-border bg-panel2 px-3 py-1 text-xs font-medium text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
               >
                 {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
               </button>
@@ -226,63 +225,59 @@ export function PlayLeaderboardPage() {
             </div>
           </div>
         </div>
-        <Panel title="Leaderboard">
-          <div className="landscape:hidden">
-            <div className="mb-3 flex items-center justify-between text-xs text-muted">
-              <span>Ranked teams</span>
-              <span>{rows.length} total</span>
-            </div>
-            <div className="space-y-2">
-              {rows.map((row, index) => (
-                <div
-                  key={row.team_id}
-                  className="surface-inset flex items-center justify-between gap-3 px-3 py-2.5"
-                >
-                  <div className="flex min-w-0 items-center gap-3">
-                    <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-full border border-border bg-panel2 px-2 text-xs text-muted">
-                      #{index + 1}
-                    </span>
-                    <span className="truncate text-sm font-medium text-text">{row.name}</span>
-                  </div>
-                  <div className={`grid gap-3 text-right ${lastCompletedRound ? 'grid-cols-2' : 'grid-cols-1'}`}>
-                    {lastCompletedRound && (
-                      <div>
-                        <div className="text-[10px] uppercase tracking-[0.16em] text-muted">Last round</div>
-                        <div className="text-sm font-semibold text-text">
-                          {row.roundScores[lastCompletedRound.id] ?? 0}
-                        </div>
-                      </div>
-                    )}
+        <div className="play-panel rounded-md p-3">
+          <div className="mb-3 flex items-center justify-between text-xs font-medium text-muted">
+            <span>Ranked teams</span>
+            <span>{rows.length} total</span>
+          </div>
+          <div className="landscape:hidden space-y-2 max-h-[70dvh] overflow-y-auto pr-0.5">
+            {rows.map((row, index) => (
+              <div
+                key={row.team_id}
+                className="play-list-row"
+              >
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className={`play-rank ${index < 3 ? 'play-rank-top' : ''}`}>#{index + 1}</span>
+                  <span className="truncate text-sm font-semibold text-text">{row.name}</span>
+                </div>
+                <div className={`grid gap-3 text-right ${lastCompletedRound ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                  {lastCompletedRound && (
                     <div>
-                      <div className="text-[10px] uppercase tracking-[0.16em] text-muted">Total</div>
-                      <div className="text-base font-semibold text-text">{row.total}</div>
+                      <div className="text-[10px] font-medium text-muted">Last round</div>
+                      <div className="text-sm font-semibold text-text">
+                        {row.roundScores[lastCompletedRound.id] ?? 0}
+                      </div>
                     </div>
+                  )}
+                  <div>
+                    <div className="text-[10px] font-medium text-muted">Total</div>
+                    <div className="text-base font-semibold text-text">{row.total}</div>
                   </div>
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
           </div>
 
           <div className="hidden landscape:block">
-            <div className="overflow-x-auto border-2 border-border">
+            <div className="overflow-x-auto rounded-sm border border-border bg-panel2">
               <table className="min-w-full text-left text-sm">
-                <thead className="bg-panel2">
+                <thead className="bg-panel3/70">
                   <tr>
-                    <th className="px-3 py-2 text-xs font-display uppercase tracking-[0.2em] text-muted">Rank</th>
-                    <th className="px-3 py-2 text-xs font-display uppercase tracking-[0.2em] text-muted">Team</th>
+                    <th className="px-3 py-2 text-xs font-medium text-muted">Rank</th>
+                    <th className="px-3 py-2 text-xs font-medium text-muted">Team</th>
                     {orderedRounds.map((round) => (
-                      <th key={round.id} className="px-3 py-2 text-xs font-display uppercase tracking-[0.2em] text-muted">
+                      <th key={round.id} className="px-3 py-2 text-xs font-medium text-muted">
                         R{round.round_number}
                       </th>
                     ))}
-                    <th className="px-3 py-2 text-xs font-display uppercase tracking-[0.2em] text-muted">Total</th>
+                    <th className="px-3 py-2 text-xs font-medium text-muted">Total</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y-2 divide-border">
+                <tbody className="divide-y divide-border">
                   {rows.map((row, index) => (
                     <tr key={row.team_id}>
                       <td className="px-3 py-2 text-xs text-muted">{index + 1}</td>
-                      <td className="px-3 py-2 text-sm font-medium text-text">{row.name}</td>
+                      <td className="px-3 py-2 text-sm font-semibold text-text">{row.name}</td>
                       {orderedRounds.map((round) => (
                         <td key={round.id} className="px-3 py-2 text-sm text-text">
                           {row.roundScores[round.id] ?? 0}
@@ -295,7 +290,7 @@ export function PlayLeaderboardPage() {
               </table>
             </div>
           </div>
-        </Panel>
+        </div>
       </div>
     </div>
   );

@@ -156,6 +156,88 @@ a:hover {
 }
 
 @layer components {
+  .play-shell {
+    background: var(--bg);
+    color: var(--text);
+  }
+
+  .play-panel {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-soft);
+    background: rgba(21, 27, 36, 0.58);
+    box-shadow: var(--surface-highlight), 0 10px 30px rgba(0, 0, 0, 0.35);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
+  }
+
+  .play-panel-strong {
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-card);
+    background: rgba(28, 35, 46, 0.68);
+    box-shadow: var(--surface-highlight), 0 14px 30px rgba(0, 0, 0, 0.36);
+  }
+
+  .play-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    border-radius: var(--radius-soft);
+    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.02);
+    padding: 0.25rem 0.5rem;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    letter-spacing: 0.01em;
+  }
+
+  .play-touch {
+    min-height: 48px;
+    min-width: 48px;
+  }
+
+  .play-list-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    border-radius: var(--radius-soft);
+    border: 1px solid var(--border);
+    background: rgba(28, 35, 46, 0.56);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+    padding: 0.75rem;
+    transition: border-color 120ms ease, background-color 120ms ease, transform 120ms ease;
+  }
+
+  .play-list-row:hover {
+    border-color: var(--border-strong);
+    background: rgba(28, 35, 46, 0.72);
+  }
+
+  .play-list-row:active {
+    transform: scale(0.995);
+  }
+
+  .play-rank {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: var(--radius-soft);
+    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.03);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--muted);
+  }
+
+  .play-rank-top {
+    border-color: rgba(244, 198, 64, 0.34);
+    color: var(--accent-ink);
+    background: rgba(244, 198, 64, 0.1);
+  }
+
   .glass-card {
     border-radius: var(--radius-card);
     border: 1px solid var(--border);
@@ -378,7 +460,8 @@ a:hover {
 
   .glass-card,
   .list-row,
-  .fab-create {
+  .fab-create,
+  .play-list-row {
     transition: none;
   }
 }
