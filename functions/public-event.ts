@@ -32,6 +32,7 @@ export type PublicEventPayload = {
     event_id: string;
     active_round_id: string | null;
     current_item_ordinal: number | null;
+    audio_playing: boolean;
     reveal_answer: boolean;
     reveal_fun_fact: boolean;
     waiting_message: string | null;
@@ -132,6 +133,7 @@ export async function getPublicEventPayload(env: Env, rawCode: string, view?: Pu
     event_id: string;
     active_round_id: string | null;
     current_item_ordinal: number | null;
+    audio_playing: number;
     reveal_answer: number;
     reveal_fun_fact: number;
     waiting_message: string | null;
@@ -143,7 +145,7 @@ export async function getPublicEventPayload(env: Env, rawCode: string, view?: Pu
     updated_at: string;
   }>(
     env,
-    `SELECT id, event_id, active_round_id, current_item_ordinal, reveal_answer, reveal_fun_fact,
+    `SELECT id, event_id, active_round_id, current_item_ordinal, audio_playing, reveal_answer, reveal_fun_fact,
             waiting_message, waiting_show_leaderboard, waiting_show_next_round, show_full_leaderboard, timer_started_at, timer_duration_seconds, updated_at
      FROM event_live_state WHERE event_id = ? AND COALESCE(deleted, 0) = 0`,
     [event.id]
@@ -152,6 +154,7 @@ export async function getPublicEventPayload(env: Env, rawCode: string, view?: Pu
   const normalizedLive = live
     ? {
         ...live,
+        audio_playing: Boolean(live.audio_playing),
         reveal_answer: Boolean(live.reveal_answer),
         reveal_fun_fact: Boolean(live.reveal_fun_fact),
         waiting_message: live.waiting_message ?? null,

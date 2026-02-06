@@ -143,6 +143,7 @@ export type EventLiveState = {
   event_id: Id;
   active_round_id: Id | null;
   current_item_ordinal: number | null;
+  audio_playing: boolean;
   reveal_answer: boolean;
   reveal_fun_fact: boolean;
   waiting_message: string | null;

@@ -272,6 +272,7 @@ export const roundScoresUpdateSchema = z.object({
 export const liveStateUpdateSchema = z.object({
   active_round_id: idSchema.nullable().optional(),
   current_item_ordinal: z.number().int().min(1).nullable().optional(),
+  audio_playing: z.boolean().optional(),
   reveal_answer: z.boolean().optional(),
   reveal_fun_fact: z.boolean().optional(),
   waiting_message: z.string().optional().nullable(),

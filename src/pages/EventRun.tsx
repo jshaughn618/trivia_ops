@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
 import { api, formatApiError } from '../api';
 import { useAuth } from '../auth';
@@ -76,6 +76,10 @@ export function EventRunPage() {
   const preselectRef = useRef(false);
   const auth = useAuth();
   const isAdmin = auth.user?.user_type === 'admin';
+  const syncAudioPlaying = useCallback((playing: boolean) => {
+    if (!eventId) return;
+    void api.updateLiveState(eventId, { audio_playing: playing });
+  }, [eventId]);
 
   const load = async () => {
     if (!eventId) return;
@@ -126,6 +130,7 @@ export function EventRunPage() {
         await api.updateLiveState(eventId, {
           active_round_id: selectedRoundId,
           current_item_ordinal: sorted[0]?.ordinal ?? null,
+          audio_playing: false,
           reveal_answer: false,
           reveal_fun_fact: false,
           timer_started_at: null,
@@ -246,6 +251,7 @@ export function EventRunPage() {
     if (!isAudioItem || !effectiveAudioKey) {
       setAudioLoading(false);
       setAudioUrl(null);
+      syncAudioPlaying(false);
       return;
     }
     const requestId = createRequestId();
@@ -255,7 +261,13 @@ export function EventRunPage() {
     setAudioRequestId(requestId);
     setAudioUrl(`${base}${joiner}request_id=${encodeURIComponent(requestId)}${retryParam}`);
     setAudioLoading(true);
-  }, [effectiveAudioKey, isAudioItem, audioRetryToken]);
+  }, [effectiveAudioKey, isAudioItem, audioRetryToken, syncAudioPlaying]);
+
+  useEffect(() => {
+    return () => {
+      syncAudioPlaying(false);
+    };
+  }, [syncAudioPlaying]);
 
   const handleAudioEvent = (event: string) => {
     const error = audioRef.current?.error;
@@ -284,6 +296,7 @@ export function EventRunPage() {
     });
     setAudioLoading(false);
     setAudioError('Audio unavailable.');
+    syncAudioPlaying(false);
   };
 
   const handleAudioReady = (event: string) => {
@@ -365,6 +378,7 @@ export function EventRunPage() {
       if (eventId) {
         api.updateLiveState(eventId, {
           current_item_ordinal: items[nextIndex]?.ordinal ?? null,
+          audio_playing: false,
           reveal_answer: false,
           reveal_fun_fact: false,
           timer_started_at: null,
@@ -386,6 +400,7 @@ export function EventRunPage() {
       if (eventId) {
         api.updateLiveState(eventId, {
           current_item_ordinal: items[prevIndex]?.ordinal ?? null,
+          audio_playing: false,
           reveal_answer: false,
           reveal_fun_fact: false,
           timer_started_at: null,
@@ -409,6 +424,7 @@ export function EventRunPage() {
       await api.updateLiveState(eventId, {
         active_round_id: activeRound.id,
         current_item_ordinal: currentOrdinal,
+        audio_playing: false,
         show_full_leaderboard: false
       });
     }
@@ -427,6 +443,7 @@ export function EventRunPage() {
       await api.updateLiveState(eventId, {
         active_round_id: roundId || activeRound.id,
         current_item_ordinal: null,
+        audio_playing: false,
         reveal_answer: false,
         reveal_fun_fact: false,
         timer_started_at: null,
@@ -473,6 +490,7 @@ export function EventRunPage() {
       waiting_message: waitingMessage.trim() ? waitingMessage.trim() : null,
       waiting_show_leaderboard: waitingShowLeaderboard,
       waiting_show_next_round: waitingShowNextRound,
+      audio_playing: false,
       show_full_leaderboard: false
     });
     if (!res.ok) {
@@ -486,7 +504,7 @@ export function EventRunPage() {
     if (!eventId) return;
     const next = !showFullLeaderboard;
     setShowFullLeaderboard(next);
-    const res = await api.updateLiveState(eventId, { show_full_leaderboard: next });
+    const res = await api.updateLiveState(eventId, { show_full_leaderboard: next, audio_playing: false });
     if (!res.ok) {
       setShowFullLeaderboard(!next);
     }
@@ -568,7 +586,8 @@ export function EventRunPage() {
     setTimerRemainingSeconds(duration);
     await api.updateLiveState(eventId, {
       timer_started_at: startedAt,
-      timer_duration_seconds: duration
+      timer_duration_seconds: duration,
+      audio_playing: false
     });
   };
 
@@ -660,8 +679,18 @@ export function EventRunPage() {
                         onLoadStart={() => setAudioLoading(true)}
                         onLoadedMetadata={() => handleAudioReady('loadedmetadata')}
                         onCanPlay={() => handleAudioReady('canplay')}
-                        onPlay={() => handleAudioEvent('audio_play_click')}
-                        onPause={() => handleAudioEvent('pause')}
+                        onPlay={() => {
+                          handleAudioEvent('audio_play_click');
+                          syncAudioPlaying(true);
+                        }}
+                        onPause={() => {
+                          handleAudioEvent('pause');
+                          syncAudioPlaying(false);
+                        }}
+                        onEnded={() => {
+                          handleAudioEvent('ended');
+                          syncAudioPlaying(false);
+                        }}
                         onError={handleAudioError}
                       />
                       {audioError && (

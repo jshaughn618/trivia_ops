@@ -80,6 +80,7 @@ type PublicEventResponse = {
   live: {
     active_round_id: string | null;
     current_item_ordinal: number | null;
+    audio_playing: boolean;
     reveal_answer: boolean;
     reveal_fun_fact: boolean;
     waiting_message: string | null;
@@ -1034,14 +1035,16 @@ export function PlayEventPage() {
                         <div>
                           <div className="text-xs uppercase tracking-[0.3em] text-muted">Audio clue</div>
                           <div className="text-sm text-muted">
-                            {speedRoundMode
-                              ? 'The host is playing a single clip for this speed round.'
-                              : 'The host is playing this clip for everyone.'}
+                            {data.live?.audio_playing
+                              ? speedRoundMode
+                                ? 'Host audio is playing for this speed round.'
+                                : 'Host audio is playing now.'
+                              : 'Audio playback is controlled by the host.'}
                           </div>
                         </div>
                       </div>
                       <div className="rounded-2xl border border-border bg-panel/40 p-3">
-                        <AudioVisualizer active />
+                        <AudioVisualizer active={Boolean(data.live?.audio_playing)} />
                       </div>
                     </div>
                   )}
