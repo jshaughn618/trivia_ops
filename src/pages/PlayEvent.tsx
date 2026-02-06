@@ -14,6 +14,7 @@ import { SwipeHint } from '../components/play/SwipeHint';
 import { ChoiceList } from '../components/play/ChoiceList';
 import { PrimaryCTA } from '../components/play/PrimaryCTA';
 import { PlayFooterHint } from '../components/play/PlayFooterHint';
+import { AudioVisualizer } from '../components/play/AudioVisualizer';
 
 const POLL_MS = 8000;
 const POLL_BACKUP_MS = 15000;
@@ -629,6 +630,7 @@ export function PlayEventPage() {
       : speedRoundMode
         ? 'Play the clip and collect answers before reveal.'
       : '';
+  const showAudioClue = speedRoundMode || displayItem?.media_type === 'audio';
   const choiceOptions =
     displayItem?.question_type === 'multiple_choice' ? parseChoices(displayItem.choices_json) : [];
   const awaitingResponseSync = Boolean(responseSync);
@@ -1010,39 +1012,37 @@ export function PlayEventPage() {
                   {mediaError && (
                     <div className="rounded-md bg-panel px-3 py-2 text-xs text-danger-ink">{mediaError}</div>
                   )}
-                  {(speedRoundMode || displayItem.media_type === 'audio') && (
-                    <div className="flex items-center gap-3 rounded-2xl bg-panel/40 px-4 py-3 text-left">
-                      <span className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border bg-panel2">
-                        <svg
-                          viewBox="0 0 24 24"
-                          aria-hidden="true"
-                          className="h-5 w-5 text-text"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-                          <path d="M15 9a4 4 0 0 1 0 6" />
-                          <path d="M19 7a8 8 0 0 1 0 10" />
-                        </svg>
-                      </span>
-                      <div>
-                        <div className="text-xs uppercase tracking-[0.3em] text-muted">Audio clue</div>
-                        <div className="text-sm text-muted">
-                          {speedRoundMode ? 'Single clip for the full speed round.' : 'Listen for the clip.'}
+                  {showAudioClue && (
+                    <div className="w-full max-w-3xl space-y-3">
+                      <div className="flex items-center gap-3 rounded-2xl bg-panel/40 px-4 py-3 text-left">
+                        <span className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border bg-panel2">
+                          <svg
+                            viewBox="0 0 24 24"
+                            aria-hidden="true"
+                            className="h-5 w-5 text-text"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                            <path d="M15 9a4 4 0 0 1 0 6" />
+                            <path d="M19 7a8 8 0 0 1 0 10" />
+                          </svg>
+                        </span>
+                        <div>
+                          <div className="text-xs uppercase tracking-[0.3em] text-muted">Audio clue</div>
+                          <div className="text-sm text-muted">
+                            {speedRoundMode
+                              ? 'The host is playing a single clip for this speed round.'
+                              : 'The host is playing this clip for everyone.'}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
-                  {speedRoundMode && activeRound?.round_audio_key && (
-                    <div className="mt-3 w-full max-w-3xl">
-                      <audio
-                        className="w-full"
-                        controls
-                        src={api.publicMediaUrl(data.event.public_code, activeRound.round_audio_key)}
-                      />
+                      <div className="rounded-2xl border border-border bg-panel/40 p-3">
+                        <AudioVisualizer active />
+                      </div>
                     </div>
                   )}
                 </>
@@ -1153,7 +1153,9 @@ export function PlayEventPage() {
               )}
               {data.live?.reveal_answer && (speedRoundMode ? (data.speed_round_answers ?? []).length > 0 : Boolean(answerText)) && (
                 <div className="w-full max-w-4xl pt-4 text-center">
-                  <div className="text-xs uppercase tracking-[0.3em] text-muted">Answer</div>
+                  <div className="text-xs uppercase tracking-[0.3em] text-muted">
+                    {speedRoundMode ? 'Answers' : 'Answer'}
+                  </div>
                   {speedRoundMode ? (
                     <div className="mt-2 flex flex-col gap-1 text-left text-base font-semibold leading-snug md:text-lg">
                       {(data.speed_round_answers ?? []).map((entry) => (
