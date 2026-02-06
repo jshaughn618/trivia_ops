@@ -1,16 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import {
-  CalendarDays,
-  ChevronRight,
-  FilePenLine,
-  Gamepad2,
-  Plus,
-  Radio,
-  PlayCircle,
-  Sparkles
-} from 'lucide-react';
+import { CalendarDays, ChevronRight, FilePenLine, Gamepad2, Plus, Radio, PlayCircle, Sparkles } from 'lucide-react';
 import { api, formatApiError } from '../api';
 import { useAuth } from '../auth';
 import { AppShell } from '../components/AppShell';
@@ -87,7 +78,7 @@ export function DashboardPage() {
           {isAdmin && (
             <Link
               to="/events/new"
-              className="fab-create hidden motion-safe:animate-pulse-amber md:inline-flex"
+              className="fab-create"
             >
               <Plus className="h-4 w-4" />
               Create Event
@@ -128,11 +119,6 @@ export function DashboardPage() {
               <Sparkles className="h-4 w-4 text-accent-ink" />
             </div>
             <div className="grid gap-2.5">
-              {isAdmin && (
-                <ActionLink to="/events/new" primary icon={<Plus className="h-4 w-4" />}>
-                  Create Event
-                </ActionLink>
-              )}
               {isAdmin && (
                 <ActionLink to="/editions/new" icon={<FilePenLine className="h-4 w-4" />}>
                   Build Edition
@@ -186,17 +172,6 @@ export function DashboardPage() {
           )}
         </section>
       </div>
-
-      {isAdmin && (
-        <Link
-          to="/events/new"
-          className="fab-create fixed bottom-5 right-5 z-40 motion-safe:animate-pulse-amber md:hidden"
-          aria-label="Create Event"
-        >
-          <Plus className="h-4 w-4" />
-          Create
-        </Link>
-      )}
     </AppShell>
   );
 }
@@ -220,11 +195,11 @@ function StatusCard({
       className="status-kpi block p-4 transition-transform duration-200 motion-safe:hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
     >
       <div className="mb-2 flex items-center justify-between">
-        <span className="text-sm font-medium text-text-soft">{label}</span>
+        <span className="text-xs font-medium text-muted">{label}</span>
         <span className="text-accent-ink">{icon}</span>
       </div>
       <div className="status-kpi-value font-display font-semibold text-accent-ink text-glow-accent">{value}</div>
-      <div className="mt-2 text-xs text-muted">{helper}</div>
+      <div className="mt-2 text-[11px] text-muted">{helper}</div>
     </Link>
   );
 }
@@ -255,26 +230,12 @@ function ListColumn({
 function ActionLink({
   to,
   children,
-  icon,
-  primary = false
+  icon
 }: {
   to: string;
   children: ReactNode;
   icon: ReactNode;
-  primary?: boolean;
 }) {
-  if (primary) {
-    return (
-      <Link
-        to={to}
-        className="fab-create justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
-      >
-        {icon}
-        {children}
-      </Link>
-    );
-  }
-
   return (
     <Link
       to={to}

@@ -5,16 +5,16 @@
 @tailwind utilities;
 
 :root {
-  --bg: #0a0e16;
-  --panel: rgba(16, 22, 34, 0.72);
-  --panel2: rgba(20, 28, 42, 0.64);
-  --panel3: rgba(26, 36, 54, 0.58);
-  --panel-solid: #121a27;
+  --bg: #06090f;
+  --panel: rgba(16, 20, 27, 0.52);
+  --panel2: #151b24;
+  --panel3: #1c232e;
+  --panel-solid: #151b24;
   --text: #f4f7ff;
   --text-soft: #c5d0e0;
   --muted: #8f9db1;
-  --border: rgba(117, 140, 173, 0.24);
-  --border-strong: rgba(152, 176, 210, 0.32);
+  --border: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.1);
   --accent: #ffbf63;
   --accent-fg: #0e1116;
   --accent-ink: #ffd88f;
@@ -33,15 +33,15 @@
   --bg-grid:
     linear-gradient(rgba(170, 190, 220, 0.035) 1px, transparent 1px),
     linear-gradient(90deg, rgba(170, 190, 220, 0.035) 1px, transparent 1px);
-  --surface-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.055);
+  --surface-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.04);
   --shadow-card: 0 16px 44px rgba(3, 6, 12, 0.56);
   --shadow-float: 0 22px 56px rgba(3, 6, 12, 0.66);
   --glow-accent: 0 0 0 1px rgba(255, 191, 99, 0.28), 0 12px 36px rgba(255, 171, 61, 0.22);
   --glow-cool: 0 10px 35px rgba(76, 137, 255, 0.16);
-  --glass-blur: 24px;
-  --glass-blur-strong: 28px;
-  --radius-card: 18px;
-  --radius-soft: 14px;
+  --glass-blur: 10px;
+  --glass-blur-strong: 12px;
+  --radius-card: 8px;
+  --radius-soft: 6px;
   --radius-pill: 999px;
   color-scheme: dark;
 }
@@ -157,40 +157,30 @@ a:hover {
 
 @layer components {
   .glass-card {
-    position: relative;
-    overflow: hidden;
     border-radius: var(--radius-card);
     border: 1px solid var(--border);
-    background: linear-gradient(160deg, rgba(20, 28, 42, 0.72) 0%, rgba(14, 20, 32, 0.56) 100%);
+    background: linear-gradient(180deg, rgba(21, 27, 36, 0.58) 0%, rgba(28, 35, 46, 0.46) 100%);
     backdrop-filter: blur(var(--glass-blur));
     -webkit-backdrop-filter: blur(var(--glass-blur));
-    box-shadow: var(--shadow-card);
+    box-shadow: var(--surface-highlight), var(--shadow-card);
     transition:
-      transform 220ms ease,
-      box-shadow 220ms ease,
-      border-color 220ms ease;
-  }
-
-  .glass-card::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.065) 0%, rgba(255, 255, 255, 0) 40%);
+      transform 160ms ease,
+      box-shadow 160ms ease,
+      border-color 160ms ease;
   }
 
   .glass-card:hover {
-    transform: translateY(-2px) scale(1.005);
+    transform: translateY(-1px);
     border-color: var(--border-strong);
-    box-shadow: var(--shadow-float), var(--glow-cool);
+    box-shadow: var(--surface-highlight), var(--shadow-float);
   }
 
   .glass-inset {
     border-radius: var(--radius-soft);
-    border: 1px solid rgba(130, 151, 182, 0.22);
-    background: rgba(11, 16, 25, 0.62);
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
+    border: 1px solid var(--border);
+    background: rgba(21, 27, 36, 0.58);
+    backdrop-filter: blur(var(--glass-blur));
+    -webkit-backdrop-filter: blur(var(--glass-blur));
   }
 
   .topbar-glass {
@@ -205,10 +195,10 @@ a:hover {
   .status-kpi {
     border-radius: var(--radius-card);
     border: 1px solid var(--border);
-    background: linear-gradient(160deg, rgba(20, 28, 42, 0.72) 0%, rgba(14, 20, 32, 0.56) 100%);
+    background: linear-gradient(180deg, rgba(21, 27, 36, 0.6) 0%, rgba(28, 35, 46, 0.5) 100%);
     backdrop-filter: blur(var(--glass-blur));
     -webkit-backdrop-filter: blur(var(--glass-blur));
-    box-shadow: var(--shadow-card);
+    box-shadow: var(--surface-highlight), var(--shadow-card);
   }
 
   .status-kpi-value {
@@ -223,17 +213,23 @@ a:hover {
     align-items: center;
     gap: 0.5rem;
     border-radius: var(--radius-pill);
-    padding: 0.78rem 1.2rem;
-    color: #0e1116;
-    font-weight: 700;
-    background: var(--accent-grad);
-    box-shadow: var(--glow-accent);
-    transition: transform 180ms ease, filter 180ms ease;
+    padding: 0.58rem 0.95rem;
+    color: var(--accent-ink);
+    font-weight: 600;
+    border: 1px solid rgba(255, 191, 99, 0.42);
+    background: rgba(255, 191, 99, 0.1);
+    transition:
+      transform 160ms ease,
+      border-color 160ms ease,
+      background-color 160ms ease,
+      color 160ms ease;
   }
 
   .fab-create:hover {
-    transform: translateY(-1px) scale(1.02);
-    filter: saturate(1.08);
+    transform: translateY(-1px);
+    border-color: rgba(255, 216, 143, 0.6);
+    background: rgba(255, 191, 99, 0.16);
+    color: #ffe5ae;
   }
 
   .list-row {
@@ -241,18 +237,17 @@ a:hover {
     align-items: center;
     justify-content: space-between;
     gap: 0.75rem;
-    border-radius: 12px;
-    border: 1px solid rgba(130, 151, 182, 0.22);
-    background: rgba(11, 16, 25, 0.62);
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
+    border-radius: var(--radius-soft);
+    border: 1px solid var(--border);
+    background: rgba(28, 35, 46, 0.56);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
     padding: 0.8rem 0.95rem;
     transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
   }
 
   .list-row:hover {
-    border-color: rgba(255, 191, 99, 0.36);
-    box-shadow: 0 0 0 1px rgba(255, 191, 99, 0.2);
+    border-color: var(--border-strong);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
     transform: translateY(-1px);
   }
 
