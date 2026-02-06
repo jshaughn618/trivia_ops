@@ -64,7 +64,16 @@ type PublicEventResponse = {
     public_code: string;
     location_name: string | null;
   };
-  rounds: { id: string; round_number: number; label: string; status: string; timer_seconds?: number | null }[];
+  rounds: {
+    id: string;
+    round_number: number;
+    label: string;
+    status: string;
+    timer_seconds?: number | null;
+    is_speed_round?: boolean;
+    round_audio_key?: string | null;
+    round_audio_name?: string | null;
+  }[];
   teams: { id: string; name: string }[];
   leaderboard: { team_id: string; name: string; total: number }[];
   live: {
@@ -96,6 +105,7 @@ type PublicEventResponse = {
     media_key: string | null;
     ordinal: number;
   }[];
+  speed_round_answers?: { ordinal: number; answer: string; song: string | null; artist: string | null }[] | null;
   current_item: {
     id?: string;
     question_type?: 'text' | 'multiple_choice';
@@ -351,6 +361,7 @@ export function PlayEventPage() {
 
   const activeRound = data?.rounds.find((round) => round.id === data?.live?.active_round_id) ?? null;
   const isLive = activeRound?.status === 'live';
+  const speedRoundMode = Boolean(isLive && activeRound?.is_speed_round);
   const visualItems = data?.visual_items ?? [];
   const visualMode = Boolean(isLive && data?.visual_round && visualItems.length > 0);
   const displayItem = visualMode ? visualItems[visualIndex] : data?.current_item ?? null;
@@ -600,6 +611,8 @@ export function PlayEventPage() {
   const waitingShowNextRound = data.live?.waiting_show_next_round ?? true;
   const questionLabel = visualMode
     ? `Round ${activeRound?.round_number ?? ''} • Image ${visualIndex + 1} of ${visualItems.length}`.trim()
+    : speedRoundMode
+      ? `Round ${activeRound?.round_number ?? ''} • Speed round`.trim()
     : activeRound && data.live?.current_item_ordinal
       ? `Round ${activeRound.round_number} • Question ${data.live.current_item_ordinal}`
       : 'Question';
@@ -610,9 +623,11 @@ export function PlayEventPage() {
       ? `${displayItem.answer_a_label ? `${displayItem.answer_a_label}: ` : 'A: '}${displayItem.answer_a} / ${displayItem.answer_b_label ? `${displayItem.answer_b_label}: ` : 'B: '}${displayItem.answer_b}`
       : null);
   const promptText = displayItem?.prompt?.trim()
-    ? displayItem.prompt
+    ? speedRoundMode ? 'Play the clip and collect answers before reveal.' : displayItem.prompt
     : displayItem?.media_type === 'audio'
       ? 'Listen to the clip.'
+      : speedRoundMode
+        ? 'Play the clip and collect answers before reveal.'
       : '';
   const choiceOptions =
     displayItem?.question_type === 'multiple_choice' ? parseChoices(displayItem.choices_json) : [];
@@ -995,7 +1010,7 @@ export function PlayEventPage() {
                   {mediaError && (
                     <div className="rounded-md bg-panel px-3 py-2 text-xs text-danger-ink">{mediaError}</div>
                   )}
-                  {displayItem.media_type === 'audio' && (
+                  {(speedRoundMode || displayItem.media_type === 'audio') && (
                     <div className="flex items-center gap-3 rounded-2xl bg-panel/40 px-4 py-3 text-left">
                       <span className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-border bg-panel2">
                         <svg
@@ -1015,8 +1030,19 @@ export function PlayEventPage() {
                       </span>
                       <div>
                         <div className="text-xs uppercase tracking-[0.3em] text-muted">Audio clue</div>
-                        <div className="text-sm text-muted">Listen for the clip.</div>
+                        <div className="text-sm text-muted">
+                          {speedRoundMode ? 'Single clip for the full speed round.' : 'Listen for the clip.'}
+                        </div>
                       </div>
+                    </div>
+                  )}
+                  {speedRoundMode && activeRound?.round_audio_key && (
+                    <div className="mt-3 w-full max-w-3xl">
+                      <audio
+                        className="w-full"
+                        controls
+                        src={api.publicMediaUrl(data.event.public_code, activeRound.round_audio_key)}
+                      />
                     </div>
                   )}
                 </>
@@ -1125,10 +1151,20 @@ export function PlayEventPage() {
                   )}
                 </div>
               )}
-              {data.live?.reveal_answer && answerText && (
+              {data.live?.reveal_answer && (speedRoundMode ? (data.speed_round_answers ?? []).length > 0 : Boolean(answerText)) && (
                 <div className="w-full max-w-4xl pt-4 text-center">
                   <div className="text-xs uppercase tracking-[0.3em] text-muted">Answer</div>
-                  <div className="mt-2 text-2xl font-display md:text-3xl">{answerText}</div>
+                  {speedRoundMode ? (
+                    <div className="mt-2 flex flex-col gap-1 text-left text-base font-semibold leading-snug md:text-lg">
+                      {(data.speed_round_answers ?? []).map((entry) => (
+                        <div key={`speed-answer-${entry.ordinal}`}>
+                          {entry.ordinal}. {entry.answer}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="mt-2 text-2xl font-display md:text-3xl">{answerText}</div>
+                  )}
                 </div>
               )}
               {data.live?.reveal_fun_fact && displayItem.fun_fact && (

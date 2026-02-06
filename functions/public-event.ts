@@ -14,7 +14,16 @@ export type PublicEventPayload = {
     public_code: string;
     location_name: string | null;
   };
-  rounds: { id: string; round_number: number; label: string; status: string; timer_seconds: number | null }[];
+  rounds: {
+    id: string;
+    round_number: number;
+    label: string;
+    status: string;
+    timer_seconds: number | null;
+    is_speed_round: boolean;
+    round_audio_key: string | null;
+    round_audio_name: string | null;
+  }[];
   teams: { id: string; name: string }[];
   leaderboard: { team_id: string; name: string; total: number }[];
   round_scores: { event_round_id: string; team_id: string; score: number }[];
@@ -36,6 +45,7 @@ export type PublicEventPayload = {
   current_item: PublicItem | null;
   visual_round: boolean;
   visual_items: PublicItem[];
+  speed_round_answers: { ordinal: number; answer: string; song: string | null; artist: string | null }[] | null;
   response_counts: { total: number; counts: number[] } | null;
 };
 
@@ -84,13 +94,25 @@ export async function getPublicEventPayload(env: Env, rawCode: string, view?: Pu
     return { ok: false, error: { code: 'not_found', message: 'Event not found' }, status: 404 };
   }
 
-  const rounds = await queryAll<{ id: string; round_number: number; label: string; status: string; timer_seconds: number | null }>(
+  const roundsRaw = await queryAll<{
+    id: string;
+    round_number: number;
+    label: string;
+    status: string;
+    timer_seconds: number | null;
+    is_speed_round: number;
+    round_audio_key: string | null;
+    round_audio_name: string | null;
+  }>(
     env,
     `SELECT er.id,
             er.round_number,
             CASE WHEN g.show_theme = 0 THEN g.name ELSE er.label END AS label,
             er.status,
-            ed.timer_seconds
+            ed.timer_seconds,
+            CASE WHEN g.subtype = 'speed_round' THEN 1 ELSE 0 END AS is_speed_round,
+            ed.speed_round_audio_key AS round_audio_key,
+            ed.speed_round_audio_name AS round_audio_name
      FROM event_rounds er
      JOIN editions ed ON ed.id = er.edition_id
      JOIN games g ON g.id = ed.game_id
@@ -98,6 +120,12 @@ export async function getPublicEventPayload(env: Env, rawCode: string, view?: Pu
      ORDER BY er.round_number ASC`,
     [event.id]
   );
+  const rounds = roundsRaw.map((round) => ({
+    ...round,
+    is_speed_round: Boolean(round.is_speed_round),
+    round_audio_key: round.round_audio_key ?? null,
+    round_audio_name: round.round_audio_name ?? null
+  }));
 
   const live = await queryFirst<{
     id: string;
@@ -224,6 +252,7 @@ export async function getPublicEventPayload(env: Env, rawCode: string, view?: Pu
   let currentItem: PublicItem | null = null;
   let visualRound = false;
   let visualItems: PublicItem[] = [];
+  let speedRoundAnswers: { ordinal: number; answer: string; song: string | null; artist: string | null }[] | null = null;
   let responseCounts: { total: number; counts: number[] } | null = null;
 
   if (!isLeaderboardView && live?.active_round_id) {
@@ -330,6 +359,68 @@ export async function getPublicEventPayload(env: Env, rawCode: string, view?: Pu
     }
   }
 
+  if (!isLeaderboardView && live?.active_round_id && canRevealAnswer) {
+    const activeRound = rounds.find((round) => round.id === live.active_round_id);
+    if (activeRound?.is_speed_round) {
+      const answerRows = await queryAll<{
+        ordinal: number;
+        answer: string;
+        answer_parts_json: string | null;
+        answer_a: string | null;
+        answer_b: string | null;
+      }>(
+        env,
+        `SELECT
+          eri.ordinal,
+          COALESCE(eri.overridden_answer, ei.answer) AS answer,
+          ei.answer_parts_json,
+          ei.answer_a,
+          ei.answer_b
+         FROM event_round_items eri
+         JOIN edition_items ei ON ei.id = eri.edition_item_id
+         WHERE eri.event_round_id = ? AND COALESCE(eri.deleted, 0) = 0 AND COALESCE(ei.deleted, 0) = 0
+         ORDER BY eri.ordinal ASC`,
+        [live.active_round_id]
+      );
+      speedRoundAnswers = answerRows.map((row) => {
+        let song: string | null = null;
+        let artist: string | null = null;
+        if (row.answer_parts_json) {
+          try {
+            const parts = JSON.parse(row.answer_parts_json) as Array<{ label?: string; answer?: string }>;
+            if (Array.isArray(parts)) {
+              for (const part of parts) {
+                const label = typeof part?.label === 'string' ? part.label.toLowerCase() : '';
+                const value = typeof part?.answer === 'string' ? part.answer.trim() : '';
+                if (!value) continue;
+                if (!song && label.includes('song')) song = value;
+                if (!artist && label.includes('artist') && !label.includes('original')) artist = value;
+              }
+            }
+          } catch {
+            // fall through to text parsing
+          }
+        }
+        if (!song && row.answer) {
+          const parts = row.answer.split(' - ').map((segment) => segment.trim()).filter(Boolean);
+          if (parts.length >= 2) {
+            artist = artist ?? parts[0];
+            song = parts[1];
+          }
+        }
+        if (!song && row.answer_a) song = row.answer_a;
+        if (!artist && row.answer_b) artist = row.answer_b;
+        const rendered = song && artist ? `${song} - ${artist}` : row.answer || song || artist || 'Answer missing';
+        return {
+          ordinal: row.ordinal,
+          answer: rendered,
+          song,
+          artist
+        };
+      });
+    }
+  }
+
   if (!isLeaderboardView && currentItem?.choices_json && live?.active_round_id && normalizedLive?.timer_started_at && normalizedLive?.timer_duration_seconds) {
     const startMs = Date.parse(normalizedLive.timer_started_at);
     const expiresAt = startMs + normalizedLive.timer_duration_seconds * 1000;
@@ -377,6 +468,7 @@ export async function getPublicEventPayload(env: Env, rawCode: string, view?: Pu
     current_item: currentItem,
     visual_round: visualRound,
     visual_items: visualItems,
+    speed_round_answers: speedRoundAnswers,
     response_counts: responseCounts
   };
 
@@ -387,6 +479,7 @@ export async function getPublicEventPayload(env: Env, rawCode: string, view?: Pu
       current_item: null,
       visual_round: false,
       visual_items: [],
+      speed_round_answers: null,
       response_counts: null
     };
   }
