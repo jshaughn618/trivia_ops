@@ -26,6 +26,7 @@ const emptyItem = {
   media_filename: '',
   answer_parts: [] as AnswerPart[]
 };
+type ItemDraft = typeof emptyItem & { item_mode: 'text' | 'audio' };
 
 const choiceLabels = ['A', 'B', 'C', 'D'];
 const defaultMusicAnswerParts: AnswerPart[] = [
@@ -117,7 +118,7 @@ export function EditionDetailPage() {
   const [edition, setEdition] = useState<GameEdition | null>(null);
   const [items, setItems] = useState<EditionItem[]>([]);
   const [games, setGames] = useState<Game[]>([]);
-  const [itemDraft, setItemDraft] = useState({ ...emptyItem, item_mode: 'text' as 'text' | 'audio' });
+  const [itemDraft, setItemDraft] = useState<ItemDraft>({ ...emptyItem, item_mode: 'text' });
   const [status, setStatus] = useState('draft');
   const [tags, setTags] = useState('');
   const [theme, setTheme] = useState('');
@@ -144,6 +145,8 @@ export function EditionDetailPage() {
   const [mediaUploading, setMediaUploading] = useState(false);
   const [mediaError, setMediaError] = useState<string | null>(null);
   const [itemValidationError, setItemValidationError] = useState<string | null>(null);
+  const [itemSaveState, setItemSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [itemSaveError, setItemSaveError] = useState<string | null>(null);
   const [itemDeleteError, setItemDeleteError] = useState<string | null>(null);
   const [aiOpen, setAiOpen] = useState(false);
   const [aiMode, setAiMode] = useState<'bulk' | 'answer' | 'mcq'>('bulk');
@@ -252,6 +255,73 @@ export function EditionDetailPage() {
     if (!activeItem) return -1;
     return orderedItems.findIndex((item) => item.id === activeItem.id);
   }, [orderedItems, activeItem]);
+
+  const buildItemDraftFromItem = (item: EditionItem): ItemDraft => {
+    const isMusic = gameTypeId === 'music';
+    const isAudioItem = item.media_type === 'audio' || Boolean(item.media_key) || Boolean(item.audio_answer_key);
+    const questionType = item.question_type ?? 'text';
+    const choices = parseChoices(item.choices_json ?? null);
+    const answerValue = safeTrim(item.answer);
+    const correctIndex = questionType === 'multiple_choice' && answerValue
+      ? Math.max(0, choices.findIndex((choice) => choice.trim() === answerValue))
+      : 0;
+    const parsedAnswerParts = parseAnswerPartsJson(item.answer_parts_json ?? null, item);
+    const answerPartsDraft =
+      isMusic && isAudioItem
+        ? parsedAnswerParts.length > 0
+          ? parsedAnswerParts
+          : defaultMusicAnswerParts
+        : [];
+    return {
+      question_type: questionType,
+      choices,
+      correct_choice_index: correctIndex,
+      prompt: safeString(item.prompt),
+      answer: safeString(item.answer),
+      answer_a: safeString(item.answer_a),
+      answer_b: safeString(item.answer_b),
+      answer_a_label: safeString(item.answer_a_label),
+      answer_b_label: safeString(item.answer_b_label),
+      fun_fact: safeString(item.fun_fact),
+      media_type: safeString(item.media_type),
+      media_key: safeString(item.media_key),
+      audio_answer_key: safeString(item.audio_answer_key),
+      media_filename: '',
+      item_mode: isAudioItem ? 'audio' : 'text',
+      answer_parts: answerPartsDraft.map((part) => ({ label: part.label, answer: part.answer }))
+    };
+  };
+
+  const normalizeItemDraft = (draft: ItemDraft) => ({
+    question_type: draft.question_type,
+    choices: draft.choices.map((choice) => safeString(choice)),
+    correct_choice_index: draft.correct_choice_index,
+    prompt: safeString(draft.prompt),
+    answer: safeString(draft.answer),
+    answer_a: safeString(draft.answer_a),
+    answer_b: safeString(draft.answer_b),
+    answer_a_label: safeString(draft.answer_a_label),
+    answer_b_label: safeString(draft.answer_b_label),
+    fun_fact: safeString(draft.fun_fact),
+    media_type: safeString(draft.media_type),
+    media_key: safeString(draft.media_key),
+    audio_answer_key: safeString(draft.audio_answer_key),
+    item_mode: draft.item_mode,
+    answer_parts: draft.answer_parts.map((part) => ({
+      label: safeString(part.label),
+      answer: safeString(part.answer)
+    }))
+  });
+
+  const activeItemDraft = useMemo(() => {
+    if (!activeItem || activeItemId === 'new') return null;
+    return buildItemDraftFromItem(activeItem);
+  }, [activeItem, activeItemId, gameTypeId]);
+
+  const itemEditDirty = useMemo(() => {
+    if (!activeItem || activeItemId === 'new' || !activeItemDraft) return false;
+    return JSON.stringify(normalizeItemDraft(itemDraft)) !== JSON.stringify(normalizeItemDraft(activeItemDraft));
+  }, [activeItem, activeItemId, activeItemDraft, itemDraft]);
 
   const filteredGames = useMemo(() => {
     if (!gameTypeId) return games;
@@ -373,6 +443,21 @@ export function EditionDetailPage() {
     return () => window.clearTimeout(timeout);
   }, [infoSaveState]);
 
+  useEffect(() => {
+    if (!activeItem || activeItemId === 'new') return;
+    if (!itemEditDirty) return;
+    const timeout = window.setTimeout(() => {
+      void saveEdit(activeItem, { source: 'auto' });
+    }, 700);
+    return () => window.clearTimeout(timeout);
+  }, [activeItem, activeItemId, itemEditDirty, itemDraft]);
+
+  useEffect(() => {
+    if (itemSaveState !== 'saved') return;
+    const timeout = window.setTimeout(() => setItemSaveState('idle'), 1400);
+    return () => window.clearTimeout(timeout);
+  }, [itemSaveState]);
+
   const handleDeleteEdition = async () => {
     if (!editionId) return;
     await api.deleteEdition(editionId);
@@ -459,62 +544,38 @@ export function EditionDetailPage() {
       setItemDraft({ ...emptyItem, item_mode: 'text', answer_parts: [] });
       setActiveItemId(null);
       setItemValidationError(null);
+      setItemSaveState('idle');
+      setItemSaveError(null);
       load();
     }
   };
 
   const startEdit = (item: EditionItem) => {
-    const isMusic = gameTypeId === 'music';
-    const isAudioItem = item.media_type === 'audio' || Boolean(item.media_key) || Boolean(item.audio_answer_key);
-    const questionType = item.question_type ?? 'text';
-    const choices = parseChoices(item.choices_json ?? null);
-    const answerValue = safeTrim(item.answer);
-    const correctIndex = questionType === 'multiple_choice' && answerValue
-      ? Math.max(0, choices.findIndex((choice) => choice.trim() === answerValue))
-      : 0;
-    const parsedAnswerParts = parseAnswerPartsJson(item.answer_parts_json ?? null, item);
-    const answerPartsDraft =
-      isMusic && isAudioItem
-        ? parsedAnswerParts.length > 0
-          ? parsedAnswerParts
-          : defaultMusicAnswerParts
-        : [];
     setActiveItemId(item.id);
     setRefineOpen(false);
     setRefineOptions([]);
     setRefineError(null);
     setItemValidationError(null);
+    setItemSaveState('idle');
+    setItemSaveError(null);
     setImageAnswerError(null);
     setImageAnswerLoading(false);
-    setItemDraft({
-      question_type: questionType,
-      choices,
-      correct_choice_index: correctIndex,
-      prompt: safeString(item.prompt),
-      answer: safeString(item.answer),
-      answer_a: safeString(item.answer_a),
-      answer_b: safeString(item.answer_b),
-      answer_a_label: safeString(item.answer_a_label),
-      answer_b_label: safeString(item.answer_b_label),
-      fun_fact: safeString(item.fun_fact),
-      media_type: safeString(item.media_type),
-      media_key: safeString(item.media_key),
-      audio_answer_key: safeString(item.audio_answer_key),
-      media_filename: '',
-      item_mode: isAudioItem ? 'audio' : 'text',
-      answer_parts: answerPartsDraft
-    });
+    setItemDraft(buildItemDraftFromItem(item));
   };
 
   const cancelEdit = () => {
     setActiveItemId(null);
     setItemDraft({ ...emptyItem, item_mode: 'text', answer_parts: [] });
     setItemValidationError(null);
+    setItemSaveState('idle');
+    setItemSaveError(null);
     setImageAnswerError(null);
     setImageAnswerLoading(false);
   };
 
-  const saveEdit = async (item: EditionItem) => {
+  const saveEdit = async (item: EditionItem, options?: { closeAfterSave?: boolean; source?: 'manual' | 'auto' }) => {
+    const closeAfterSave = options?.closeAfterSave ?? false;
+    const source = options?.source ?? 'manual';
     const isMusic = gameTypeId === 'music';
     const isMusicAudio = isMusic && itemDraft.item_mode === 'audio';
     const isMultipleChoice = itemDraft.question_type === 'multiple_choice' && gameTypeId !== 'audio';
@@ -525,23 +586,43 @@ export function EditionDetailPage() {
     let musicAnswerALabel: string | null = null;
     let musicAnswerBLabel: string | null = null;
     if (!isMusicAudio && !itemDraft.prompt.trim()) {
-      setItemValidationError('Question is required.');
-      return;
+      const message = 'Question is required.';
+      setItemValidationError(message);
+      if (source === 'auto') {
+        setItemSaveState('error');
+        setItemSaveError(message);
+      }
+      return false;
     }
     if (isMusicAudio && !isMusicSpeedRound && !itemDraft.media_key) {
-      setItemValidationError('Question audio clip is required.');
-      return;
+      const message = 'Question audio clip is required.';
+      setItemValidationError(message);
+      if (source === 'auto') {
+        setItemSaveState('error');
+        setItemSaveError(message);
+      }
+      return false;
     }
     if (gameTypeId === 'audio') {
       if (!itemDraft.answer_a.trim() || !itemDraft.answer_b.trim()) {
-        setItemValidationError('Answer A and Answer B are required for audio items.');
-        return;
+        const message = 'Answer A and Answer B are required for audio items.';
+        setItemValidationError(message);
+        if (source === 'auto') {
+          setItemSaveState('error');
+          setItemSaveError(message);
+        }
+        return false;
       }
     } else if (isMusicAudio) {
       const partsClean = sanitizeAnswerParts(itemDraft.answer_parts);
       if (partsClean.length === 0) {
-        setItemValidationError('At least one answer part is required.');
-        return;
+        const message = 'At least one answer part is required.';
+        setItemValidationError(message);
+        if (source === 'auto') {
+          setItemSaveState('error');
+          setItemSaveError(message);
+        }
+        return false;
       }
       answerPartsPayload = partsClean;
       answerValue = partsClean.map((part) => part.answer).join(' / ');
@@ -550,29 +631,51 @@ export function EditionDetailPage() {
       musicAnswerB = partsClean[1]?.answer ?? null;
       musicAnswerBLabel = partsClean[1]?.label ?? null;
     } else if (!isMultipleChoice && !itemDraft.answer.trim()) {
-      setItemValidationError('Answer is required.');
-      return;
+      const message = 'Answer is required.';
+      setItemValidationError(message);
+      if (source === 'auto') {
+        setItemSaveState('error');
+        setItemSaveError(message);
+      }
+      return false;
     }
     let choicesJson: string[] | null = null;
     if (isMultipleChoice) {
       const { normalized, hasGap } = normalizeChoices(itemDraft.choices);
       if (hasGap) {
-        setItemValidationError('Fill multiple choice options in order without gaps.');
-        return;
+        const message = 'Fill multiple choice options in order without gaps.';
+        setItemValidationError(message);
+        if (source === 'auto') {
+          setItemSaveState('error');
+          setItemSaveError(message);
+        }
+        return false;
       }
       if (normalized.length < 2) {
-        setItemValidationError('Multiple choice needs at least two options.');
-        return;
+        const message = 'Multiple choice needs at least two options.';
+        setItemValidationError(message);
+        if (source === 'auto') {
+          setItemSaveState('error');
+          setItemSaveError(message);
+        }
+        return false;
       }
       const correctChoice = normalized[itemDraft.correct_choice_index];
       if (!correctChoice) {
-        setItemValidationError('Select a correct choice.');
-        return;
+        const message = 'Select a correct choice.';
+        setItemValidationError(message);
+        if (source === 'auto') {
+          setItemSaveState('error');
+          setItemSaveError(message);
+        }
+        return false;
       }
       choicesJson = normalized;
       answerValue = correctChoice;
     }
     setItemValidationError(null);
+    setItemSaveState('saving');
+    setItemSaveError(null);
     const res = await api.updateEditionItem(item.id, {
       question_type: isMultipleChoice ? 'multiple_choice' : 'text',
       choices_json: isMultipleChoice ? choicesJson ?? [] : [],
@@ -589,9 +692,18 @@ export function EditionDetailPage() {
       audio_answer_key: itemDraft.audio_answer_key || null
     });
     if (res.ok) {
-      cancelEdit();
-      load();
+      setItems((prev) => prev.map((entry) => (entry.id === res.data.id ? res.data : entry)));
+      if (activeItemId === res.data.id) {
+        setItemDraft(buildItemDraftFromItem(res.data));
+      }
+      setItemSaveState('saved');
+      setItemSaveError(null);
+      if (closeAfterSave) cancelEdit();
+      return true;
     }
+    setItemSaveState('error');
+    setItemSaveError(formatApiError(res, source === 'auto' ? 'Auto-save failed.' : 'Save failed.'));
+    return false;
   };
 
   const reorderItems = async (sourceId: string, targetId: string) => {
@@ -825,7 +937,11 @@ export function EditionDetailPage() {
     setItemDeleteError(null);
     setItems((prev) => prev.filter((item) => item.id !== itemId));
     setItemMenuId(null);
-    if (activeItemId === itemId) setActiveItemId(null);
+    if (activeItemId === itemId) {
+      setActiveItemId(null);
+      setItemSaveState('idle');
+      setItemSaveError(null);
+    }
     const res = await api.deleteEditionItem(itemId);
     if (!res.ok) {
       setItems(previous);
@@ -842,6 +958,8 @@ export function EditionDetailPage() {
     setRefineError(null);
     setImageAnswerError(null);
     setImageAnswerLoading(false);
+    setItemSaveState('idle');
+    setItemSaveError(null);
     setItemDraft({
       ...emptyItem,
       prompt: visualPrompt,
@@ -2420,9 +2538,18 @@ export function EditionDetailPage() {
             {itemValidationError}
           </div>
         )}
-        <div className="flex flex-wrap gap-2">
-          <PrimaryButton onClick={() => saveEdit(item)}>Save</PrimaryButton>
+        {itemSaveError && (
+          <div className="border-2 border-danger bg-panel px-3 py-2 text-xs uppercase tracking-[0.2em] text-danger">
+            {itemSaveError}
+          </div>
+        )}
+        <div className="flex flex-wrap items-center gap-2">
+          <PrimaryButton onClick={() => saveEdit(item, { source: 'manual' })}>Save Now</PrimaryButton>
           <SecondaryButton onClick={cancelEdit}>Cancel</SecondaryButton>
+          <div aria-live="polite" className="text-xs">
+            {itemSaveState === 'saving' && <span className="text-muted">Saving changes…</span>}
+            {itemSaveState === 'saved' && <span className="text-accent-ink">All changes saved.</span>}
+          </div>
         </div>
         {refineOpen && (
           <div className="border-2 border-border bg-panel2 p-3">
