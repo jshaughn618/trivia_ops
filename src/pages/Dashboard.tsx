@@ -1,13 +1,32 @@
 import { useEffect, useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+import {
+  CalendarDays,
+  ChevronRight,
+  FilePenLine,
+  Gamepad2,
+  Plus,
+  Radio,
+  PlayCircle,
+  Sparkles
+} from 'lucide-react';
 import { api, formatApiError } from '../api';
 import { useAuth } from '../auth';
 import { AppShell } from '../components/AppShell';
-import { ButtonLink } from '../components/Buttons';
-import { Panel } from '../components/Panel';
-import { StatTile } from '../components/StatTile';
 import { logError } from '../lib/log';
 import type { Event, GameEdition } from '../types';
+
+const formatEventDate = (value: string) => {
+  const date = new Date(value);
+  return date.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit'
+  });
+};
 
 export function DashboardPage() {
   const [events, setEvents] = useState<Event[]>([]);
@@ -40,14 +59,14 @@ export function DashboardPage() {
     return [...events]
       .filter((event) => event.status === 'planned')
       .sort((a, b) => a.starts_at.localeCompare(b.starts_at))
-      .slice(0, 5);
+      .slice(0, 6);
   }, [events]);
 
   const drafts = useMemo(() => {
     return [...editions]
       .filter((edition) => edition.status === 'draft')
-      .sort((a, b) => a.updated_at.localeCompare(b.updated_at))
-      .slice(0, 5);
+      .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
+      .slice(0, 6);
   }, [editions]);
 
   const liveCount = events.filter((event) => event.status === 'live').length;
@@ -56,123 +75,216 @@ export function DashboardPage() {
 
   return (
     <AppShell title="Dashboard" showTitle={false}>
-      {error && (
-        <div className="mb-4 border border-danger bg-panel2 px-3 py-2 text-xs text-danger-ink">
-          {error}
-        </div>
-      )}
-      <div className="space-y-6">
-        <h1 className="text-[1.75rem] font-display tracking-tight sm:text-[1.95rem]">Dashboard</h1>
-        <section className={`grid gap-4 ${isAdmin ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
-          <Link
-            to="/events?status=live"
-            className="group block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
-          >
-            <StatTile
-              label="Live Events"
-              labelClassName="text-sm font-semibold tracking-[0.02em] text-text sm:text-base"
-              value={String(liveCount)}
-              helper="On air now"
-              className="transition-transform duration-150 group-hover:-translate-y-0.5"
-            />
-          </Link>
-          <Link
-            to="/events?status=planned"
-            className="group block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
-          >
-            <StatTile
-              label="Planned Events"
-              labelClassName="text-sm font-semibold tracking-[0.02em] text-text sm:text-base"
-              value={String(plannedCount)}
-              helper="Scheduled"
-              className="transition-transform duration-150 group-hover:-translate-y-0.5"
-            />
-          </Link>
+      <div className="space-y-5">
+        {error && (
+          <div className="glass-card border-danger px-3 py-2 text-xs text-danger-ink">
+            {error}
+          </div>
+        )}
+
+        <div className="flex items-center justify-between">
+          <h1 className="text-[1.85rem] font-display tracking-tight sm:text-[2rem]">Dashboard</h1>
           {isAdmin && (
             <Link
-              to="/editions?status=draft"
-              className="group block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+              to="/events/new"
+              className="fab-create hidden motion-safe:animate-pulse-amber md:inline-flex"
             >
-              <StatTile
-                label="Draft Editions"
-                labelClassName="text-sm font-semibold tracking-[0.02em] text-text sm:text-base"
-                value={String(draftCount)}
-                helper="In progress"
-                className="transition-transform duration-150 group-hover:-translate-y-0.5"
-              />
+              <Plus className="h-4 w-4" />
+              Create Event
             </Link>
+          )}
+        </div>
+
+        <section className={`grid gap-3 ${isAdmin ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
+          <StatusCard
+            to="/events?status=live"
+            label="Live Events"
+            value={liveCount}
+            helper="On air now"
+            icon={<Radio className="h-4 w-4" />}
+          />
+          <StatusCard
+            to="/events?status=planned"
+            label="Planned Events"
+            value={plannedCount}
+            helper="Scheduled"
+            icon={<CalendarDays className="h-4 w-4" />}
+          />
+          {isAdmin && (
+            <StatusCard
+              to="/editions?status=draft"
+              label="Draft Editions"
+              value={draftCount}
+              helper="In progress"
+              icon={<FilePenLine className="h-4 w-4" />}
+            />
           )}
         </section>
 
-        <section className={`grid gap-4 ${isAdmin ? 'lg:grid-cols-3' : 'lg:grid-cols-2'}`}>
-          <Panel title="Quick Actions" className="p-5" headerDivider={false}>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+        <section className={`grid gap-4 ${isAdmin ? 'xl:grid-cols-[300px,minmax(0,1fr),minmax(0,1fr)]' : 'xl:grid-cols-[300px,minmax(0,1fr)]'}`}>
+          <div className="glass-card p-4 md:p-5">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="panel-title">Quick Actions</h2>
+              <Sparkles className="h-4 w-4 text-accent-ink" />
+            </div>
+            <div className="grid gap-2.5">
               {isAdmin && (
-                <ButtonLink to="/events/new" variant="primary" className="h-11">
+                <ActionLink to="/events/new" primary icon={<Plus className="h-4 w-4" />}>
                   Create Event
-                </ButtonLink>
+                </ActionLink>
               )}
               {isAdmin && (
-                <ButtonLink to="/editions/new" variant="secondary" className="h-11">
+                <ActionLink to="/editions/new" icon={<FilePenLine className="h-4 w-4" />}>
                   Build Edition
-                </ButtonLink>
+                </ActionLink>
               )}
               {isAdmin && (
-                <ButtonLink to="/games" variant="secondary" className="h-11">
+                <ActionLink to="/games" icon={<Gamepad2 className="h-4 w-4" />}>
                   Games
-                </ButtonLink>
+                </ActionLink>
               )}
-              <ButtonLink to="/events" variant="secondary" className="h-11">
+              <ActionLink to="/events" icon={<PlayCircle className="h-4 w-4" />}>
                 Run Event
-              </ButtonLink>
+              </ActionLink>
             </div>
-          </Panel>
+          </div>
 
-          <Panel title="Upcoming Events" className="p-5" headerDivider={false}>
-            <div className="flex flex-col gap-3">
-              {upcoming.length === 0 && (
-                <div className="text-sm text-muted">No scheduled events.</div>
-              )}
-              {upcoming.map((event) => (
-                <Link
-                  key={event.id}
-                  to={`/events/${event.id}`}
-                  className="surface-inset flex flex-col gap-2 p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
-                >
-                  <div>
-                    <div className="text-sm font-semibold text-text">{event.title}</div>
-                    <div className="mt-1 text-xs text-muted">{new Date(event.starts_at).toLocaleString()}</div>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </Panel>
+          <ListColumn title="Upcoming Events" emptyMessage="No scheduled events.">
+            {upcoming.map((event) => (
+              <Link
+                key={event.id}
+                to={`/events/${event.id}`}
+                className="list-row group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+              >
+                <div>
+                  <div className="text-sm font-semibold text-text">{event.title}</div>
+                  <div className="mt-1 text-xs text-muted">{formatEventDate(event.starts_at)}</div>
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted transition group-hover:text-accent-ink" />
+              </Link>
+            ))}
+          </ListColumn>
 
           {isAdmin && (
-            <Panel title="Draft Editions" className="p-5" headerDivider={false}>
-              <div className="flex flex-col gap-3">
-                {drafts.length === 0 && <div className="text-sm text-muted">No draft editions.</div>}
-                {drafts.map((edition) => (
-                  <Link
+            <ListColumn title="Draft Editions" emptyMessage="No draft editions.">
+              {drafts.map((edition) => (
+                <Link
                   key={edition.id}
                   to={`/editions/${edition.id}`}
-                  className="surface-inset flex flex-col gap-2 p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+                  className="list-row group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
                 >
-                    <div>
-                      <div className="text-sm font-semibold text-text">
-                        {edition.theme ?? 'Untitled theme'}
-                      </div>
-                      <div className="mt-1 text-xs text-muted">
-                        Updated {new Date(edition.updated_at).toLocaleDateString()}
-                      </div>
+                  <div>
+                    <div className="text-sm font-semibold text-text">{edition.theme ?? 'Untitled Theme'}</div>
+                    <div className="mt-1 text-xs text-muted">
+                      Updated {new Date(edition.updated_at).toLocaleDateString()}
                     </div>
-                  </Link>
-                ))}
-              </div>
-            </Panel>
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-muted transition group-hover:text-accent-ink" />
+                </Link>
+              ))}
+            </ListColumn>
           )}
         </section>
       </div>
+
+      {isAdmin && (
+        <Link
+          to="/events/new"
+          className="fab-create fixed bottom-5 right-5 z-40 motion-safe:animate-pulse-amber md:hidden"
+          aria-label="Create Event"
+        >
+          <Plus className="h-4 w-4" />
+          Create
+        </Link>
+      )}
     </AppShell>
+  );
+}
+
+function StatusCard({
+  to,
+  label,
+  value,
+  helper,
+  icon
+}: {
+  to: string;
+  label: string;
+  value: number;
+  helper: string;
+  icon: ReactNode;
+}) {
+  return (
+    <Link
+      to={to}
+      className="status-kpi block p-4 transition-transform duration-200 motion-safe:hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+    >
+      <div className="mb-2 flex items-center justify-between">
+        <span className="text-sm font-medium text-text-soft">{label}</span>
+        <span className="text-accent-ink">{icon}</span>
+      </div>
+      <div className="status-kpi-value font-display font-semibold text-accent-ink text-glow-accent">{value}</div>
+      <div className="mt-2 text-xs text-muted">{helper}</div>
+    </Link>
+  );
+}
+
+function ListColumn({
+  title,
+  emptyMessage,
+  children
+}: {
+  title: string;
+  emptyMessage: string;
+  children: ReactNode;
+}) {
+  const hasItems = Array.isArray(children) ? children.length > 0 : Boolean(children);
+  return (
+    <div className="glass-card p-4 md:p-5">
+      <div className="mb-3">
+        <h2 className="panel-title">{title}</h2>
+      </div>
+      <div className="flex flex-col gap-2.5">
+        {!hasItems && <div className="text-sm text-muted">{emptyMessage}</div>}
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function ActionLink({
+  to,
+  children,
+  icon,
+  primary = false
+}: {
+  to: string;
+  children: ReactNode;
+  icon: ReactNode;
+  primary?: boolean;
+}) {
+  if (primary) {
+    return (
+      <Link
+        to={to}
+        className="fab-create justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+      >
+        {icon}
+        {children}
+      </Link>
+    );
+  }
+
+  return (
+    <Link
+      to={to}
+      className="list-row group text-sm font-medium text-text-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+    >
+      <span className="inline-flex items-center gap-2">
+        <span className="text-muted transition group-hover:text-accent-ink">{icon}</span>
+        <span className="group-hover:text-text">{children}</span>
+      </span>
+      <ChevronRight className="h-4 w-4 text-muted transition group-hover:text-accent-ink" />
+    </Link>
   );
 }
