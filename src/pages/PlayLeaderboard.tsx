@@ -192,7 +192,7 @@ export function PlayLeaderboardPage() {
             Returning to game…
           </div>
         )}
-        <div className="play-panel mb-4 rounded-sm px-3 py-3">
+        <div className="mb-4 border-b border-border/60 px-1 pb-3">
           <div className="flex items-start justify-between gap-4">
             <div>
               <div className="text-xs font-medium text-muted">Event Code</div>
@@ -213,6 +213,7 @@ export function PlayLeaderboardPage() {
               </button>
               {!fromHost && (
                 <SecondaryButton
+                  className="play-touch h-10 rounded-md"
                   onClick={() =>
                     navigate(
                       `/play/${data.event.public_code}`
@@ -259,7 +260,7 @@ export function PlayLeaderboardPage() {
           </div>
 
           <div className="hidden landscape:block">
-            <div className="overflow-x-auto rounded-sm border border-border bg-panel2">
+            <div className="overflow-x-auto border border-border bg-panel2">
               <table className="min-w-full text-left text-sm">
                 <thead className="bg-panel3/70">
                   <tr>

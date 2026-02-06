@@ -664,7 +664,7 @@ export function PlayEventPage() {
       <div className="play-chip">Waiting room</div>
       <PromptHero>{waitingMessage || 'Stand by for the next round.'}</PromptHero>
       {waitingShowNextRound && nextRound && (
-        <div className="play-panel rounded-sm px-3 py-2 text-sm text-muted">
+        <div className="text-sm text-muted">
           Up next: Round {nextRound.round_number}
           {nextRound.label ? ` — ${nextRound.label}` : ''}
         </div>
@@ -1154,7 +1154,7 @@ export function PlayEventPage() {
                 </div>
               )}
               {data.live?.reveal_answer && (speedRoundMode ? (data.speed_round_answers ?? []).length > 0 : Boolean(answerText)) && (
-                <div className="play-panel-strong w-full max-w-4xl rounded-md px-4 py-4 text-center">
+                <div className="w-full max-w-4xl pt-4 text-center">
                   <div className="text-xs font-medium text-muted">
                     {speedRoundMode ? 'Answers' : 'Answer'}
                   </div>
@@ -1172,7 +1172,7 @@ export function PlayEventPage() {
                 </div>
               )}
               {data.live?.reveal_fun_fact && displayItem.fun_fact && (
-                <div className="play-panel w-full max-w-4xl rounded-md px-4 py-4 text-center">
+                <div className="w-full max-w-4xl pt-4 text-center">
                   <div className="text-xs font-medium text-muted">Factoid</div>
                   <div className="mt-2 text-lg text-text">{displayItem.fun_fact}</div>
                 </div>
@@ -1192,7 +1192,7 @@ export function PlayEventPage() {
               {data.leaderboard.map((entry, index) => (
                 <div
                   key={entry.team_id}
-                  className={`play-list-row rounded-none border-x-0 border-t-0 first:border-t ${
+                  className={`play-list-row ${
                     teamId && entry.team_id === teamId ? 'text-accent-ink' : 'text-text'
                   }`}
                 >
