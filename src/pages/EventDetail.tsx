@@ -543,9 +543,14 @@ export function EventDetailPage() {
   const [editingTeamId, setEditingTeamId] = useState<string | null>(null);
   const [editingTeamName, setEditingTeamName] = useState('');
   const [editingTeamTable, setEditingTeamTable] = useState('');
+  const [teamEditState, setTeamEditState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [teamEditError, setTeamEditError] = useState<string | null>(null);
   const [scoreRoundId, setScoreRoundId] = useState('');
   const [scoreMap, setScoreMap] = useState<Record<string, number>>({});
+  const [scoreMapBaseline, setScoreMapBaseline] = useState<Record<string, number>>({});
+  const [scoreBaselineRoundId, setScoreBaselineRoundId] = useState('');
+  const [scoreSaveState, setScoreSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [scoreSaveError, setScoreSaveError] = useState<string | null>(null);
   const [scoreLoading, setScoreLoading] = useState(false);
   const [qrUrl, setQrUrl] = useState<string | null>(null);
   const [qrLoading, setQrLoading] = useState(false);
@@ -554,6 +559,8 @@ export function EventDetailPage() {
   const [expandedRoundId, setExpandedRoundId] = useState<string | null>(null);
   const [draggedRoundId, setDraggedRoundId] = useState<string | null>(null);
   const [scoresheetTitles, setScoresheetTitles] = useState<Record<string, string>>({});
+  const [scoresheetSaveState, setScoresheetSaveState] = useState<Record<string, 'idle' | 'saving' | 'saved' | 'error'>>({});
+  const [scoresheetSaveError, setScoresheetSaveError] = useState<Record<string, string>>({});
   const [roundSyncingId, setRoundSyncingId] = useState<string | null>(null);
   const [roundSyncMessage, setRoundSyncMessage] = useState<Record<string, string>>({});
   const [roundSyncError, setRoundSyncError] = useState<Record<string, string>>({});
@@ -569,9 +576,12 @@ export function EventDetailPage() {
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
   const [titleSaving, setTitleSaving] = useState(false);
+  const [titleSaveState, setTitleSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [titleError, setTitleError] = useState<string | null>(null);
   const [startsAtLocal, setStartsAtLocal] = useState('');
   const [startsAtError, setStartsAtError] = useState<string | null>(null);
+  const [settingsSaveState, setSettingsSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [settingsSaveError, setSettingsSaveError] = useState<string | null>(null);
   const scoresheetInputId = useId();
   const answersheetInputId = useId();
   const documentMenuRef = useRef<HTMLDivElement | null>(null);
@@ -678,6 +688,81 @@ export function EventDetailPage() {
     setStartsAtLocal(localValue);
   }, [event?.starts_at]);
 
+  const parsedStartsAt = useMemo(() => {
+    if (!startsAtLocal) {
+      return { valid: true, iso: event?.starts_at ?? '' };
+    }
+    const parsed = new Date(startsAtLocal);
+    if (Number.isNaN(parsed.getTime())) {
+      return { valid: false, iso: event?.starts_at ?? '' };
+    }
+    return { valid: true, iso: parsed.toISOString() };
+  }, [startsAtLocal, event?.starts_at]);
+
+  const eventSettingsDraft = useMemo(
+    () => ({
+      status,
+      event_type: eventType,
+      notes,
+      starts_at: parsedStartsAt.iso || event?.starts_at || '',
+      location_id: locationId || null,
+      host_user_id: hostUserId || null
+    }),
+    [status, eventType, notes, parsedStartsAt.iso, locationId, hostUserId, event?.starts_at]
+  );
+
+  const eventSettingsSaved = useMemo(
+    () =>
+      event
+        ? {
+            status: event.status,
+            event_type: event.event_type ?? 'Pub Trivia',
+            notes: event.notes ?? '',
+            starts_at: event.starts_at,
+            location_id: event.location_id ?? null,
+            host_user_id: event.host_user_id ?? null
+          }
+        : null,
+    [event]
+  );
+
+  const eventSettingsDirty = useMemo(() => {
+    if (!eventSettingsSaved) return false;
+    return JSON.stringify(eventSettingsDraft) !== JSON.stringify(eventSettingsSaved);
+  }, [eventSettingsDraft, eventSettingsSaved]);
+
+  useEffect(() => {
+    if (!eventId || !event) return;
+    if (!eventSettingsDirty) return;
+    if (!parsedStartsAt.valid) {
+      setStartsAtError('Invalid date/time.');
+      setSettingsSaveState('error');
+      setSettingsSaveError('Fix the date/time to continue.');
+      return;
+    }
+    setStartsAtError(null);
+    setSettingsSaveState('saving');
+    setSettingsSaveError(null);
+    const timeout = window.setTimeout(async () => {
+      const res = await api.updateEvent(eventId, eventSettingsDraft);
+      if (res.ok) {
+        setEvent(res.data);
+        setSettingsSaveState('saved');
+        setSettingsSaveError(null);
+      } else {
+        setSettingsSaveState('error');
+        setSettingsSaveError(formatApiError(res, 'Auto-save failed.'));
+      }
+    }, 700);
+    return () => window.clearTimeout(timeout);
+  }, [eventId, event, eventSettingsDraft, eventSettingsDirty, parsedStartsAt.valid]);
+
+  useEffect(() => {
+    if (settingsSaveState !== 'saved') return;
+    const timeout = window.setTimeout(() => setSettingsSaveState('idle'), 1400);
+    return () => window.clearTimeout(timeout);
+  }, [settingsSaveState]);
+
   useEffect(() => {
     setScoresheetTitles((prev) => {
       const next = { ...prev };
@@ -731,24 +816,44 @@ export function EventDetailPage() {
     }
   };
 
-  const saveEventTitle = async () => {
+  const saveEventTitle = async (closeEditor = true) => {
     if (!eventId) return;
     const nextTitle = titleDraft.trim();
     if (!nextTitle) {
       setTitleError('Title cannot be empty.');
+      setTitleSaveState('error');
       return;
     }
     setTitleSaving(true);
+    setTitleSaveState('saving');
     setTitleError(null);
     const res = await api.updateEvent(eventId, { title: nextTitle });
     if (res.ok) {
       setEvent(res.data);
-      setEditingTitle(false);
+      if (closeEditor) setEditingTitle(false);
+      setTitleSaveState('saved');
     } else {
       setTitleError(formatApiError(res, 'Failed to update title.'));
+      setTitleSaveState('error');
     }
     setTitleSaving(false);
   };
+
+  useEffect(() => {
+    if (!editingTitle || !eventId || !event) return;
+    const nextTitle = titleDraft.trim();
+    if (!nextTitle || nextTitle === event.title) return;
+    const timeout = window.setTimeout(() => {
+      saveEventTitle(false);
+    }, 700);
+    return () => window.clearTimeout(timeout);
+  }, [editingTitle, eventId, event, titleDraft]);
+
+  useEffect(() => {
+    if (titleSaveState !== 'saved') return;
+    const timeout = window.setTimeout(() => setTitleSaveState('idle'), 1400);
+    return () => window.clearTimeout(timeout);
+  }, [titleSaveState]);
 
   useEffect(() => {
     if (!publicUrl) return;
@@ -817,25 +922,6 @@ export function EventDetailPage() {
     };
   };
 
-  const updateEvent = async () => {
-    if (!eventId) return;
-    const startsAtIso = startsAtLocal ? new Date(startsAtLocal) : null;
-    if (startsAtLocal && (!startsAtIso || Number.isNaN(startsAtIso.getTime()))) {
-      setStartsAtError('Invalid date/time.');
-      return;
-    }
-    setStartsAtError(null);
-    const res = await api.updateEvent(eventId, {
-      status,
-      event_type: eventType,
-      notes,
-      starts_at: startsAtIso ? startsAtIso.toISOString() : event?.starts_at,
-      location_id: locationId || null,
-      host_user_id: hostUserId || null
-    });
-    if (res.ok) setEvent(res.data);
-  };
-
   const createRound = async () => {
     if (!eventId || !roundGameId || !roundEditionId) return;
     const edition = editionById[roundEditionId];
@@ -858,10 +944,19 @@ export function EventDetailPage() {
   const saveScoresheetTitle = async (round: EventRound) => {
     const rawTitle = scoresheetTitles[round.id];
     const nextTitle = rawTitle?.trim() || round.label;
+    setScoresheetSaveState((prev) => ({ ...prev, [round.id]: 'saving' }));
+    setScoresheetSaveError((prev) => ({ ...prev, [round.id]: '' }));
     const res = await api.updateEventRound(round.id, { scoresheet_title: nextTitle });
     if (res.ok) {
       setRounds((prev) => prev.map((item) => (item.id === round.id ? res.data : item)));
       setScoresheetTitles((prev) => ({ ...prev, [round.id]: res.data.scoresheet_title ?? res.data.label }));
+      setScoresheetSaveState((prev) => ({ ...prev, [round.id]: 'saved' }));
+      window.setTimeout(() => {
+        setScoresheetSaveState((prev) => ({ ...prev, [round.id]: 'idle' }));
+      }, 1200);
+    } else {
+      setScoresheetSaveState((prev) => ({ ...prev, [round.id]: 'error' }));
+      setScoresheetSaveError((prev) => ({ ...prev, [round.id]: formatApiError(res, 'Save failed.') }));
     }
   };
 
@@ -929,6 +1024,7 @@ export function EventDetailPage() {
 
   const startEditTeam = (team: Team) => {
     setTeamEditError(null);
+    setTeamEditState('idle');
     setEditingTeamId(team.id);
     setEditingTeamName(team.name ?? '');
     setEditingTeamTable(team.table_label ?? '');
@@ -936,31 +1032,73 @@ export function EventDetailPage() {
 
   const cancelEditTeam = () => {
     setTeamEditError(null);
+    setTeamEditState('idle');
     setEditingTeamId(null);
     setEditingTeamName('');
     setEditingTeamTable('');
   };
 
-  const saveEditTeam = async () => {
+  const saveEditTeam = async (closeEditor = true) => {
     if (!editingTeamId) return;
     if (!editingTeamName.trim()) {
       setTeamEditError('Team name is required.');
+      setTeamEditState('error');
       return;
     }
+    setTeamEditState('saving');
+    setTeamEditError(null);
     const res = await api.updateTeam(editingTeamId, {
       name: editingTeamName.trim(),
       table_label: editingTeamTable.trim() || null
     });
     if (res.ok) {
-      cancelEditTeam();
-      loadCore();
+      setTeams((prev) => prev.map((team) => (team.id === editingTeamId ? res.data : team)));
+      setTeamEditState('saved');
+      if (closeEditor) {
+        cancelEditTeam();
+      }
     } else {
       setTeamEditError(formatApiError(res, 'Unable to update team.'));
+      setTeamEditState('error');
     }
   };
 
+  const editingTeam = useMemo(() => {
+    if (!editingTeamId) return null;
+    return teams.find((team) => team.id === editingTeamId) ?? null;
+  }, [teams, editingTeamId]);
+
+  const teamEditDirty = useMemo(() => {
+    if (!editingTeam) return false;
+    return (
+      editingTeam.name !== editingTeamName.trim() ||
+      (editingTeam.table_label ?? '') !== (editingTeamTable.trim() || '')
+    );
+  }, [editingTeam, editingTeamName, editingTeamTable]);
+
+  useEffect(() => {
+    if (!editingTeamId || !editingTeam || !teamEditDirty) return;
+    if (!editingTeamName.trim()) {
+      setTeamEditError('Team name is required.');
+      setTeamEditState('error');
+      return;
+    }
+    const timeout = window.setTimeout(() => {
+      saveEditTeam(false);
+    }, 700);
+    return () => window.clearTimeout(timeout);
+  }, [editingTeamId, editingTeam, teamEditDirty, editingTeamName, editingTeamTable]);
+
+  useEffect(() => {
+    if (teamEditState !== 'saved') return;
+    const timeout = window.setTimeout(() => setTeamEditState('idle'), 1400);
+    return () => window.clearTimeout(timeout);
+  }, [teamEditState]);
+
   const loadScores = async (roundId: string) => {
     if (!roundId) return;
+    setScoreSaveError(null);
+    setScoreSaveState('idle');
     const res = await api.listRoundScores(roundId);
     if (res.ok) {
       const map: Record<string, number> = {};
@@ -968,19 +1106,51 @@ export function EventDetailPage() {
         map[row.team_id] = row.score;
       });
       setScoreMap(map);
+      setScoreMapBaseline(map);
+      setScoreBaselineRoundId(roundId);
     }
   };
 
   const saveScores = async () => {
     if (!scoreRoundId) return;
     setScoreLoading(true);
+    setScoreSaveState('saving');
+    setScoreSaveError(null);
     const scores = teams.map((team) => ({
       team_id: team.id,
       score: Number(scoreMap[team.id] ?? 0)
     }));
-    await api.updateRoundScores(scoreRoundId, scores);
+    const res = await api.updateRoundScores(scoreRoundId, scores);
+    if (res.ok) {
+      setScoreMapBaseline({ ...scoreMap });
+      setScoreSaveState('saved');
+    } else {
+      setScoreSaveState('error');
+      setScoreSaveError(formatApiError(res, 'Failed to save scores.'));
+    }
     setScoreLoading(false);
   };
+
+  const scoreDirty = useMemo(
+    () =>
+      scoreRoundId === scoreBaselineRoundId &&
+      teams.some((team) => Number(scoreMap[team.id] ?? 0) !== Number(scoreMapBaseline[team.id] ?? 0)),
+    [teams, scoreMap, scoreMapBaseline, scoreRoundId, scoreBaselineRoundId]
+  );
+
+  useEffect(() => {
+    if (!scoreRoundId || !scoreDirty) return;
+    const timeout = window.setTimeout(() => {
+      saveScores();
+    }, 700);
+    return () => window.clearTimeout(timeout);
+  }, [scoreRoundId, scoreDirty, scoreMap, teams]);
+
+  useEffect(() => {
+    if (scoreSaveState !== 'saved') return;
+    const timeout = window.setTimeout(() => setScoreSaveState('idle'), 1400);
+    return () => window.clearTimeout(timeout);
+  }, [scoreSaveState]);
 
   const uploadDocument = async (type: 'scoresheet' | 'answersheet', file: File) => {
     if (!eventId) return;
@@ -1301,23 +1471,26 @@ export function EventDetailPage() {
                   >
                     <label className="flex flex-col gap-2 text-sm text-muted">
                       <span>Scoresheet title</span>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <input
-                          className="h-9 flex-1 px-2 text-xs"
-                          value={scoresheetTitles[round.id] ?? ''}
-                          onChange={(event) =>
-                            setScoresheetTitles((prev) => ({ ...prev, [round.id]: event.target.value }))
+                      <input
+                        className="h-9 flex-1 px-2 text-xs"
+                        value={scoresheetTitles[round.id] ?? ''}
+                        onChange={(event) =>
+                          setScoresheetTitles((prev) => ({ ...prev, [round.id]: event.target.value }))
+                        }
+                        onBlur={() => saveScoresheetTitle(round)}
+                        onKeyDown={(event) => {
+                          event.stopPropagation();
+                          if (event.key === 'Enter') {
+                            event.currentTarget.blur();
                           }
-                          onKeyDown={(event) => {
-                            event.stopPropagation();
-                          }}
-                        />
-                        <SecondaryButton
-                          className="px-3 py-2 text-xs"
-                          onClick={() => saveScoresheetTitle(round)}
-                        >
-                          Save
-                        </SecondaryButton>
+                        }}
+                      />
+                      <div className="text-xs" aria-live="polite">
+                        {scoresheetSaveState[round.id] === 'saving' && <span className="text-muted">Saving…</span>}
+                        {scoresheetSaveState[round.id] === 'saved' && <span className="text-accent-ink">Saved</span>}
+                        {scoresheetSaveState[round.id] === 'error' && (
+                          <span className="text-danger-ink">{scoresheetSaveError[round.id] || 'Save failed.'}</span>
+                        )}
                       </div>
                     </label>
                   </div>
@@ -1392,6 +1565,13 @@ export function EventDetailPage() {
                         className="h-10 px-3"
                         value={editingTeamName}
                         onChange={(event) => setEditingTeamName(event.target.value)}
+                        onBlur={() => saveEditTeam(false)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') {
+                            event.preventDefault();
+                            saveEditTeam(false);
+                          }
+                        }}
                       />
                     </label>
                     <label className="flex flex-col gap-1 text-sm text-muted">
@@ -1400,6 +1580,13 @@ export function EventDetailPage() {
                         className="h-10 px-3"
                         value={editingTeamTable}
                         onChange={(event) => setEditingTeamTable(event.target.value)}
+                        onBlur={() => saveEditTeam(false)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter') {
+                            event.preventDefault();
+                            saveEditTeam(false);
+                          }
+                        }}
                       />
                     </label>
                   </div>
@@ -1408,15 +1595,16 @@ export function EventDetailPage() {
                     <div className="text-xs text-muted">Status: Unclaimed</div>
                   ) : null}
                   <div className="flex flex-wrap gap-2">
-                    <PrimaryButton className="px-3 py-2 text-xs" onClick={saveEditTeam}>
-                      Save
-                    </PrimaryButton>
                     <SecondaryButton className="px-3 py-2 text-xs" onClick={cancelEditTeam}>
-                      Cancel
+                      Close
                     </SecondaryButton>
                     <DangerButton className="px-3 py-2 text-xs" onClick={() => deleteTeam(team.id)}>
                       Remove
                     </DangerButton>
+                    <div className="text-xs" aria-live="polite">
+                      {teamEditState === 'saving' && <span className="text-muted">Saving…</span>}
+                      {teamEditState === 'saved' && <span className="text-accent-ink">Saved</span>}
+                    </div>
                   </div>
                 </>
               ) : (
@@ -1539,9 +1727,11 @@ export function EventDetailPage() {
         </List>
       )}
       <div className="flex justify-end">
-        <PrimaryButton onClick={saveScores} disabled={!scoreRoundId || scoreLoading}>
-          {scoreLoading ? 'Saving' : 'Save scores'}
-        </PrimaryButton>
+        <div className="text-xs" aria-live="polite">
+          {scoreSaveState === 'saving' && <span className="text-muted">Saving changes…</span>}
+          {scoreSaveState === 'saved' && <span className="text-accent-ink">All changes saved.</span>}
+          {scoreSaveState === 'error' && <span className="text-danger-ink">{scoreSaveError ?? 'Save failed.'}</span>}
+        </div>
       </div>
     </div>
   );
@@ -1799,7 +1989,13 @@ export function EventDetailPage() {
           />
         </label>
       </div>
-      <SecondaryButton onClick={updateEvent}>Update Event</SecondaryButton>
+      <div aria-live="polite" className="text-xs">
+        {settingsSaveState === 'saving' && <span className="text-muted">Saving changes…</span>}
+        {settingsSaveState === 'saved' && <span className="text-accent-ink">All changes saved.</span>}
+        {settingsSaveState === 'error' && (
+          <span className="text-danger-ink">{settingsSaveError ?? 'Auto-save failed.'}</span>
+        )}
+      </div>
       <div className="border-t border-border pt-4">
         <div className="text-sm font-medium text-danger-ink">Danger zone</div>
         <div className="mt-2 text-xs text-muted">Deleting an event cannot be undone.</div>
@@ -1843,6 +2039,11 @@ export function EventDetailPage() {
                     className="h-10 w-full px-3"
                     value={titleDraft}
                     onChange={(event) => setTitleDraft(event.target.value)}
+                    onBlur={() => {
+                      if (titleDraft.trim() && titleDraft.trim() !== event.title) {
+                        saveEventTitle();
+                      }
+                    }}
                     onKeyDown={(event) => {
                       if (event.key === 'Enter') {
                         event.preventDefault();
@@ -1858,9 +2059,6 @@ export function EventDetailPage() {
                     autoFocus
                   />
                   <div className="flex flex-wrap items-center gap-2">
-                    <SecondaryButton onClick={saveEventTitle} disabled={titleSaving}>
-                      {titleSaving ? 'Saving…' : 'Save title'}
-                    </SecondaryButton>
                     <SecondaryButton
                       onClick={() => {
                         setEditingTitle(false);
@@ -1870,6 +2068,10 @@ export function EventDetailPage() {
                     >
                       Cancel
                     </SecondaryButton>
+                    <span className="text-xs" aria-live="polite">
+                      {titleSaveState === 'saving' && <span className="text-muted">Saving…</span>}
+                      {titleSaveState === 'saved' && <span className="text-accent-ink">Saved</span>}
+                    </span>
                     {titleError && <span className="text-xs text-danger-ink">{titleError}</span>}
                   </div>
                 </div>

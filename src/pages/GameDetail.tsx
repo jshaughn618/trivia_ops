@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api, formatApiError } from '../api';
 import { AI_ICON } from '../lib/ai';
 import { AppShell } from '../components/AppShell';
 import { Panel } from '../components/Panel';
-import { PrimaryButton, SecondaryButton, DangerButton } from '../components/Buttons';
+import { SecondaryButton, DangerButton } from '../components/Buttons';
 import type { Game, GameEdition, GameType } from '../types';
 
 export function GameDetailPage() {
@@ -27,6 +27,7 @@ export function GameDetailPage() {
   const [showTheme, setShowTheme] = useState(true);
   const [descLoading, setDescLoading] = useState(false);
   const [descError, setDescError] = useState<string | null>(null);
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [updateError, setUpdateError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -52,24 +53,79 @@ export function GameDetailPage() {
     load();
   }, [gameId]);
 
-  const handleUpdate = async () => {
-    if (!gameId) return;
-    setUpdateError(null);
-    const res = await api.updateGame(gameId, {
+  const gameDraft = useMemo(
+    () => ({
       name,
-      game_code: gameCode.trim() || null,
+      game_code: gameCode.trim() || '',
       description,
       game_type_id: gameTypeId,
-      subtype: subtype.trim() || null,
-      show_theme: showTheme
-    });
-    if (res.ok) {
-      setGame(res.data);
-      setUpdateError(null);
-    } else {
-      setUpdateError(formatApiError(res, 'Failed to update game.'));
+      subtype: subtype.trim() || '',
+      show_theme: showTheme ? 1 : 0
+    }),
+    [name, gameCode, description, gameTypeId, subtype, showTheme]
+  );
+
+  const gameSaved = useMemo(
+    () =>
+      game
+        ? {
+            name: game.name,
+            game_code: game.game_code ?? '',
+            description: game.description ?? '',
+            game_type_id: game.game_type_id,
+            subtype: game.subtype ?? '',
+            show_theme: game.show_theme ? 1 : 0
+          }
+        : null,
+    [game]
+  );
+
+  const gameDirty = useMemo(() => {
+    if (!gameSaved) return false;
+    return JSON.stringify(gameDraft) !== JSON.stringify(gameSaved);
+  }, [gameDraft, gameSaved]);
+
+  useEffect(() => {
+    if (!gameId || !game) return;
+    if (!gameDirty) return;
+    if (!name.trim()) {
+      setSaveState('error');
+      setUpdateError('Name is required.');
+      return;
     }
-  };
+    if (!gameTypeId) {
+      setSaveState('error');
+      setUpdateError('Game type is required.');
+      return;
+    }
+    setSaveState('saving');
+    setUpdateError(null);
+    const timeout = window.setTimeout(async () => {
+      const res = await api.updateGame(gameId, {
+        name,
+        game_code: gameCode.trim() || null,
+        description,
+        game_type_id: gameTypeId,
+        subtype: subtype.trim() || null,
+        show_theme: showTheme
+      });
+      if (res.ok) {
+        setGame(res.data);
+        setSaveState('saved');
+        setUpdateError(null);
+      } else {
+        setSaveState('error');
+        setUpdateError(formatApiError(res, 'Auto-save failed.'));
+      }
+    }, 600);
+    return () => window.clearTimeout(timeout);
+  }, [gameId, game, gameDirty, name, gameCode, description, gameTypeId, subtype, showTheme]);
+
+  useEffect(() => {
+    if (saveState !== 'saved') return;
+    const timeout = window.setTimeout(() => setSaveState('idle'), 1400);
+    return () => window.clearTimeout(timeout);
+  }, [saveState]);
 
   const generateDescription = async () => {
     if (!name.trim() && editions.length === 0) return;
@@ -189,9 +245,12 @@ export function GameDetailPage() {
               </div>
             )}
             <div className="flex flex-wrap items-center gap-2">
-              <PrimaryButton onClick={handleUpdate}>Update</PrimaryButton>
               <DangerButton onClick={handleDelete}>Delete</DangerButton>
               <SecondaryButton onClick={() => navigate('/games')}>Back</SecondaryButton>
+              <div aria-live="polite" className="text-xs">
+                {saveState === 'saving' && <span className="text-muted">Saving changes…</span>}
+                {saveState === 'saved' && <span className="text-accent-ink">All changes saved.</span>}
+              </div>
             </div>
           </div>
         </Panel>

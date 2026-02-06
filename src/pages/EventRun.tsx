@@ -63,7 +63,9 @@ export function EventRunPage() {
   const [waitingMessage, setWaitingMessage] = useState('');
   const [waitingShowLeaderboard, setWaitingShowLeaderboard] = useState(false);
   const [waitingShowNextRound, setWaitingShowNextRound] = useState(true);
+  const [waitingSnapshot, setWaitingSnapshot] = useState<{ message: string; showLeaderboard: boolean; showNextRound: boolean } | null>(null);
   const [waitingSaving, setWaitingSaving] = useState(false);
+  const [waitingSaveState, setWaitingSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [waitingError, setWaitingError] = useState<string | null>(null);
   const [showFullLeaderboard, setShowFullLeaderboard] = useState(false);
   const [clearResponsesStatus, setClearResponsesStatus] = useState<'idle' | 'clearing' | 'done' | 'error'>('idle');
@@ -71,8 +73,11 @@ export function EventRunPage() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [scoresOpen, setScoresOpen] = useState(false);
   const [scoresSaving, setScoresSaving] = useState(false);
+  const [scoresSaveState, setScoresSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [scoresError, setScoresError] = useState<string | null>(null);
   const [scoreDrafts, setScoreDrafts] = useState<Record<string, string>>({});
+  const [scoreDraftBaseline, setScoreDraftBaseline] = useState<Record<string, string>>({});
+  const [scoreDraftRoundId, setScoreDraftRoundId] = useState<string | null>(null);
   const preselectRef = useRef(false);
   const auth = useAuth();
   const isAdmin = auth.user?.user_type === 'admin';
@@ -103,6 +108,12 @@ export function EventRunPage() {
         setWaitingShowNextRound(
           liveRes.data.waiting_show_next_round === undefined ? true : Boolean(liveRes.data.waiting_show_next_round)
         );
+        setWaitingSnapshot({
+          message: liveRes.data.waiting_message ?? '',
+          showLeaderboard: Boolean(liveRes.data.waiting_show_leaderboard),
+          showNextRound:
+            liveRes.data.waiting_show_next_round === undefined ? true : Boolean(liveRes.data.waiting_show_next_round)
+        });
         setShowFullLeaderboard(Boolean(liveRes.data.show_full_leaderboard));
         setTimerStartedAt(liveRes.data.timer_started_at ?? null);
         setTimerDurationSeconds(liveRes.data.timer_duration_seconds ?? 15);
@@ -485,7 +496,13 @@ export function EventRunPage() {
   const saveWaitingRoom = async () => {
     if (!eventId) return;
     setWaitingSaving(true);
+    setWaitingSaveState('saving');
     setWaitingError(null);
+    const nextSnapshot = {
+      message: waitingMessage,
+      showLeaderboard: waitingShowLeaderboard,
+      showNextRound: waitingShowNextRound
+    };
     const res = await api.updateLiveState(eventId, {
       waiting_message: waitingMessage.trim() ? waitingMessage.trim() : null,
       waiting_show_leaderboard: waitingShowLeaderboard,
@@ -495,10 +512,38 @@ export function EventRunPage() {
     });
     if (!res.ok) {
       setWaitingError(formatApiError(res, 'Failed to update waiting room.'));
+      setWaitingSaveState('error');
       logError('waiting_room_update_failed', { eventId, error: res.error });
+    } else {
+      setWaitingSnapshot(nextSnapshot);
+      setWaitingSaveState('saved');
     }
     setWaitingSaving(false);
   };
+
+  const waitingRoomDirty = useMemo(() => {
+    if (!waitingSnapshot) return false;
+    return (
+      waitingSnapshot.message !== waitingMessage ||
+      waitingSnapshot.showLeaderboard !== waitingShowLeaderboard ||
+      waitingSnapshot.showNextRound !== waitingShowNextRound
+    );
+  }, [waitingSnapshot, waitingMessage, waitingShowLeaderboard, waitingShowNextRound]);
+
+  useEffect(() => {
+    if (!eventId || !waitingSnapshot) return;
+    if (!waitingRoomDirty) return;
+    const timeout = window.setTimeout(() => {
+      saveWaitingRoom();
+    }, 700);
+    return () => window.clearTimeout(timeout);
+  }, [eventId, waitingSnapshot, waitingRoomDirty, waitingMessage, waitingShowLeaderboard, waitingShowNextRound]);
+
+  useEffect(() => {
+    if (waitingSaveState !== 'saved') return;
+    const timeout = window.setTimeout(() => setWaitingSaveState('idle'), 1400);
+    return () => window.clearTimeout(timeout);
+  }, [waitingSaveState]);
 
   const toggleFullLeaderboard = async () => {
     if (!eventId) return;
@@ -541,6 +586,8 @@ export function EventRunPage() {
     setScoresOpen(true);
     setScoresError(null);
     setScoresSaving(false);
+    setScoresSaveState('idle');
+    setScoreDraftRoundId(activeRound.id);
     const scoresRes = await api.listRoundScores(activeRound.id);
     const scores = scoresRes.ok ? (scoresRes.data as EventRoundScore[]) : [];
     const scoresByTeam = new Map(scores.map((row) => [row.team_id, row.score]));
@@ -550,6 +597,7 @@ export function EventRunPage() {
       nextDrafts[team.id] = value === undefined || value === null ? '' : String(value);
     });
     setScoreDrafts(nextDrafts);
+    setScoreDraftBaseline(nextDrafts);
     if (!scoresRes.ok) {
       setScoresError(scoresRes.error.message ?? 'Failed to load scores.');
     }
@@ -558,6 +606,7 @@ export function EventRunPage() {
   const saveScores = async () => {
     if (!activeRound) return;
     setScoresSaving(true);
+    setScoresSaveState('saving');
     setScoresError(null);
     const payload = teams.map((team) => {
       const raw = scoreDrafts[team.id];
@@ -567,11 +616,39 @@ export function EventRunPage() {
     const res = await api.updateRoundScores(activeRound.id, payload);
     if (!res.ok) {
       setScoresError(formatApiError(res, 'Failed to save scores.'));
+      setScoresSaveState('error');
     } else {
-      setScoresOpen(false);
+      const nextBaseline: Record<string, string> = {};
+      teams.forEach((team) => {
+        const raw = scoreDrafts[team.id];
+        nextBaseline[team.id] = raw ?? '';
+      });
+      setScoreDraftBaseline(nextBaseline);
+      setScoresSaveState('saved');
     }
     setScoresSaving(false);
   };
+
+  const scoresDirty = useMemo(() => {
+    if (!scoresOpen) return false;
+    if (!activeRound || scoreDraftRoundId !== activeRound.id) return false;
+    return teams.some((team) => (scoreDrafts[team.id] ?? '') !== (scoreDraftBaseline[team.id] ?? ''));
+  }, [scoresOpen, teams, scoreDrafts, scoreDraftBaseline, activeRound, scoreDraftRoundId]);
+
+  useEffect(() => {
+    if (!scoresOpen || !activeRound) return;
+    if (!scoresDirty) return;
+    const timeout = window.setTimeout(() => {
+      saveScores();
+    }, 700);
+    return () => window.clearTimeout(timeout);
+  }, [scoresOpen, activeRound, scoresDirty, scoreDrafts, teams]);
+
+  useEffect(() => {
+    if (scoresSaveState !== 'saved') return;
+    const timeout = window.setTimeout(() => setScoresSaveState('idle'), 1400);
+    return () => window.clearTimeout(timeout);
+  }, [scoresSaveState]);
 
   const startTimer = async () => {
     if (!eventId || !activeRound) return;
@@ -941,14 +1018,15 @@ export function EventRunPage() {
                   {waitingError}
                 </div>
               )}
+              <div className="text-xs" aria-live="polite">
+                {waitingSaveState === 'saving' && <span className="text-muted">Saving changes…</span>}
+                {waitingSaveState === 'saved' && <span className="text-accent-ink">All changes saved.</span>}
+              </div>
               {waitingShowLeaderboard && (
                 <SecondaryButton className="h-11" onClick={() => window.open(`/events/${eventId}/leaderboard`, '_blank')}>
                   View Full Leaderboard
                 </SecondaryButton>
               )}
-              <PrimaryButton className="h-11" onClick={saveWaitingRoom} disabled={waitingSaving}>
-                {waitingSaving ? 'Updating…' : 'Update Waiting Room'}
-              </PrimaryButton>
             </div>
           </AccordionSection>
           <AccordionSection title="Round Control" defaultOpen>
@@ -1007,10 +1085,11 @@ export function EventRunPage() {
               )}
             </div>
             <div className="mt-4 flex items-center justify-end gap-2">
-              <SecondaryButton onClick={() => setScoresOpen(false)}>Cancel</SecondaryButton>
-              <PrimaryButton onClick={saveScores} disabled={scoresSaving || teams.length === 0}>
-                {scoresSaving ? 'Saving…' : 'Save Scores'}
-              </PrimaryButton>
+              <div className="mr-auto text-xs" aria-live="polite">
+                {scoresSaveState === 'saving' && <span className="text-muted">Saving changes…</span>}
+                {scoresSaveState === 'saved' && <span className="text-accent-ink">All changes saved.</span>}
+              </div>
+              <SecondaryButton onClick={() => setScoresOpen(false)}>Close</SecondaryButton>
             </div>
           </div>
         </div>

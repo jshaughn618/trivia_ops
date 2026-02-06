@@ -1,9 +1,9 @@
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api, formatApiError } from '../api';
 import { AppShell } from '../components/AppShell';
 import { Panel } from '../components/Panel';
-import { PrimaryButton, SecondaryButton, DangerButton } from '../components/Buttons';
+import { SecondaryButton, DangerButton } from '../components/Buttons';
 import type { Location } from '../types';
 
 export function LocationDetailPage() {
@@ -17,6 +17,8 @@ export function LocationDetailPage() {
   const [notes, setNotes] = useState('');
   const [logoUploading, setLogoUploading] = useState(false);
   const [logoError, setLogoError] = useState<string | null>(null);
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [saveError, setSaveError] = useState<string | null>(null);
   const logoInputId = useId();
 
   useEffect(() => {
@@ -35,17 +37,71 @@ export function LocationDetailPage() {
     load();
   }, [locationId]);
 
-  const handleUpdate = async () => {
-    if (!locationId) return;
-    const res = await api.updateLocation(locationId, {
+  const locationDraft = useMemo(
+    () => ({
       name,
       address,
       city,
       state,
       notes
-    });
-    if (res.ok) setLocation(res.data);
-  };
+    }),
+    [name, address, city, state, notes]
+  );
+
+  const locationSaved = useMemo(
+    () =>
+      location
+        ? {
+            name: location.name,
+            address: location.address ?? '',
+            city: location.city ?? '',
+            state: location.state ?? '',
+            notes: location.notes ?? ''
+          }
+        : null,
+    [location]
+  );
+
+  const locationDirty = useMemo(() => {
+    if (!locationSaved) return false;
+    return JSON.stringify(locationDraft) !== JSON.stringify(locationSaved);
+  }, [locationDraft, locationSaved]);
+
+  useEffect(() => {
+    if (!locationId || !location) return;
+    if (!locationDirty) return;
+    if (!name.trim()) {
+      setSaveState('error');
+      setSaveError('Name is required.');
+      return;
+    }
+    setSaveState('saving');
+    setSaveError(null);
+    const timeout = window.setTimeout(async () => {
+      const res = await api.updateLocation(locationId, {
+        name,
+        address,
+        city,
+        state,
+        notes
+      });
+      if (res.ok) {
+        setLocation(res.data);
+        setSaveState('saved');
+        setSaveError(null);
+      } else {
+        setSaveState('error');
+        setSaveError(formatApiError(res, 'Auto-save failed.'));
+      }
+    }, 600);
+    return () => window.clearTimeout(timeout);
+  }, [locationId, location, locationDirty, name, address, city, state, notes]);
+
+  useEffect(() => {
+    if (saveState !== 'saved') return;
+    const timeout = window.setTimeout(() => setSaveState('idle'), 1400);
+    return () => window.clearTimeout(timeout);
+  }, [saveState]);
 
   const handleDelete = async () => {
     if (!locationId) return;
@@ -163,10 +219,18 @@ export function LocationDetailPage() {
             Notes
             <textarea className="min-h-[100px] px-3 py-2" value={notes} onChange={(event) => setNotes(event.target.value)} />
           </label>
+          {saveError && (
+            <div className="border border-danger bg-panel2 px-3 py-2 text-xs text-danger-ink">
+              {saveError}
+            </div>
+          )}
           <div className="flex flex-wrap items-center gap-2">
-            <PrimaryButton onClick={handleUpdate}>Update</PrimaryButton>
             <DangerButton onClick={handleDelete}>Delete</DangerButton>
             <SecondaryButton onClick={() => navigate('/locations')}>Back</SecondaryButton>
+            <div aria-live="polite" className="text-xs">
+              {saveState === 'saving' && <span className="text-muted">Saving changes…</span>}
+              {saveState === 'saved' && <span className="text-accent-ink">All changes saved.</span>}
+            </div>
           </div>
         </div>
       </Panel>

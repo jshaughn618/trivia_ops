@@ -165,6 +165,8 @@ export function EditionDetailPage() {
   const [speedRoundError, setSpeedRoundError] = useState<string | null>(null);
   const [speedRoundResult, setSpeedRoundResult] = useState<string | null>(null);
   const [speedRoundInstructions, setSpeedRoundInstructions] = useState('');
+  const [infoSaveState, setInfoSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [infoSaveError, setInfoSaveError] = useState<string | null>(null);
   const [activeItemId, setActiveItemId] = useState<string | null>(null);
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [itemMenuId, setItemMenuId] = useState<string | null>(null);
@@ -268,22 +270,108 @@ export function EditionDetailPage() {
     return { normalized, hasGap };
   };
 
-  const handleEditionUpdate = async () => {
-    if (!editionId || !gameId) return;
-    const parsedNumber = Number(editionNumber);
-    const editionNumberValue = Number.isFinite(parsedNumber) && parsedNumber > 0 ? parsedNumber : null;
-    const res = await api.updateEdition(editionId, {
+  const parsedEditionNumber = useMemo(() => {
+    const parsed = Number(editionNumber);
+    return Number.isFinite(parsed) && parsed > 0 ? Math.trunc(parsed) : null;
+  }, [editionNumber]);
+
+  const timerSecondsValid = Number.isFinite(timerSeconds) && timerSeconds >= 5 && timerSeconds <= 600;
+
+  const editionInfoDraft = useMemo(
+    () => ({
       title: theme,
       status,
       tags_csv: tags,
       theme,
       description,
-      edition_number: editionNumberValue,
+      edition_number: parsedEditionNumber,
       game_id: gameId,
-      timer_seconds: timerSeconds
-    });
-    if (res.ok) setEdition(res.data);
-  };
+      timer_seconds: timerSecondsValid ? Math.trunc(timerSeconds) : null
+    }),
+    [theme, status, tags, description, parsedEditionNumber, gameId, timerSeconds, timerSecondsValid]
+  );
+
+  const editionInfoSaved = useMemo(
+    () =>
+      edition
+        ? {
+            title: edition.theme ?? '',
+            status: edition.status,
+            tags_csv: edition.tags_csv ?? '',
+            theme: edition.theme ?? '',
+            description: edition.description ?? '',
+            edition_number: edition.edition_number ?? null,
+            game_id: edition.game_id,
+            timer_seconds: edition.timer_seconds ?? 15
+          }
+        : null,
+    [edition]
+  );
+
+  const editionInfoDirty = useMemo(() => {
+    if (!editionInfoSaved) return false;
+    const comparableDraft = {
+      ...editionInfoDraft,
+      timer_seconds: editionInfoDraft.timer_seconds ?? editionInfoSaved.timer_seconds
+    };
+    return JSON.stringify(comparableDraft) !== JSON.stringify(editionInfoSaved);
+  }, [editionInfoDraft, editionInfoSaved]);
+
+  useEffect(() => {
+    if (!editionId || !edition) return;
+    if (!editionInfoDirty) return;
+    if (!gameId) {
+      setInfoSaveState('error');
+      setInfoSaveError('Select a game to continue.');
+      return;
+    }
+    if (!timerSecondsValid) {
+      setInfoSaveState('error');
+      setInfoSaveError('Timer seconds must be between 5 and 600.');
+      return;
+    }
+    setInfoSaveState('saving');
+    setInfoSaveError(null);
+    const timeout = window.setTimeout(async () => {
+      const res = await api.updateEdition(editionId, {
+        title: theme,
+        status,
+        tags_csv: tags,
+        theme,
+        description,
+        edition_number: parsedEditionNumber,
+        game_id: gameId,
+        timer_seconds: Math.trunc(timerSeconds)
+      });
+      if (res.ok) {
+        setEdition(res.data);
+        setInfoSaveState('saved');
+        setInfoSaveError(null);
+      } else {
+        setInfoSaveState('error');
+        setInfoSaveError(formatApiError(res, 'Auto-save failed.'));
+      }
+    }, 700);
+    return () => window.clearTimeout(timeout);
+  }, [
+    editionId,
+    edition,
+    editionInfoDirty,
+    gameId,
+    timerSecondsValid,
+    theme,
+    status,
+    tags,
+    description,
+    parsedEditionNumber,
+    timerSeconds
+  ]);
+
+  useEffect(() => {
+    if (infoSaveState !== 'saved') return;
+    const timeout = window.setTimeout(() => setInfoSaveState('idle'), 1400);
+    return () => window.clearTimeout(timeout);
+  }, [infoSaveState]);
 
   const handleDeleteEdition = async () => {
     if (!editionId) return;
@@ -2999,9 +3087,15 @@ export function EditionDetailPage() {
               />
             </label>
             <div className="flex flex-wrap items-center gap-2">
-              <PrimaryButton onClick={handleEditionUpdate}>Update</PrimaryButton>
               <DangerButton onClick={handleDeleteEdition}>Delete</DangerButton>
               <SecondaryButton onClick={() => navigate('/editions')}>Back</SecondaryButton>
+              <div aria-live="polite" className="text-xs">
+                {infoSaveState === 'saving' && <span className="text-muted">Saving changes…</span>}
+                {infoSaveState === 'saved' && <span className="text-accent-ink">All changes saved.</span>}
+                {infoSaveState === 'error' && (
+                  <span className="text-danger-ink">{infoSaveError ?? 'Auto-save failed.'}</span>
+                )}
+              </div>
             </div>
             </div>
           )}
