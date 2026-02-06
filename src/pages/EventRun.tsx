@@ -184,18 +184,57 @@ export function EventRunPage() {
   };
 
   const activeRound = useMemo(() => rounds.find((round) => round.id === roundId) ?? null, [rounds, roundId]);
+  const activeEdition = activeRound ? editionById[activeRound.edition_id] : null;
+  const activeGame = activeEdition ? gameById[activeEdition.game_id] : null;
+  const isSpeedRoundMode = activeGame?.subtype === 'speed_round';
   const item = items[index];
   const isAudioItem = item?.media_type === 'audio';
   const isImageItem = item?.media_type === 'image';
   const roundAudioKey = activeRound?.edition_audio_key ?? activeRound?.audio_key ?? null;
   const roundAudioName = activeRound?.edition_audio_name ?? activeRound?.audio_name ?? null;
-  const effectiveAudioKey = isAudioItem ? item?.media_key ?? roundAudioKey : null;
-  const usesRoundAudio = isAudioItem && !item?.media_key && Boolean(roundAudioKey);
+  const effectiveAudioKey = isSpeedRoundMode ? roundAudioKey : isAudioItem ? item?.media_key ?? roundAudioKey : null;
+  const usesRoundAudio = isSpeedRoundMode
+    ? Boolean(roundAudioKey)
+    : isAudioItem && !item?.media_key && Boolean(roundAudioKey);
+  const speedRoundPrompt = 'Play the clip and collect answers before reveal.';
   const questionLabel = item?.prompt?.trim()
-    ? item.prompt
+    ? isSpeedRoundMode ? speedRoundPrompt : item.prompt
     : item?.media_type === 'audio'
       ? 'Listen to the clip.'
-      : item?.prompt ?? '';
+      : isSpeedRoundMode
+        ? speedRoundPrompt
+        : item?.prompt ?? '';
+
+  const speedRoundAnswerLines = useMemo(() => {
+    if (!isSpeedRoundMode) return [];
+    const byOrdinal = [...items].sort((a, b) => a.ordinal - b.ordinal);
+    return byOrdinal.map((entry, idx) => {
+      const answerParts = parseAnswerParts(entry.answer_parts_json);
+      const songPart = answerParts.find((part) => part.label.toLowerCase().includes('song'))?.answer?.trim();
+      const artistPart = answerParts.find((part) => {
+        const label = part.label.toLowerCase();
+        return label.includes('artist') && !label.includes('original');
+      })?.answer?.trim();
+      if (songPart && artistPart) return `${idx + 1}. ${songPart} - ${artistPart}`;
+      if (songPart) return `${idx + 1}. ${songPart}`;
+      if (entry.answer?.trim()) {
+        const segments = entry.answer
+          .split(' - ')
+          .map((value) => value.trim())
+          .filter(Boolean);
+        if (segments.length >= 2) {
+          return `${idx + 1}. ${segments[1]} - ${segments[0]}`;
+        }
+        return `${idx + 1}. ${entry.answer.trim()}`;
+      }
+      return `${idx + 1}. ${entry.answer_a?.trim() || entry.answer_b?.trim() || 'Answer missing'}`;
+    });
+  }, [isSpeedRoundMode, items]);
+
+  useEffect(() => {
+    if (!isSpeedRoundMode || index === 0) return;
+    setIndex(0);
+  }, [isSpeedRoundMode, index]);
 
   useEffect(() => {
     setTimerDurationSeconds(activeRound?.timer_seconds ?? 15);
@@ -561,7 +600,7 @@ export function EventRunPage() {
                     variant={activeRound.status === 'live' ? 'approved' : 'inspected'}
                   />
                   <div className="text-xs tabular-nums text-muted">
-                    Item {items.length === 0 ? 0 : index + 1} / {items.length}
+                    {isSpeedRoundMode ? `Songs ${items.length}` : `Item ${items.length === 0 ? 0 : index + 1} / ${items.length}`}
                   </div>
                 </div>
               </div>
@@ -569,7 +608,9 @@ export function EventRunPage() {
                 <div className="surface-inset p-5">
                   <div className="flex items-center justify-between gap-3">
                     <div className="ui-label">
-                      {item.media_type === 'audio'
+                      {isSpeedRoundMode
+                        ? 'Speed round clip'
+                        : item.media_type === 'audio'
                         ? `Clip ${index + 1}`
                         : item.media_type === 'image'
                           ? `Image ${index + 1}`
@@ -595,7 +636,7 @@ export function EventRunPage() {
                       />
                     </div>
                   )}
-                  {item.media_type === 'audio' && effectiveAudioKey && (
+                  {(isSpeedRoundMode || item.media_type === 'audio') && effectiveAudioKey && (
                     <div className="mt-4 flex flex-col gap-2">
                       {usesRoundAudio && (
                         <div className="ui-label">
@@ -630,7 +671,7 @@ export function EventRunPage() {
                       )}
                     </div>
                   )}
-                  {item.media_type === 'audio' && !effectiveAudioKey && (
+                  {(isSpeedRoundMode || item.media_type === 'audio') && !effectiveAudioKey && (
                     <div className="mt-4 rounded-lg border border-danger bg-panel px-3 py-2 text-sm text-danger-ink">
                       No audio clip attached to this edition.
                     </div>
@@ -644,7 +685,17 @@ export function EventRunPage() {
                   {showAnswer && (
                     <div className="surface-inset p-5">
                       <div className="ui-label">Answer</div>
-                      {(() => {
+                      {isSpeedRoundMode ? (
+                        <div className="mt-2 flex flex-col gap-1.5 text-sm font-semibold leading-snug">
+                          {speedRoundAnswerLines.length > 0 ? (
+                            speedRoundAnswerLines.map((line, lineIndex) => (
+                              <div key={`${item.id}-${lineIndex}`}>{line}</div>
+                            ))
+                          ) : (
+                            <div className="text-muted">No answers available.</div>
+                          )}
+                        </div>
+                      ) : (() => {
                         const answerParts = parseAnswerParts(item.answer_parts_json);
                         if (answerParts.length > 0) {
                           return (
@@ -691,9 +742,11 @@ export function EventRunPage() {
                 </div>
               )}
               <div className="flex flex-wrap items-center gap-2 pt-1">
-                <SecondaryButton className="h-11" onClick={prevItem} disabled={index === 0}>
-                  Back
-                </SecondaryButton>
+                {!isSpeedRoundMode && (
+                  <SecondaryButton className="h-11" onClick={prevItem} disabled={index === 0}>
+                    Back
+                  </SecondaryButton>
+                )}
                 {activeRound?.status !== 'live' && (
                   <PrimaryButton className="h-11" onClick={setLive} disabled={!activeRound}>
                     Display
@@ -736,13 +789,15 @@ export function EventRunPage() {
                     setShowFact(next);
                     if (eventId) api.updateLiveState(eventId, { reveal_fun_fact: next });
                   }}
-                  disabled={!item}
+                  disabled={!item || isSpeedRoundMode}
                 >
                   {showFact ? 'Hide fact' : 'Reveal fact'}
                 </SecondaryButton>
-                <SecondaryButton className="h-11" onClick={nextItem} disabled={!item}>
-                  Next
-                </SecondaryButton>
+                {!isSpeedRoundMode && (
+                  <SecondaryButton className="h-11" onClick={nextItem} disabled={!item}>
+                    Next
+                  </SecondaryButton>
+                )}
                 {(activeRound?.status === 'completed' || activeRound?.status === 'locked') && (
                   <SecondaryButton className="h-11" onClick={reopenRound} disabled={!activeRound}>
                     Reopen Round
@@ -753,7 +808,10 @@ export function EventRunPage() {
                     Enter Scores
                   </SecondaryButton>
                 )}
-                {activeRound?.status !== 'completed' && activeRound?.status !== 'locked' && item && index === items.length - 1 && (
+                {activeRound?.status !== 'completed' &&
+                  activeRound?.status !== 'locked' &&
+                  item &&
+                  (isSpeedRoundMode || index === items.length - 1) && (
                   <SecondaryButton className="h-11" onClick={setCompleted} disabled={!activeRound}>
                     Mark Completed
                   </SecondaryButton>
