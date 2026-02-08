@@ -25,6 +25,7 @@ type RoundBundle = {
   round: EventRound;
   items: EditionItem[];
 };
+type ParsedAnswerPart = { label: string; answer: string };
 
 const safeFileName = (value: string, fallback: string) => {
   const trimmed = value.trim().toLowerCase();
@@ -40,14 +41,57 @@ const roundTitle = (round: EventRound) => {
   return title ? `${round.round_number}. ${title}` : `${round.round_number}.`;
 };
 
-const answerLabel = (items: EditionItem[], key: 'a' | 'b') => {
-  if (key === 'a') {
-    return items.find((item) => item.answer_a_label)?.answer_a_label ?? 'Answer A';
+const parseAnswerPartsJson = (value?: string | null): ParsedAnswerPart[] => {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map((entry) => {
+        if (!entry || typeof entry !== 'object') return null;
+        const label = typeof entry.label === 'string' ? entry.label.trim() : '';
+        const answer = typeof entry.answer === 'string' ? entry.answer.trim() : '';
+        if (!label) return null;
+        return { label, answer } as ParsedAnswerPart;
+      })
+      .filter((entry): entry is ParsedAnswerPart => Boolean(entry));
+  } catch {
+    return [];
   }
-  return items.find((item) => item.answer_b_label)?.answer_b_label ?? 'Answer B';
+};
+
+const deriveAnswerTypeLabels = (item: EditionItem): string[] => {
+  const parts = parseAnswerPartsJson(item.answer_parts_json);
+  if (parts.length > 0) {
+    return parts.map((part) => part.label).filter((label) => label.length > 0);
+  }
+  const labels: string[] = [];
+  const labelA = item.answer_a_label?.trim() || 'Answer A';
+  const labelB = item.answer_b_label?.trim() || 'Answer B';
+  if ((item.answer_a?.trim() ?? '') || (item.answer_a_label?.trim() ?? '')) labels.push(labelA);
+  if ((item.answer_b?.trim() ?? '') || (item.answer_b_label?.trim() ?? '')) labels.push(labelB);
+  return labels;
+};
+
+const resolveScoresheetAnswerColumns = (items: EditionItem[]) => {
+  for (const item of items) {
+    const labels = deriveAnswerTypeLabels(item);
+    if (labels.length >= 2) {
+      return [labels[0], labels[1]];
+    }
+  }
+  return [] as string[];
 };
 
 const formatAnswer = (item: EditionItem) => {
+  const answerParts = parseAnswerPartsJson(item.answer_parts_json);
+  if (answerParts.length > 0) {
+    const joined = answerParts
+      .filter((part) => part.answer.length > 0)
+      .map((part) => `${part.label}: ${part.answer}`)
+      .join('  ');
+    if (joined) return joined;
+  }
   const answerA = item.answer_a?.trim();
   const answerB = item.answer_b?.trim();
   if (answerA || answerB) {
@@ -113,7 +157,7 @@ const drawPageHeader = (
   }
 };
 
-const drawGridLines = (page: any) => {
+const drawGridLines = (page: any, layout: 'quad' | 'two-up' = 'quad') => {
   const gridTop = PAGE_HEIGHT - PAGE_MARGIN - HEADER_HEIGHT;
   const gridBottom = PAGE_MARGIN;
   const gridHeight = gridTop - gridBottom;
@@ -122,12 +166,14 @@ const drawGridLines = (page: any) => {
   const midY = gridBottom + gridHeight / 2;
   const lineColor = rgb(0.75, 0.75, 0.75);
 
-  page.drawLine({
-    start: { x: midX, y: gridBottom },
-    end: { x: midX, y: gridTop },
-    thickness: 0.6,
-    color: lineColor
-  });
+  if (layout === 'quad') {
+    page.drawLine({
+      start: { x: midX, y: gridBottom },
+      end: { x: midX, y: gridTop },
+      thickness: 0.6,
+      color: lineColor
+    });
+  }
   page.drawLine({
     start: { x: PAGE_MARGIN, y: midY },
     end: { x: PAGE_WIDTH - PAGE_MARGIN, y: midY },
@@ -147,7 +193,8 @@ const renderRoundBlock = (
   const numberSize = 9;
   const textSize = mode === 'scoresheet' ? 9 : 8.5;
   const items = bundle.items;
-  const hasParts = items.some((item) => item.answer_a || item.answer_b);
+  const answerColumns = mode === 'scoresheet' ? resolveScoresheetAnswerColumns(items) : [];
+  const hasSplitAnswerColumns = mode === 'scoresheet' && answerColumns.length > 0;
   const titleY = cell.y + cell.height - CELL_PADDING - titleSize;
   page.drawText(roundTitle(bundle.round), {
     x: cell.x + CELL_PADDING,
@@ -163,22 +210,20 @@ const renderRoundBlock = (
   const textStartX = contentX + numberWidth + 6;
   const availableWidth = cell.width - CELL_PADDING * 2 - numberWidth - 6;
 
-  if (hasParts && mode === 'scoresheet') {
+  if (hasSplitAnswerColumns) {
     const labelSize = 8.5;
     const labelY = contentTop - labelSize;
     const gap = 12;
-    const colWidth = (availableWidth - gap) / 2;
-    page.drawText(answerLabel(items, 'a'), {
-      x: textStartX,
-      y: labelY,
-      size: labelSize,
-      font: fonts.regular
-    });
-    page.drawText(answerLabel(items, 'b'), {
-      x: textStartX + colWidth + gap,
-      y: labelY,
-      size: labelSize,
-      font: fonts.regular
+    const colCount = answerColumns.length;
+    const totalGap = gap * Math.max(0, colCount - 1);
+    const colWidth = (availableWidth - totalGap) / colCount;
+    answerColumns.forEach((columnLabel, index) => {
+      page.drawText(columnLabel, {
+        x: textStartX + index * (colWidth + gap),
+        y: labelY,
+        size: labelSize,
+        font: fonts.regular
+      });
     });
     const labelGap = 8;
     contentTop = labelY - labelGap;
@@ -213,21 +258,20 @@ const renderRoundBlock = (
       font: fonts.regular
     });
     if (mode === 'scoresheet') {
-      if (hasParts) {
+      if (hasSplitAnswerColumns) {
         const gap = 12;
-        const colWidth = (availableWidth - gap) / 2;
+        const colCount = answerColumns.length;
+        const totalGap = gap * Math.max(0, colCount - 1);
+        const colWidth = (availableWidth - totalGap) / colCount;
         const lineY = rowY - 2;
-        page.drawLine({
-          start: { x: textStartX, y: lineY },
-          end: { x: textStartX + colWidth, y: lineY },
-          thickness: 0.8,
-          color: rgb(0, 0, 0)
-        });
-        page.drawLine({
-          start: { x: textStartX + colWidth + gap, y: lineY },
-          end: { x: textStartX + colWidth + gap + colWidth, y: lineY },
-          thickness: 0.8,
-          color: rgb(0, 0, 0)
+        answerColumns.forEach((_, columnIndex) => {
+          const columnStart = textStartX + columnIndex * (colWidth + gap);
+          page.drawLine({
+            start: { x: columnStart, y: lineY },
+            end: { x: columnStart + colWidth, y: lineY },
+            thickness: 0.8,
+            color: rgb(0, 0, 0)
+          });
         });
       } else {
         const lineY = rowY - 2;
@@ -439,10 +483,10 @@ const buildPdf = async (
   const cellHeight = gridHeight / 2;
 
   const pageCount = () => pdfDoc.getPages().length;
-  const createPage = (showEventCode = false) => {
+  const createPage = (showEventCode = false, layout: 'quad' | 'two-up' = 'quad') => {
     const page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
     drawPageHeader(page, event, locationName, fonts, { showEventCode });
-    drawGridLines(page);
+    drawGridLines(page, layout);
     return page;
   };
 
@@ -454,51 +498,74 @@ const buildPdf = async (
     return { x: cellX, y: cellY, width: cellWidth, height: cellHeight };
   };
 
+  const getTwoUpCell = (cellIndex: number) => {
+    const row = cellIndex === 0 ? 0 : 1;
+    const sectionHeight = gridHeight / 2;
+    const cellX = PAGE_MARGIN;
+    const cellY = row === 0 ? gridBottom + sectionHeight : gridBottom;
+    return { x: cellX, y: cellY, width: gridWidth, height: sectionHeight };
+  };
+
   const hasUpcoming = Boolean(extras?.upcomingLines?.some((line) => line.trim()));
 
   if (mode === 'scoresheet') {
-    let pageIndex = -1;
-    let page = createPage(true);
-    pageIndex = 0;
-    let positionIndex = 0;
-    const positionsForPage = (index: number) => {
-      if (index === 0) return [1, 2, 3];
-      if (index === 1 && hasUpcoming) return [0, 1, 2];
-      return [0, 1, 2, 3];
-    };
-
-    for (let index = 0; index < rounds.length; index += 1) {
-      let positions = positionsForPage(pageIndex);
-      if (positionIndex >= positions.length) {
-        page = createPage(false);
-        pageIndex += 1;
-        positionIndex = 0;
-        positions = positionsForPage(pageIndex);
+    const hasMusicStyleRounds = rounds.some((bundle) => resolveScoresheetAnswerColumns(bundle.items).length > 0);
+    if (hasMusicStyleRounds) {
+      let page = createPage(true, 'two-up');
+      let positionIndex = 0;
+      for (let index = 0; index < rounds.length; index += 1) {
+        if (positionIndex >= 2) {
+          page = createPage(false, 'two-up');
+          positionIndex = 0;
+        }
+        const cellIndex = positionIndex;
+        positionIndex += 1;
+        renderRoundBlock(page, rounds[index], getTwoUpCell(cellIndex), fonts, mode);
       }
-      const cellIndex = positions[positionIndex];
-      positionIndex += 1;
-      renderRoundBlock(page, rounds[index], getCell(cellIndex), fonts, mode);
-    }
+    } else {
+      let pageIndex = -1;
+      let page = createPage(true);
+      pageIndex = 0;
+      let positionIndex = 0;
+      const positionsForPage = (index: number) => {
+        if (index === 0) return [1, 2, 3];
+        if (index === 1 && hasUpcoming) return [0, 1, 2];
+        return [0, 1, 2, 3];
+      };
 
-    const firstPage = pdfDoc.getPages()[0] ?? createPage(true);
-    renderTeamBlock(firstPage, getCell(0), fonts, {
-      qrImage: qrImage ?? undefined,
-      logoImage: logoImage ?? undefined,
-      eventCode: extras?.eventCode,
-      teamCode: extras?.teamCode,
-      teamName: extras?.teamName,
-      teamPlaceholder: extras?.teamPlaceholder
-    });
-
-    if (hasUpcoming) {
-      while (pageCount() < 2) {
-        createPage(false);
+      for (let index = 0; index < rounds.length; index += 1) {
+        let positions = positionsForPage(pageIndex);
+        if (positionIndex >= positions.length) {
+          page = createPage(false);
+          pageIndex += 1;
+          positionIndex = 0;
+          positions = positionsForPage(pageIndex);
+        }
+        const cellIndex = positions[positionIndex];
+        positionIndex += 1;
+        renderRoundBlock(page, rounds[index], getCell(cellIndex), fonts, mode);
       }
-      const upcomingPage = pdfDoc.getPages()[1];
-      renderUpcomingBlock(upcomingPage, getCell(3), fonts, {
-        upcomingLines: extras?.upcomingLines,
-        locationName: extras?.locationName
+
+      const firstPage = pdfDoc.getPages()[0] ?? createPage(true);
+      renderTeamBlock(firstPage, getCell(0), fonts, {
+        qrImage: qrImage ?? undefined,
+        logoImage: logoImage ?? undefined,
+        eventCode: extras?.eventCode,
+        teamCode: extras?.teamCode,
+        teamName: extras?.teamName,
+        teamPlaceholder: extras?.teamPlaceholder
       });
+
+      if (hasUpcoming) {
+        while (pageCount() < 2) {
+          createPage(false);
+        }
+        const upcomingPage = pdfDoc.getPages()[1];
+        renderUpcomingBlock(upcomingPage, getCell(3), fonts, {
+          upcomingLines: extras?.upcomingLines,
+          locationName: extras?.locationName
+        });
+      }
     }
   } else {
     for (let index = 0; index < rounds.length; index += 1) {
