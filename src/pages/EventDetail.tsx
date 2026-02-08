@@ -491,6 +491,7 @@ const buildPdf = async (
     const useMusicLayout = event.event_type === 'Music Trivia';
     if (useMusicLayout) {
       let page = createPage(true, 'two-up');
+      const firstPage = page;
       let positionIndex = 0;
       for (let index = 0; index < rounds.length; index += 1) {
         if (positionIndex >= 2) {
@@ -499,7 +500,29 @@ const buildPdf = async (
         }
         const cellIndex = positionIndex;
         positionIndex += 1;
-        renderRoundBlock(page, rounds[index], getTwoUpCell(cellIndex), fonts, mode);
+        let roundCell = getTwoUpCell(cellIndex);
+        if (page === firstPage && cellIndex === 0) {
+          const teamBlockHeight = 92;
+          const teamCell = {
+            x: roundCell.x,
+            y: roundCell.y + roundCell.height - teamBlockHeight,
+            width: roundCell.width,
+            height: teamBlockHeight
+          };
+          renderTeamBlock(page, teamCell, fonts, {
+            qrImage: qrImage ?? undefined,
+            logoImage: logoImage ?? undefined,
+            eventCode: extras?.eventCode,
+            teamCode: extras?.teamCode,
+            teamName: extras?.teamName,
+            teamPlaceholder: extras?.teamPlaceholder
+          });
+          roundCell = {
+            ...roundCell,
+            height: Math.max(120, roundCell.height - teamBlockHeight - 8)
+          };
+        }
+        renderRoundBlock(page, rounds[index], roundCell, fonts, mode);
       }
     } else {
       let pageIndex = -1;
