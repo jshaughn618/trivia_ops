@@ -145,6 +145,112 @@ const drawPageHeader = (
   }
 };
 
+const drawMusicScoresheetHeader = (
+  page: any,
+  event: Event,
+  fonts: { regular: any; bold: any },
+  extras?: {
+    qrImage?: any;
+    logoImage?: any;
+    eventCode?: string;
+    teamCode?: string;
+    teamName?: string;
+    teamPlaceholder?: boolean;
+  }
+) => {
+  const headerTop = PAGE_HEIGHT - PAGE_MARGIN;
+  const titleSize = 14;
+  const metaSize = 9.5;
+  const leftColumnWidth = 210;
+  const titleY = headerTop - titleSize;
+  const eventCode = extras?.eventCode ?? event.public_code ?? '';
+
+  const title = truncateText(fonts.bold, event.title, leftColumnWidth, titleSize);
+  page.drawText(title, {
+    x: PAGE_MARGIN,
+    y: titleY,
+    size: titleSize,
+    font: fonts.bold
+  });
+
+  if (eventCode) {
+    const codeText = truncateText(fonts.regular, `Event Code: ${eventCode}`, leftColumnWidth, metaSize);
+    page.drawText(codeText, {
+      x: PAGE_MARGIN,
+      y: titleY - metaSize - 3,
+      size: metaSize,
+      font: fonts.regular
+    });
+  }
+
+  let logoWidth = 0;
+  let logoHeight = 0;
+  if (extras?.logoImage) {
+    const maxLogoWidth = 84;
+    const maxLogoHeight = 24;
+    const scale = Math.min(
+      maxLogoWidth / extras.logoImage.width,
+      maxLogoHeight / extras.logoImage.height,
+      1
+    );
+    logoWidth = extras.logoImage.width * scale;
+    logoHeight = extras.logoImage.height * scale;
+  }
+
+  const qrSize = extras?.qrImage ? 44 : 0;
+  const centerGap = logoWidth > 0 && qrSize > 0 ? 8 : 0;
+  const centerWidth = logoWidth + centerGap + qrSize;
+  const centerStartX = PAGE_WIDTH / 2 - centerWidth / 2;
+  const centerTopY = headerTop - 2;
+  const centerBlockHeight = Math.max(logoHeight, qrSize);
+
+  if (extras?.logoImage && logoWidth > 0 && logoHeight > 0) {
+    const logoY = centerTopY - (centerBlockHeight - logoHeight) / 2 - logoHeight;
+    page.drawImage(extras.logoImage, {
+      x: centerStartX,
+      y: logoY,
+      width: logoWidth,
+      height: logoHeight
+    });
+  }
+
+  if (extras?.qrImage && qrSize > 0) {
+    const qrX = centerStartX + logoWidth + centerGap;
+    const qrY = centerTopY - (centerBlockHeight - qrSize) / 2 - qrSize;
+    page.drawImage(extras.qrImage, {
+      x: qrX,
+      y: qrY,
+      width: qrSize,
+      height: qrSize
+    });
+  }
+
+  const rightColumnWidth = 176;
+  const rightX = PAGE_WIDTH - PAGE_MARGIN - rightColumnWidth;
+  const rawTeamName = extras?.teamName?.trim() ?? '';
+  const teamDisplay = rawTeamName && !extras?.teamPlaceholder ? rawTeamName : '________________';
+  const teamLine = truncateText(fonts.bold, `Team: ${teamDisplay}`, rightColumnWidth, 10.5);
+  const teamCodeLine = truncateText(
+    fonts.regular,
+    `Code: ${extras?.teamCode?.trim() || '—'}`,
+    rightColumnWidth,
+    metaSize
+  );
+
+  page.drawText(teamLine, {
+    x: rightX,
+    y: titleY,
+    size: 10.5,
+    font: fonts.bold
+  });
+  page.drawText(teamCodeLine, {
+    x: rightX,
+    y: titleY - metaSize - 3,
+    size: metaSize,
+    font: fonts.regular
+  });
+};
+
 const drawGridLines = (page: any, layout: 'quad' | 'two-up' = 'quad') => {
   const gridTop = PAGE_HEIGHT - PAGE_MARGIN - HEADER_HEIGHT;
   const gridBottom = PAGE_MARGIN;
@@ -462,9 +568,15 @@ const buildPdf = async (
   const cellHeight = gridHeight / 2;
 
   const pageCount = () => pdfDoc.getPages().length;
-  const createPage = (showEventCode = false, layout: 'quad' | 'two-up' = 'quad') => {
+  const createPage = (
+    showEventCode = false,
+    layout: 'quad' | 'two-up' = 'quad',
+    drawHeader = true
+  ) => {
     const page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
-    drawPageHeader(page, event, locationName, fonts, { showEventCode });
+    if (drawHeader) {
+      drawPageHeader(page, event, locationName, fonts, { showEventCode });
+    }
     drawGridLines(page, layout);
     return page;
   };
@@ -490,26 +602,20 @@ const buildPdf = async (
   if (mode === 'scoresheet') {
     const useMusicLayout = event.event_type === 'Music Trivia';
     if (useMusicLayout) {
-      let page = createPage(true, 'two-up');
-      const firstPage = page;
+      let page = createPage(false, 'two-up', false);
+      drawMusicScoresheetHeader(page, event, fonts, {
+        qrImage: qrImage ?? undefined,
+        logoImage: logoImage ?? undefined,
+        eventCode: extras?.eventCode,
+        teamCode: extras?.teamCode,
+        teamName: extras?.teamName,
+        teamPlaceholder: extras?.teamPlaceholder
+      });
       let positionIndex = 0;
       for (let index = 0; index < rounds.length; index += 1) {
         if (positionIndex >= 2) {
-          page = createPage(false, 'two-up');
-          positionIndex = 0;
-        }
-        const cellIndex = positionIndex;
-        positionIndex += 1;
-        let roundCell = getTwoUpCell(cellIndex);
-        if (page === firstPage && cellIndex === 0) {
-          const teamBlockHeight = 92;
-          const teamCell = {
-            x: roundCell.x,
-            y: roundCell.y + roundCell.height - teamBlockHeight,
-            width: roundCell.width,
-            height: teamBlockHeight
-          };
-          renderTeamBlock(page, teamCell, fonts, {
+          page = createPage(false, 'two-up', false);
+          drawMusicScoresheetHeader(page, event, fonts, {
             qrImage: qrImage ?? undefined,
             logoImage: logoImage ?? undefined,
             eventCode: extras?.eventCode,
@@ -517,12 +623,11 @@ const buildPdf = async (
             teamName: extras?.teamName,
             teamPlaceholder: extras?.teamPlaceholder
           });
-          roundCell = {
-            ...roundCell,
-            height: Math.max(120, roundCell.height - teamBlockHeight - 8)
-          };
+          positionIndex = 0;
         }
-        renderRoundBlock(page, rounds[index], roundCell, fonts, mode);
+        const cellIndex = positionIndex;
+        positionIndex += 1;
+        renderRoundBlock(page, rounds[index], getTwoUpCell(cellIndex), fonts, mode);
       }
     } else {
       let pageIndex = -1;
