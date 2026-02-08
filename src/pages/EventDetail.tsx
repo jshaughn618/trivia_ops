@@ -132,27 +132,15 @@ const drawPageHeader = (
     size: titleSize,
     font: fonts.bold
   });
-  const dateLabel = new Date(event.starts_at).toLocaleDateString();
-  const metaParts = [locationName, dateLabel].filter((value) => value && value.trim().length > 0);
-  const metaLine = metaParts.join(' • ');
-  if (metaLine) {
-    page.drawText(metaLine, {
-      x: PAGE_MARGIN,
-      y: titleY - metaSize - 4,
-      size: metaSize,
-      font: fonts.regular
-    });
-  }
 
   if (options?.showEventCode && event.public_code) {
     const codeText = `Event Code: ${event.public_code}`;
-    const codeSize = 10;
-    const codeWidth = fonts.bold.widthOfTextAtSize(codeText, codeSize);
+    const codeSize = metaSize;
     page.drawText(codeText, {
-      x: PAGE_WIDTH - PAGE_MARGIN - codeWidth,
-      y: titleY,
+      x: PAGE_MARGIN,
+      y: titleY - codeSize - 4,
       size: codeSize,
-      font: fonts.bold
+      font: fonts.regular
     });
   }
 };
@@ -320,78 +308,69 @@ const renderTeamBlock = (
 ) => {
   const padding = CELL_PADDING;
   const textSize = 11;
-  let cursorY = cell.y + cell.height - padding;
+  const topY = cell.y + cell.height - padding;
+  const leftX = cell.x + padding;
+  const contentWidth = cell.width - padding * 2;
+  const leftColumnWidth = Math.min(220, Math.max(160, contentWidth * 0.55));
+  const rightX = leftX + leftColumnWidth + 12;
+  const rightWidth = Math.max(60, cell.x + cell.width - padding - rightX);
 
-  const teamName = extras.teamName?.trim() ?? '';
-  if (teamName && !extras.teamPlaceholder) {
-    page.drawText(`Team: ${teamName}`, {
-      x: cell.x + padding,
-      y: cursorY - textSize,
-      size: textSize,
-      font: fonts.bold
-    });
-    cursorY -= textSize + 36;
-  } else {
-    const label = 'Team Name:';
-    const labelWidth = fonts.bold.widthOfTextAtSize(label, textSize);
-    const baseY = cursorY - textSize;
-    const lineStartX = cell.x + padding + labelWidth + 6;
-    const lineEndX = cell.x + cell.width - padding;
-    page.drawText(label, {
-      x: cell.x + padding,
-      y: baseY,
-      size: textSize,
-      font: fonts.bold
-    });
-    page.drawLine({
-      start: { x: lineStartX, y: baseY - 2 },
-      end: { x: lineEndX, y: baseY - 2 },
-      thickness: 1,
-      color: rgb(0, 0, 0)
-    });
-    cursorY -= textSize + 36;
-  }
-
+  let logoWidth = 0;
+  let logoHeight = 0;
   if (extras.logoImage) {
-    const maxLogoWidth = 150;
-    const maxLogoHeight = 44;
+    const maxLogoWidth = Math.min(120, leftColumnWidth - 96);
+    const maxLogoHeight = 42;
     const scale = Math.min(
       maxLogoWidth / extras.logoImage.width,
       maxLogoHeight / extras.logoImage.height,
       1
     );
-    const logoWidth = extras.logoImage.width * scale;
-    const logoHeight = extras.logoImage.height * scale;
+    logoWidth = extras.logoImage.width * scale;
+    logoHeight = extras.logoImage.height * scale;
     page.drawImage(extras.logoImage, {
-      x: cell.x + padding,
-      y: cursorY - logoHeight,
+      x: leftX,
+      y: topY - logoHeight,
       width: logoWidth,
       height: logoHeight
     });
-    cursorY -= logoHeight + 4;
   }
 
-  cursorY -= textSize * 0.5;
-
-  const teamCodeText = extras.teamCode ? `Team Code: ${extras.teamCode}` : 'Team Code: —';
-  page.drawText(teamCodeText, {
-    x: cell.x + padding,
-    y: cursorY - textSize,
-    size: textSize,
-    font: fonts.bold
-  });
-  cursorY -= textSize + 8;
-
-  const qrSize = 96;
+  const qrSize = extras.qrImage ? 86 : 0;
   if (extras.qrImage) {
+    const qrX = leftX + (logoWidth > 0 ? logoWidth + 8 : 0);
     page.drawImage(extras.qrImage, {
-      x: cell.x + padding,
-      y: cursorY - qrSize,
+      x: qrX,
+      y: topY - qrSize,
       width: qrSize,
       height: qrSize
     });
-    cursorY -= qrSize + 10;
   }
+
+  const nameLabel = 'Team Name:';
+  const lineBaseY = topY - textSize;
+  const nameLabelWidth = fonts.bold.widthOfTextAtSize(nameLabel, textSize);
+  const lineStartX = rightX + nameLabelWidth + 6;
+  const lineEndX = rightX + rightWidth;
+  page.drawText(nameLabel, {
+    x: rightX,
+    y: lineBaseY,
+    size: textSize,
+    font: fonts.bold
+  });
+  page.drawLine({
+    start: { x: Math.min(lineStartX, lineEndX - 12), y: lineBaseY - 2 },
+    end: { x: lineEndX, y: lineBaseY - 2 },
+    thickness: 1,
+    color: rgb(0, 0, 0)
+  });
+
+  const teamCodeText = extras.teamCode ? `Team Code: ${extras.teamCode}` : 'Team Code: —';
+  page.drawText(teamCodeText, {
+    x: rightX,
+    y: lineBaseY - 28,
+    size: textSize,
+    font: fonts.bold
+  });
 };
 
 const renderUpcomingBlock = (
@@ -509,8 +488,8 @@ const buildPdf = async (
   const hasUpcoming = Boolean(extras?.upcomingLines?.some((line) => line.trim()));
 
   if (mode === 'scoresheet') {
-    const hasMusicStyleRounds = rounds.some((bundle) => resolveScoresheetAnswerColumns(bundle.items).length > 0);
-    if (hasMusicStyleRounds) {
+    const useMusicLayout = event.event_type === 'Music Trivia';
+    if (useMusicLayout) {
       let page = createPage(true, 'two-up');
       let positionIndex = 0;
       for (let index = 0; index < rounds.length; index += 1) {
