@@ -225,24 +225,48 @@ const drawMusicScoresheetHeader = (
     });
   }
 
-  const rightColumnWidth = 176;
+  const rightColumnWidth = 210;
   const rightX = PAGE_WIDTH - PAGE_MARGIN - rightColumnWidth;
   const rawTeamName = extras?.teamName?.trim() ?? '';
-  const teamDisplay = rawTeamName && !extras?.teamPlaceholder ? rawTeamName : '________________';
-  const teamLine = truncateText(fonts.bold, `Team: ${teamDisplay}`, rightColumnWidth, 10.5);
+  const teamLabel = 'Team Name:';
+  const teamLabelSize = 10.5;
+  const teamLabelWidth = fonts.bold.widthOfTextAtSize(teamLabel, teamLabelSize);
+  page.drawText(teamLabel, {
+    x: rightX,
+    y: titleY,
+    size: teamLabelSize,
+    font: fonts.bold
+  });
+  if (rawTeamName && !extras?.teamPlaceholder) {
+    const nameText = truncateText(
+      fonts.regular,
+      rawTeamName,
+      Math.max(30, rightColumnWidth - teamLabelWidth - 8),
+      teamLabelSize
+    );
+    page.drawText(nameText, {
+      x: rightX + teamLabelWidth + 6,
+      y: titleY,
+      size: teamLabelSize,
+      font: fonts.regular
+    });
+  } else {
+    const lineStartX = rightX + teamLabelWidth + 6;
+    page.drawLine({
+      start: { x: lineStartX, y: titleY + 1 },
+      end: { x: rightX + rightColumnWidth, y: titleY + 1 },
+      thickness: 1,
+      color: rgb(0, 0, 0)
+    });
+  }
+
   const teamCodeLine = truncateText(
     fonts.regular,
-    `Code: ${extras?.teamCode?.trim() || '—'}`,
+    `Team Code: ${extras?.teamCode?.trim() || '—'}`,
     rightColumnWidth,
     metaSize
   );
 
-  page.drawText(teamLine, {
-    x: rightX,
-    y: titleY,
-    size: 10.5,
-    font: fonts.bold
-  });
   page.drawText(teamCodeLine, {
     x: rightX,
     y: titleY - metaSize - 3,
