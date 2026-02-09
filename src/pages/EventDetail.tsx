@@ -36,6 +36,12 @@ const safeFileName = (value: string, fallback: string) => {
     .replace(/-+$/, '') || fallback;
 };
 
+const formatEditionCode = (gameCode?: string | null, editionNumber?: number | null) => {
+  const code = (gameCode ?? '').trim().toUpperCase();
+  if (!code || editionNumber == null || !Number.isFinite(editionNumber)) return '';
+  return `${code}${String(editionNumber).padStart(3, '0')}`;
+};
+
 const roundTitle = (round: EventRound) => {
   const title = round.scoresheet_title?.trim();
   return title ? `${round.round_number}. ${title}` : `${round.round_number}.`;
@@ -1094,6 +1100,13 @@ export function EventDetailPage() {
     return editions.filter((edition) => edition.game_id === roundGameId);
   }, [editions, roundGameId]);
 
+  const editionPickerLabel = (edition: GameEdition) => {
+    const game = gameById[edition.game_id];
+    const theme = edition.theme?.trim() || edition.title?.trim() || 'Untitled Theme';
+    const editionCode = formatEditionCode(game?.game_code, edition.edition_number);
+    return editionCode ? `${editionCode} - ${theme}` : theme;
+  };
+
   const reorderRounds = async (sourceId: string, targetId: string) => {
     if (sourceId === targetId) return;
     const ordered = [...rounds].sort((a, b) => a.round_number - b.round_number);
@@ -1730,7 +1743,7 @@ export function EventDetailPage() {
               <option value="">{roundGameId ? 'Select edition' : 'Select a game first'}</option>
               {roundEditions.map((edition) => (
                 <option key={edition.id} value={edition.id}>
-                  {edition.theme ?? 'Untitled Theme'}
+                  {editionPickerLabel(edition)}
                 </option>
               ))}
             </select>
