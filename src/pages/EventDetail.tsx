@@ -129,6 +129,20 @@ const formatAnswer = (item: EditionItem) => {
   return item.answer?.trim() || '—';
 };
 
+const resolveTotalPossiblePoints = (item: EditionItem) => {
+  const parts = parseAnswerPartsJson(item.answer_parts_json);
+  if (parts.length > 0) {
+    const total = parts.reduce((sum, part) => sum + Math.max(0, part.points), 0);
+    return total > 0 ? total : 1;
+  }
+  const labels = deriveAnswerTypeLabels(item);
+  if (labels.length > 0) {
+    const total = labels.reduce((sum, label) => sum + Math.max(0, label.points), 0);
+    return total > 0 ? total : 1;
+  }
+  return 1;
+};
+
 const truncateText = (font: any, text: string, maxWidth: number, size: number) => {
   if (font.widthOfTextAtSize(text, size) <= maxWidth) return text;
   let truncated = text;
@@ -355,14 +369,20 @@ const renderRoundBlock = (
   const contentX = cell.x + CELL_PADDING;
   const textStartX = contentX + numberWidth + 6;
   const availableWidth = cell.width - CELL_PADDING * 2 - numberWidth - 6;
+  const pointsColWidth = Math.min(56, Math.max(44, availableWidth * 0.24));
+  const pointsGap = 10;
+  const responseWidth = Math.max(60, availableWidth - pointsColWidth - pointsGap);
+  const responseEndX = textStartX + responseWidth;
+  const pointsX = responseEndX + pointsGap;
+  const pointsLineWidth = Math.max(22, pointsColWidth - 8);
 
+  const labelSize = 8.5;
+  const labelY = contentTop - labelSize;
   if (hasSplitAnswerColumns) {
-    const labelSize = 8.5;
-    const labelY = contentTop - labelSize;
     const gap = 12;
     const colCount = answerColumns.length;
     const totalGap = gap * Math.max(0, colCount - 1);
-    const colWidth = (availableWidth - totalGap) / colCount;
+    const colWidth = (responseWidth - totalGap) / colCount;
     answerColumns.forEach((columnLabel, index) => {
       page.drawText(columnLabel, {
         x: textStartX + index * (colWidth + gap),
@@ -371,9 +391,15 @@ const renderRoundBlock = (
         font: fonts.regular
       });
     });
-    const labelGap = 8;
-    contentTop = labelY - labelGap;
   }
+  page.drawText('Points', {
+    x: pointsX,
+    y: labelY,
+    size: labelSize,
+    font: fonts.regular
+  });
+  const labelGap = 8;
+  contentTop = labelY - labelGap;
 
   const itemCount = items.length;
   const minLineSpacing = mode === 'scoresheet' ? 14 : 12;
@@ -410,10 +436,16 @@ const renderRoundBlock = (
         });
         const labelWidth = fonts.regular.widthOfTextAtSize(labelText, textSize);
         const lineY = rowY - 2;
-        const lineStart = Math.min(textStartX + labelWidth + 6, textStartX + availableWidth - 12);
+        const lineStart = Math.min(textStartX + labelWidth + 6, responseEndX - 12);
         page.drawLine({
           start: { x: lineStart, y: lineY },
-          end: { x: textStartX + availableWidth, y: lineY },
+          end: { x: responseEndX, y: lineY },
+          thickness: 0.8,
+          color: rgb(0, 0, 0)
+        });
+        page.drawLine({
+          start: { x: pointsX, y: lineY },
+          end: { x: pointsX + pointsLineWidth, y: lineY },
           thickness: 0.8,
           color: rgb(0, 0, 0)
         });
@@ -428,7 +460,7 @@ const renderRoundBlock = (
         const gap = 12;
         const colCount = answerColumns.length;
         const totalGap = gap * Math.max(0, colCount - 1);
-        const colWidth = (availableWidth - totalGap) / colCount;
+        const colWidth = (responseWidth - totalGap) / colCount;
         const lineY = rowY - 2;
         answerColumns.forEach((_, columnIndex) => {
           const columnStart = textStartX + columnIndex * (colWidth + gap);
@@ -438,6 +470,12 @@ const renderRoundBlock = (
             thickness: 0.8,
             color: rgb(0, 0, 0)
           });
+        });
+        page.drawLine({
+          start: { x: pointsX, y: lineY },
+          end: { x: pointsX + pointsLineWidth, y: lineY },
+          thickness: 0.8,
+          color: rgb(0, 0, 0)
         });
       } else {
         numberedRow += 1;
@@ -450,7 +488,13 @@ const renderRoundBlock = (
         const lineY = rowY - 2;
         page.drawLine({
           start: { x: textStartX, y: lineY },
-          end: { x: textStartX + availableWidth, y: lineY },
+          end: { x: responseEndX, y: lineY },
+          thickness: 0.8,
+          color: rgb(0, 0, 0)
+        });
+        page.drawLine({
+          start: { x: pointsX, y: lineY },
+          end: { x: pointsX + pointsLineWidth, y: lineY },
           thickness: 0.8,
           color: rgb(0, 0, 0)
         });
@@ -462,12 +506,20 @@ const renderRoundBlock = (
         size: numberSize,
         font: fonts.regular
       });
-      const answer = truncateText(fonts.regular, formatAnswer(item), availableWidth, textSize);
+      const answer = truncateText(fonts.regular, formatAnswer(item), responseWidth, textSize);
       page.drawText(answer, {
         x: textStartX,
         y: rowY,
         size: textSize,
         font: fonts.regular
+      });
+      const pointsText = String(resolveTotalPossiblePoints(item));
+      const pointsWidth = fonts.bold.widthOfTextAtSize(pointsText, textSize);
+      page.drawText(pointsText, {
+        x: pointsX + Math.max(0, (pointsLineWidth - pointsWidth) / 2),
+        y: rowY,
+        size: textSize,
+        font: fonts.bold
       });
     }
   }
