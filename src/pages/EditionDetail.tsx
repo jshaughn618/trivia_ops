@@ -26,13 +26,14 @@ const emptyItem = {
   media_filename: '',
   answer_parts: [] as AnswerPart[]
 };
-type ItemDraft = typeof emptyItem & { item_mode: 'text' | 'audio' };
+type ItemDraft = typeof emptyItem & { item_mode: 'text' | 'audio' | 'labeled' };
 
 const choiceLabels = ['A', 'B', 'C', 'D'];
 const defaultMusicAnswerParts: AnswerPart[] = [
   { label: 'Song', answer: '' },
   { label: 'Artist', answer: '' }
 ];
+const defaultMusicConnectionPart: AnswerPart[] = [{ label: 'Connection', answer: '' }];
 const MUSIC_AI_PARSE_LIMIT = 60;
 const MUSIC_AI_INSTRUCTION_LIMIT = 600;
 const SPEED_ROUND_MAX_ITEMS = 60;
@@ -271,7 +272,9 @@ export function EditionDetailPage() {
         ? parsedAnswerParts.length > 0
           ? parsedAnswerParts
           : defaultMusicAnswerParts
-        : [];
+        : isMusic && parsedAnswerParts.length === 1
+          ? parsedAnswerParts
+          : [];
     return {
       question_type: questionType,
       choices,
@@ -287,7 +290,7 @@ export function EditionDetailPage() {
       media_key: safeString(item.media_key),
       audio_answer_key: safeString(item.audio_answer_key),
       media_filename: '',
-      item_mode: isAudioItem ? 'audio' : 'text',
+      item_mode: isAudioItem ? 'audio' : isMusic && parsedAnswerParts.length === 1 ? 'labeled' : 'text',
       answer_parts: answerPartsDraft.map((part) => ({ label: part.label, answer: part.answer }))
     };
   };
@@ -468,14 +471,19 @@ export function EditionDetailPage() {
     if (!editionId) return;
     const isMusic = gameTypeId === 'music';
     const isMusicAudio = isMusic && itemDraft.item_mode === 'audio';
-    const isMultipleChoice = itemDraft.question_type === 'multiple_choice' && gameTypeId !== 'audio';
+    const isMusicLabeled = isMusic && itemDraft.item_mode === 'labeled';
+    const isMusicPartBased = isMusicAudio || isMusicLabeled;
+    const isMultipleChoice =
+      itemDraft.question_type === 'multiple_choice' &&
+      gameTypeId !== 'audio' &&
+      !(isMusic && itemDraft.item_mode !== 'text');
     let answerValue = gameTypeId === 'audio' ? undefined : itemDraft.answer.trim();
     let answerPartsPayload: AnswerPart[] | undefined;
     let musicAnswerA: string | null = null;
     let musicAnswerB: string | null = null;
     let musicAnswerALabel: string | null = null;
     let musicAnswerBLabel: string | null = null;
-    if (!isMusicAudio && !itemDraft.prompt.trim()) {
+    if (!isMusicPartBased && !itemDraft.prompt.trim()) {
       setItemValidationError('Question is required.');
       return;
     }
@@ -488,7 +496,7 @@ export function EditionDetailPage() {
         setItemValidationError('Answer A and Answer B are required for audio items.');
         return;
       }
-    } else if (isMusicAudio) {
+    } else if (isMusicPartBased) {
       const partsClean = sanitizeAnswerParts(itemDraft.answer_parts);
       if (partsClean.length === 0) {
         setItemValidationError('At least one answer part is required.');
@@ -535,7 +543,7 @@ export function EditionDetailPage() {
       answer_b_label: isMusicAudio ? musicAnswerBLabel : itemDraft.answer_b_label || null,
       answer_parts_json: answerPartsPayload,
       fun_fact: itemDraft.fun_fact || null,
-      media_type: isMusicAudio ? 'audio' : itemDraft.media_type || null,
+      media_type: isMusicAudio ? 'audio' : isMusicLabeled ? null : itemDraft.media_type || null,
       media_key: itemDraft.media_key || null,
       audio_answer_key: itemDraft.audio_answer_key || null,
       ordinal: nextOrdinal
@@ -578,14 +586,19 @@ export function EditionDetailPage() {
     const source = options?.source ?? 'manual';
     const isMusic = gameTypeId === 'music';
     const isMusicAudio = isMusic && itemDraft.item_mode === 'audio';
-    const isMultipleChoice = itemDraft.question_type === 'multiple_choice' && gameTypeId !== 'audio';
+    const isMusicLabeled = isMusic && itemDraft.item_mode === 'labeled';
+    const isMusicPartBased = isMusicAudio || isMusicLabeled;
+    const isMultipleChoice =
+      itemDraft.question_type === 'multiple_choice' &&
+      gameTypeId !== 'audio' &&
+      !(isMusic && itemDraft.item_mode !== 'text');
     let answerValue = gameTypeId === 'audio' ? undefined : itemDraft.answer.trim();
     let answerPartsPayload: AnswerPart[] | undefined;
     let musicAnswerA: string | null = null;
     let musicAnswerB: string | null = null;
     let musicAnswerALabel: string | null = null;
     let musicAnswerBLabel: string | null = null;
-    if (!isMusicAudio && !itemDraft.prompt.trim()) {
+    if (!isMusicPartBased && !itemDraft.prompt.trim()) {
       const message = 'Question is required.';
       setItemValidationError(message);
       if (source === 'auto') {
@@ -613,7 +626,7 @@ export function EditionDetailPage() {
         }
         return false;
       }
-    } else if (isMusicAudio) {
+    } else if (isMusicPartBased) {
       const partsClean = sanitizeAnswerParts(itemDraft.answer_parts);
       if (partsClean.length === 0) {
         const message = 'At least one answer part is required.';
@@ -687,7 +700,7 @@ export function EditionDetailPage() {
       answer_b_label: isMusicAudio ? musicAnswerBLabel : itemDraft.answer_b_label || null,
       answer_parts_json: answerPartsPayload,
       fun_fact: itemDraft.fun_fact || null,
-      media_type: isMusicAudio ? 'audio' : itemDraft.media_type || null,
+      media_type: isMusicAudio ? 'audio' : isMusicLabeled ? null : itemDraft.media_type || null,
       media_key: itemDraft.media_key || null,
       audio_answer_key: itemDraft.audio_answer_key || null
     });
@@ -1144,7 +1157,7 @@ export function EditionDetailPage() {
       if (itemDraft.answer_b.trim()) parts.push(`Answer B: ${itemDraft.answer_b.trim()}`);
       if (itemDraft.answer_a_label.trim()) parts.push(`Answer A Label: ${itemDraft.answer_a_label.trim()}`);
       if (itemDraft.answer_b_label.trim()) parts.push(`Answer B Label: ${itemDraft.answer_b_label.trim()}`);
-    } else if (gameTypeId === 'music' && itemDraft.item_mode === 'audio') {
+    } else if (gameTypeId === 'music' && itemDraft.item_mode !== 'text') {
       const partsClean = sanitizeAnswerParts(itemDraft.answer_parts);
       partsClean.forEach((part) => parts.push(`${part.label}: ${part.answer}`));
     } else if (itemDraft.answer.trim()) {
@@ -2088,13 +2101,17 @@ export function EditionDetailPage() {
               value={itemDraft.item_mode}
               onChange={(event) =>
                 setItemDraft((draft) => {
-                  const mode = event.target.value as 'audio' | 'text';
+                  const mode = event.target.value as 'audio' | 'text' | 'labeled';
                   const nextParts =
                     mode === 'audio'
                       ? draft.answer_parts.length > 0
                         ? draft.answer_parts
                         : defaultMusicAnswerParts
-                      : [];
+                      : mode === 'labeled'
+                        ? draft.answer_parts.length > 0
+                          ? [{ ...draft.answer_parts[0], label: draft.answer_parts[0].label || 'Connection' }]
+                          : defaultMusicConnectionPart
+                        : [];
                   return {
                     ...draft,
                     item_mode: mode,
@@ -2107,6 +2124,7 @@ export function EditionDetailPage() {
               }
             >
               <option value="audio">Audio Clip</option>
+              <option value="labeled">Labeled Response</option>
               <option value="text">Text Question</option>
             </select>
           </label>
@@ -2131,7 +2149,7 @@ export function EditionDetailPage() {
         )}
         <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
           <span className="flex items-center justify-between">
-            {gameTypeId === 'music' && itemDraft.item_mode === 'audio' ? 'Question (optional)' : 'Question'}
+            {gameTypeId === 'music' && itemDraft.item_mode !== 'text' ? 'Question (optional)' : 'Question'}
             <button
               type="button"
               onClick={startRefine}
@@ -2149,7 +2167,7 @@ export function EditionDetailPage() {
         </label>
         {gameTypeId !== 'audio' &&
           itemDraft.question_type !== 'multiple_choice' &&
-          !(gameTypeId === 'music' && itemDraft.item_mode === 'audio') && (
+          !(gameTypeId === 'music' && itemDraft.item_mode !== 'text') && (
           <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
             <span className="flex items-center justify-between">
               Answer
@@ -2176,17 +2194,19 @@ export function EditionDetailPage() {
             )}
           </label>
         )}
-        {gameTypeId === 'music' && itemDraft.item_mode === 'audio' && (
+        {gameTypeId === 'music' && itemDraft.item_mode !== 'text' && (
           <div className="flex flex-col gap-2">
-            <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">Answer parts</div>
+            <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">
+              {itemDraft.item_mode === 'labeled' ? 'Response' : 'Answer parts'}
+            </div>
             <div className="flex flex-col gap-2">
               {itemDraft.answer_parts.map((part, idx) => (
                 <div
                   key={`edit-answer-part-${idx}`}
-                  className="grid gap-2 sm:grid-cols-[1fr,2fr,auto] sm:items-end"
+                  className={`grid gap-2 sm:items-end ${itemDraft.item_mode === 'labeled' ? 'sm:grid-cols-[1fr,2fr]' : 'sm:grid-cols-[1fr,2fr,auto]'}`}
                 >
                   <label className="flex flex-col gap-1 text-[10px] font-display uppercase tracking-[0.25em] text-muted">
-                    Answer type
+                    {itemDraft.item_mode === 'labeled' ? 'Label' : 'Answer type'}
                     <input
                       className="h-10 px-3"
                       value={part.label}
@@ -2213,7 +2233,7 @@ export function EditionDetailPage() {
                       }
                     />
                   </label>
-                  {itemDraft.answer_parts.length > 1 && (
+                  {itemDraft.item_mode !== 'labeled' && itemDraft.answer_parts.length > 1 && (
                     <button
                       type="button"
                       onClick={() =>
@@ -2230,20 +2250,22 @@ export function EditionDetailPage() {
                 </div>
               ))}
             </div>
-            <SecondaryButton
-              onClick={() =>
-                setItemDraft((draft) => ({
-                  ...draft,
-                  answer_parts: [
-                    ...draft.answer_parts,
-                    { label: `Answer ${draft.answer_parts.length + 1}`, answer: '' }
-                  ]
-                }))
-              }
-              className="self-start px-3 py-2 text-xs"
-            >
-              Add answer part
-            </SecondaryButton>
+            {itemDraft.item_mode !== 'labeled' && (
+              <SecondaryButton
+                onClick={() =>
+                  setItemDraft((draft) => ({
+                    ...draft,
+                    answer_parts: [
+                      ...draft.answer_parts,
+                      { label: `Answer ${draft.answer_parts.length + 1}`, answer: '' }
+                    ]
+                  }))
+                }
+                className="self-start px-3 py-2 text-xs"
+              >
+                Add answer part
+              </SecondaryButton>
+            )}
           </div>
         )}
         {gameTypeId !== 'audio' && itemDraft.question_type === 'multiple_choice' && (
@@ -2613,13 +2635,17 @@ export function EditionDetailPage() {
               value={itemDraft.item_mode}
               onChange={(event) =>
                 setItemDraft((draft) => {
-                  const mode = event.target.value as 'audio' | 'text';
+                  const mode = event.target.value as 'audio' | 'text' | 'labeled';
                   const nextParts =
                     mode === 'audio'
                       ? draft.answer_parts.length > 0
                         ? draft.answer_parts
                         : defaultMusicAnswerParts
-                      : [];
+                      : mode === 'labeled'
+                        ? draft.answer_parts.length > 0
+                          ? [{ ...draft.answer_parts[0], label: draft.answer_parts[0].label || 'Connection' }]
+                          : defaultMusicConnectionPart
+                        : [];
                   return {
                     ...draft,
                     item_mode: mode,
@@ -2632,6 +2658,7 @@ export function EditionDetailPage() {
               }
             >
               <option value="audio">Audio Clip</option>
+              <option value="labeled">Labeled Response</option>
               <option value="text">Text Question</option>
             </select>
           </label>
@@ -2656,7 +2683,7 @@ export function EditionDetailPage() {
         )}
         <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
           <span className="flex items-center justify-between">
-            {gameTypeId === 'music' && itemDraft.item_mode === 'audio' ? 'Question (optional)' : 'Question'}
+            {gameTypeId === 'music' && itemDraft.item_mode !== 'text' ? 'Question (optional)' : 'Question'}
             <button
               type="button"
               onClick={startRefine}
@@ -2674,7 +2701,7 @@ export function EditionDetailPage() {
         </label>
         {gameTypeId !== 'audio' &&
           itemDraft.question_type !== 'multiple_choice' &&
-          !(gameTypeId === 'music' && itemDraft.item_mode === 'audio') && (
+          !(gameTypeId === 'music' && itemDraft.item_mode !== 'text') && (
           <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
             <span className="flex items-center justify-between">
               Answer
@@ -2701,17 +2728,19 @@ export function EditionDetailPage() {
             )}
           </label>
         )}
-        {gameTypeId === 'music' && itemDraft.item_mode === 'audio' && (
+        {gameTypeId === 'music' && itemDraft.item_mode !== 'text' && (
           <div className="flex flex-col gap-2">
-            <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">Answer parts</div>
+            <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">
+              {itemDraft.item_mode === 'labeled' ? 'Response' : 'Answer parts'}
+            </div>
             <div className="flex flex-col gap-2">
               {itemDraft.answer_parts.map((part, idx) => (
                 <div
                   key={`new-answer-part-${idx}`}
-                  className="grid gap-2 sm:grid-cols-[1fr,2fr,auto] sm:items-end"
+                  className={`grid gap-2 sm:items-end ${itemDraft.item_mode === 'labeled' ? 'sm:grid-cols-[1fr,2fr]' : 'sm:grid-cols-[1fr,2fr,auto]'}`}
                 >
                   <label className="flex flex-col gap-1 text-[10px] font-display uppercase tracking-[0.25em] text-muted">
-                    Answer type
+                    {itemDraft.item_mode === 'labeled' ? 'Label' : 'Answer type'}
                     <input
                       className="h-10 px-3"
                       value={part.label}
@@ -2738,7 +2767,7 @@ export function EditionDetailPage() {
                       }
                     />
                   </label>
-                  {itemDraft.answer_parts.length > 1 && (
+                  {itemDraft.item_mode !== 'labeled' && itemDraft.answer_parts.length > 1 && (
                     <button
                       type="button"
                       onClick={() =>
@@ -2755,20 +2784,22 @@ export function EditionDetailPage() {
                 </div>
               ))}
             </div>
-            <SecondaryButton
-              onClick={() =>
-                setItemDraft((draft) => ({
-                  ...draft,
-                  answer_parts: [
-                    ...draft.answer_parts,
-                    { label: `Answer ${draft.answer_parts.length + 1}`, answer: '' }
-                  ]
-                }))
-              }
-              className="self-start px-3 py-2 text-xs"
-            >
-              Add answer part
-            </SecondaryButton>
+            {itemDraft.item_mode !== 'labeled' && (
+              <SecondaryButton
+                onClick={() =>
+                  setItemDraft((draft) => ({
+                    ...draft,
+                    answer_parts: [
+                      ...draft.answer_parts,
+                      { label: `Answer ${draft.answer_parts.length + 1}`, answer: '' }
+                    ]
+                  }))
+                }
+                className="self-start px-3 py-2 text-xs"
+              >
+                Add answer part
+              </SecondaryButton>
+            )}
           </div>
         )}
         {gameTypeId !== 'audio' && itemDraft.question_type === 'multiple_choice' && (
@@ -3571,6 +3602,8 @@ export function EditionDetailPage() {
                           ? item.prompt
                           : gameTypeId === 'music' && item.media_type === 'audio'
                             ? `Audio Clip ${item.ordinal}`
+                            : gameTypeId === 'music' && parseAnswerPartsJson(item.answer_parts_json ?? null, item).length === 1
+                              ? parseAnswerPartsJson(item.answer_parts_json ?? null, item)[0]?.label ?? ''
                             : ''}
                       </div>
                       <div className="mt-1 text-xs uppercase tracking-[0.2em] text-muted">

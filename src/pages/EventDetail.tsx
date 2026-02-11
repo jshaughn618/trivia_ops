@@ -89,6 +89,13 @@ const resolveScoresheetAnswerColumns = (items: EditionItem[]) => {
   return [] as string[];
 };
 
+const resolveInlineResponseLabel = (item: EditionItem) => {
+  if (item.media_type === 'audio') return null;
+  const labels = deriveAnswerTypeLabels(item);
+  if (labels.length === 1) return labels[0];
+  return null;
+};
+
 const formatAnswer = (item: EditionItem) => {
   const answerParts = parseAnswerPartsJson(item.answer_parts_json);
   if (answerParts.length > 0) {
@@ -372,17 +379,37 @@ const renderRoundBlock = (
     return;
   }
 
+  let numberedRow = 0;
   for (let index = 0; index < itemCount; index += 1) {
     const item = items[index];
     const rowY = baseY - lineSpacing * index;
-    page.drawText(`${index + 1}.`, {
-      x: contentX,
-      y: rowY,
-      size: numberSize,
-      font: fonts.regular
-    });
+    const inlineLabel = mode === 'scoresheet' ? resolveInlineResponseLabel(item) : null;
     if (mode === 'scoresheet') {
-      if (hasSplitAnswerColumns) {
+      if (inlineLabel) {
+        const labelText = `${inlineLabel}:`;
+        page.drawText(labelText, {
+          x: textStartX,
+          y: rowY,
+          size: textSize,
+          font: fonts.regular
+        });
+        const labelWidth = fonts.regular.widthOfTextAtSize(labelText, textSize);
+        const lineY = rowY - 2;
+        const lineStart = Math.min(textStartX + labelWidth + 6, textStartX + availableWidth - 12);
+        page.drawLine({
+          start: { x: lineStart, y: lineY },
+          end: { x: textStartX + availableWidth, y: lineY },
+          thickness: 0.8,
+          color: rgb(0, 0, 0)
+        });
+      } else if (hasSplitAnswerColumns) {
+        numberedRow += 1;
+        page.drawText(`${numberedRow}.`, {
+          x: contentX,
+          y: rowY,
+          size: numberSize,
+          font: fonts.regular
+        });
         const gap = 12;
         const colCount = answerColumns.length;
         const totalGap = gap * Math.max(0, colCount - 1);
@@ -398,6 +425,13 @@ const renderRoundBlock = (
           });
         });
       } else {
+        numberedRow += 1;
+        page.drawText(`${numberedRow}.`, {
+          x: contentX,
+          y: rowY,
+          size: numberSize,
+          font: fonts.regular
+        });
         const lineY = rowY - 2;
         page.drawLine({
           start: { x: textStartX, y: lineY },
@@ -407,6 +441,12 @@ const renderRoundBlock = (
         });
       }
     } else {
+      page.drawText(`${index + 1}.`, {
+        x: contentX,
+        y: rowY,
+        size: numberSize,
+        font: fonts.regular
+      });
       const answer = truncateText(fonts.regular, formatAnswer(item), availableWidth, textSize);
       page.drawText(answer, {
         x: textStartX,
