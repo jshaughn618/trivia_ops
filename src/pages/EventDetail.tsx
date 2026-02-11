@@ -203,15 +203,11 @@ const drawMusicScoresheetHeader = (
   const centerLaneEndX = rightX - centerLaneInset;
   const centerLaneWidth = Math.max(68, centerLaneEndX - centerLaneStartX);
   const qrImageSize = extras?.qrImage ? 36 : 0;
-  const qrPadding = extras?.qrImage ? 3 : 0;
-  const qrFrameSize = qrImageSize > 0 ? qrImageSize + qrPadding * 2 : 0;
 
   let logoWidth = 0;
   let logoHeight = 0;
   if (extras?.logoImage) {
-    const maxLogoWidth = extras?.qrImage
-      ? Math.min(62, Math.max(40, centerLaneWidth - qrFrameSize - 12))
-      : Math.min(84, centerLaneWidth);
+    const maxLogoWidth = extras?.qrImage ? Math.min(72, centerLaneWidth) : Math.min(84, centerLaneWidth);
     const maxLogoHeight = 20;
     const scale = Math.min(
       maxLogoWidth / extras.logoImage.width,
@@ -222,36 +218,27 @@ const drawMusicScoresheetHeader = (
     logoHeight = extras.logoImage.height * scale;
   }
 
-  const centerGap = logoWidth > 0 && qrFrameSize > 0 ? 10 : 0;
-  const centerWidth = logoWidth + centerGap + qrFrameSize;
+  const verticalGap = logoHeight > 0 && qrImageSize > 0 ? 6 : 0;
+  const centerWidth = Math.max(logoWidth, qrImageSize);
   const centerStartX = centerLaneStartX + Math.max(0, (centerLaneWidth - centerWidth) / 2);
   const centerTopY = headerTop - 2;
-  const centerBlockHeight = Math.max(logoHeight, qrFrameSize);
+  const qrDrop = qrImageSize > 0 ? 4 : 0;
+  const centerBlockHeight = logoHeight + verticalGap + qrImageSize + qrDrop;
 
   if (extras?.logoImage && logoWidth > 0 && logoHeight > 0) {
-    const logoY = centerTopY - (centerBlockHeight - logoHeight) / 2 - logoHeight;
+    const logoX = centerStartX + (centerWidth - logoWidth) / 2;
+    const logoY = centerTopY - logoHeight;
     page.drawImage(extras.logoImage, {
-      x: centerStartX,
+      x: logoX,
       y: logoY,
       width: logoWidth,
       height: logoHeight
     });
   }
 
-  if (extras?.qrImage && qrFrameSize > 0) {
-    const qrFrameX = centerStartX + logoWidth + centerGap;
-    const qrFrameY = centerTopY - (centerBlockHeight - qrFrameSize) / 2 - qrFrameSize;
-    page.drawRectangle({
-      x: qrFrameX,
-      y: qrFrameY,
-      width: qrFrameSize,
-      height: qrFrameSize,
-      color: rgb(1, 1, 1),
-      borderColor: rgb(0.78, 0.78, 0.78),
-      borderWidth: 0.8
-    });
-    const qrX = qrFrameX + qrPadding;
-    const qrY = qrFrameY + qrPadding;
+  if (extras?.qrImage && qrImageSize > 0) {
+    const qrX = centerStartX + (centerWidth - qrImageSize) / 2;
+    const qrY = centerTopY - logoHeight - verticalGap - qrImageSize - qrDrop;
     page.drawImage(extras.qrImage, {
       x: qrX,
       y: qrY,
