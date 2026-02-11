@@ -108,7 +108,7 @@ export function LoginPage() {
       if (res.error?.code === 'team_name_required') {
         setRequireTeamName(true);
         setRequireTeamNameCode(normalized);
-        setTeamError(formatApiError(res, 'Team name required to claim this code.'));
+        setTeamError(null);
         return;
       }
       setTeamError(formatApiError(res, 'Team code not recognized. Check the code and try again.'));
@@ -308,6 +308,7 @@ export function LoginPage() {
                           onChange={(event) => setTeamNameInput(event.target.value)}
                           placeholder="Enter your team name"
                         />
+                        <span className="text-xs text-muted">Enter a team name to claim this code.</span>
                       </label>
                     )}
                     {teamError && (

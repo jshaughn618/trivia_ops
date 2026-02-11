@@ -493,6 +493,9 @@ export function PlayEventPage() {
       if (res.error?.code === 'team_name_required') {
         setRequireTeamName(true);
         setRequireTeamNameCode(normalized);
+        setJoinError(null);
+        setJoinLoading(false);
+        return;
       }
       setJoinError(formatApiError(res, 'Unable to join team.'));
     }
@@ -912,6 +915,7 @@ export function PlayEventPage() {
                       onChange={(event) => setTeamNameInput(event.target.value)}
                       placeholder="Enter your team name"
                     />
+                    <span className="text-xs text-muted">Enter a team name to claim this code.</span>
                   </label>
                 )}
                 {joinError && (
