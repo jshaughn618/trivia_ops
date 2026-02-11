@@ -80,7 +80,8 @@ const editionItemBaseSchema = z.object({
     .array(
       z.object({
         label: z.string().min(1),
-        answer: z.string().min(1)
+        answer: z.string().min(1),
+        points: z.number().int().min(0).optional().default(1)
       })
     )
     .optional(),

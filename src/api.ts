@@ -15,7 +15,7 @@ import type {
 } from './types';
 import { createRequestId, logError, logInfo, logWarn } from './lib/log';
 
-type AnswerPartPayload = { label: string; answer: string };
+type AnswerPartPayload = { label: string; answer: string; points?: number };
 type EditionItemPayload = Partial<EditionItem> & { answer_parts_json?: AnswerPartPayload[] };
 
 async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<ApiEnvelope<T>> {

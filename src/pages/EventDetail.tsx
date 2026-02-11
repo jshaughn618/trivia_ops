@@ -25,7 +25,7 @@ type RoundBundle = {
   round: EventRound;
   items: EditionItem[];
 };
-type ParsedAnswerPart = { label: string; answer: string };
+type ParsedAnswerPart = { label: string; answer: string; points: number };
 
 const safeFileName = (value: string, fallback: string) => {
   const trimmed = value.trim().toLowerCase();
@@ -57,8 +57,11 @@ const parseAnswerPartsJson = (value?: string | null): ParsedAnswerPart[] => {
         if (!entry || typeof entry !== 'object') return null;
         const label = typeof entry.label === 'string' ? entry.label.trim() : '';
         const answer = typeof entry.answer === 'string' ? entry.answer.trim() : '';
+        const rawPoints = (entry as { points?: unknown }).points;
+        const points =
+          typeof rawPoints === 'number' && Number.isFinite(rawPoints) ? Math.max(0, Math.trunc(rawPoints)) : 1;
         if (!label) return null;
-        return { label, answer } as ParsedAnswerPart;
+        return { label, answer, points } as ParsedAnswerPart;
       })
       .filter((entry): entry is ParsedAnswerPart => Boolean(entry));
   } catch {
@@ -66,16 +69,20 @@ const parseAnswerPartsJson = (value?: string | null): ParsedAnswerPart[] => {
   }
 };
 
-const deriveAnswerTypeLabels = (item: EditionItem): string[] => {
+const formatPointsLabel = (points: number) => `${points} ${points === 1 ? 'point' : 'points'}`;
+
+const deriveAnswerTypeLabels = (item: EditionItem): Array<{ label: string; points: number }> => {
   const parts = parseAnswerPartsJson(item.answer_parts_json);
   if (parts.length > 0) {
-    return parts.map((part) => part.label).filter((label) => label.length > 0);
+    return parts
+      .filter((part) => part.label.length > 0)
+      .map((part) => ({ label: part.label, points: part.points }));
   }
-  const labels: string[] = [];
+  const labels: Array<{ label: string; points: number }> = [];
   const labelA = item.answer_a_label?.trim() || 'Answer A';
   const labelB = item.answer_b_label?.trim() || 'Answer B';
-  if ((item.answer_a?.trim() ?? '') || (item.answer_a_label?.trim() ?? '')) labels.push(labelA);
-  if ((item.answer_b?.trim() ?? '') || (item.answer_b_label?.trim() ?? '')) labels.push(labelB);
+  if ((item.answer_a?.trim() ?? '') || (item.answer_a_label?.trim() ?? '')) labels.push({ label: labelA, points: 1 });
+  if ((item.answer_b?.trim() ?? '') || (item.answer_b_label?.trim() ?? '')) labels.push({ label: labelB, points: 1 });
   return labels;
 };
 
@@ -83,7 +90,10 @@ const resolveScoresheetAnswerColumns = (items: EditionItem[]) => {
   for (const item of items) {
     const labels = deriveAnswerTypeLabels(item);
     if (labels.length >= 2) {
-      return [labels[0], labels[1]];
+      return [
+        `${labels[0].label} (${formatPointsLabel(labels[0].points)})`,
+        `${labels[1].label} (${formatPointsLabel(labels[1].points)})`
+      ];
     }
   }
   return [] as string[];
@@ -92,7 +102,7 @@ const resolveScoresheetAnswerColumns = (items: EditionItem[]) => {
 const resolveInlineResponseLabel = (item: EditionItem) => {
   if (item.media_type === 'audio') return null;
   const labels = deriveAnswerTypeLabels(item);
-  if (labels.length === 1) return labels[0];
+  if (labels.length === 1) return `${labels[0].label} (${formatPointsLabel(labels[0].points)})`;
   return null;
 };
 

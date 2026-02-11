@@ -7,7 +7,7 @@ import { Panel } from '../components/Panel';
 import { PrimaryButton, SecondaryButton, DangerButton } from '../components/Buttons';
 import type { EditionItem, Game, GameEdition } from '../types';
 
-type AnswerPart = { label: string; answer: string };
+type AnswerPart = { label: string; answer: string; points: number };
 
 const emptyItem = {
   question_type: 'text' as 'text' | 'multiple_choice',
@@ -19,6 +19,8 @@ const emptyItem = {
   answer_b: '',
   answer_a_label: '',
   answer_b_label: '',
+  answer_a_points: 1,
+  answer_b_points: 1,
   fun_fact: '',
   media_key: '',
   media_type: '',
@@ -30,10 +32,10 @@ type ItemDraft = typeof emptyItem & { item_mode: 'text' | 'audio' | 'labeled' };
 
 const choiceLabels = ['A', 'B', 'C', 'D'];
 const defaultMusicAnswerParts: AnswerPart[] = [
-  { label: 'Song', answer: '' },
-  { label: 'Artist', answer: '' }
+  { label: 'Song', answer: '', points: 1 },
+  { label: 'Artist', answer: '', points: 1 }
 ];
-const defaultMusicConnectionPart: AnswerPart[] = [{ label: 'Connection', answer: '' }];
+const defaultMusicConnectionPart: AnswerPart[] = [{ label: 'Connection', answer: '', points: 1 }];
 const MUSIC_AI_PARSE_LIMIT = 60;
 const MUSIC_AI_INSTRUCTION_LIMIT = 600;
 const SPEED_ROUND_MAX_ITEMS = 60;
@@ -61,8 +63,10 @@ const parseAnswerPartsJson = (answerPartsJson: string | null, item?: EditionItem
             if (!entry || typeof entry !== 'object') return null;
             const label = typeof entry.label === 'string' ? entry.label : '';
             const answer = typeof entry.answer === 'string' ? entry.answer : '';
+            const pointsRaw = (entry as { points?: unknown }).points;
+            const points = typeof pointsRaw === 'number' && Number.isFinite(pointsRaw) ? Math.max(0, Math.trunc(pointsRaw)) : 1;
             if (!label || !answer) return null;
-            return { label, answer } as AnswerPart;
+            return { label, answer, points } as AnswerPart;
           })
           .filter((part): part is AnswerPart => Boolean(part));
         if (parts.length > 0) return parts;
@@ -74,10 +78,10 @@ const parseAnswerPartsJson = (answerPartsJson: string | null, item?: EditionItem
   if (item && (item.answer_a || item.answer_b)) {
     const parts: AnswerPart[] = [];
     if (item.answer_a) {
-      parts.push({ label: item.answer_a_label ?? 'Answer 1', answer: item.answer_a });
+      parts.push({ label: item.answer_a_label ?? 'Answer 1', answer: item.answer_a, points: 1 });
     }
     if (item.answer_b) {
-      parts.push({ label: item.answer_b_label ?? `Answer ${parts.length + 1}`, answer: item.answer_b });
+      parts.push({ label: item.answer_b_label ?? `Answer ${parts.length + 1}`, answer: item.answer_b, points: 1 });
     }
     if (parts.length > 0) return parts;
   }
@@ -89,7 +93,11 @@ const safeString = (value: unknown) => (typeof value === 'string' ? value : valu
 
 const sanitizeAnswerParts = (parts: AnswerPart[]) =>
   parts
-    .map((part) => ({ label: safeTrim(part.label), answer: safeTrim(part.answer) }))
+    .map((part) => ({
+      label: safeTrim(part.label),
+      answer: safeTrim(part.answer),
+      points: Number.isFinite(part.points) ? Math.max(0, Math.trunc(part.points)) : 1
+    }))
     .filter((part) => part.label.length > 0 && part.answer.length > 0);
 
 const answerSummary = (item: EditionItem, isMusic: boolean) => {
@@ -285,13 +293,15 @@ export function EditionDetailPage() {
       answer_b: safeString(item.answer_b),
       answer_a_label: safeString(item.answer_a_label),
       answer_b_label: safeString(item.answer_b_label),
+      answer_a_points: parsedAnswerParts[0]?.points ?? 1,
+      answer_b_points: parsedAnswerParts[1]?.points ?? 1,
       fun_fact: safeString(item.fun_fact),
       media_type: safeString(item.media_type),
       media_key: safeString(item.media_key),
       audio_answer_key: safeString(item.audio_answer_key),
       media_filename: '',
       item_mode: isAudioItem ? 'audio' : isMusic && parsedAnswerParts.length === 1 ? 'labeled' : 'text',
-      answer_parts: answerPartsDraft.map((part) => ({ label: part.label, answer: part.answer }))
+      answer_parts: answerPartsDraft.map((part) => ({ label: part.label, answer: part.answer, points: part.points ?? 1 }))
     };
   };
 
@@ -305,6 +315,8 @@ export function EditionDetailPage() {
     answer_b: safeString(draft.answer_b),
     answer_a_label: safeString(draft.answer_a_label),
     answer_b_label: safeString(draft.answer_b_label),
+    answer_a_points: Number.isFinite(draft.answer_a_points) ? Math.max(0, Math.trunc(draft.answer_a_points)) : 1,
+    answer_b_points: Number.isFinite(draft.answer_b_points) ? Math.max(0, Math.trunc(draft.answer_b_points)) : 1,
     fun_fact: safeString(draft.fun_fact),
     media_type: safeString(draft.media_type),
     media_key: safeString(draft.media_key),
@@ -312,7 +324,8 @@ export function EditionDetailPage() {
     item_mode: draft.item_mode,
     answer_parts: draft.answer_parts.map((part) => ({
       label: safeString(part.label),
-      answer: safeString(part.answer)
+      answer: safeString(part.answer),
+      points: Number.isFinite(part.points) ? Math.max(0, Math.trunc(part.points)) : 1
     }))
   });
 
@@ -496,6 +509,18 @@ export function EditionDetailPage() {
         setItemValidationError('Answer A and Answer B are required for audio items.');
         return;
       }
+      answerPartsPayload = sanitizeAnswerParts([
+        {
+          label: itemDraft.answer_a_label.trim() || 'Answer A',
+          answer: itemDraft.answer_a.trim(),
+          points: itemDraft.answer_a_points
+        },
+        {
+          label: itemDraft.answer_b_label.trim() || 'Answer B',
+          answer: itemDraft.answer_b.trim(),
+          points: itemDraft.answer_b_points
+        }
+      ]);
     } else if (isMusicPartBased) {
       const partsClean = sanitizeAnswerParts(itemDraft.answer_parts);
       if (partsClean.length === 0) {
@@ -626,6 +651,18 @@ export function EditionDetailPage() {
         }
         return false;
       }
+      answerPartsPayload = sanitizeAnswerParts([
+        {
+          label: itemDraft.answer_a_label.trim() || 'Answer A',
+          answer: itemDraft.answer_a.trim(),
+          points: itemDraft.answer_a_points
+        },
+        {
+          label: itemDraft.answer_b_label.trim() || 'Answer B',
+          answer: itemDraft.answer_b.trim(),
+          points: itemDraft.answer_b_points
+        }
+      ]);
     } else if (isMusicPartBased) {
       const partsClean = sanitizeAnswerParts(itemDraft.answer_parts);
       if (partsClean.length === 0) {
@@ -1520,25 +1557,28 @@ export function EditionDetailPage() {
         return sanitizeAnswerParts(
           raw.map((part, index) => {
             if (typeof part === 'string') {
-              return { label: `Answer ${index + 1}`, answer: part };
+              return { label: `Answer ${index + 1}`, answer: part, points: 1 };
             }
-            if (!part || typeof part !== 'object') return { label: '', answer: '' };
+            if (!part || typeof part !== 'object') return { label: '', answer: '', points: 1 };
             const label = typeof (part as { label?: unknown }).label === 'string' ? (part as { label: string }).label : '';
             const answer =
               typeof (part as { answer?: unknown }).answer === 'string' ? (part as { answer: string }).answer : '';
-            if (label && answer) return { label, answer };
+            const rawPoints = (part as { points?: unknown }).points;
+            const points =
+              typeof rawPoints === 'number' && Number.isFinite(rawPoints) ? Math.max(0, Math.trunc(rawPoints)) : 1;
+            if (label && answer) return { label, answer, points };
             const entries = Object.entries(part as Record<string, unknown>).filter(([, value]) => typeof value === 'string');
             if (entries.length === 1) {
               const [key, value] = entries[0];
-              return { label: normalizeLabel(key), answer: String(value) };
+              return { label: normalizeLabel(key), answer: String(value), points: 1 };
             }
-            return { label: '', answer: '' };
+            return { label: '', answer: '', points: 1 };
           })
         );
       }
       if (raw && typeof raw === 'object') {
         const entries = Object.entries(raw as Record<string, unknown>).filter(([, value]) => typeof value === 'string');
-        return sanitizeAnswerParts(entries.map(([key, value]) => ({ label: normalizeLabel(key), answer: String(value) })));
+        return sanitizeAnswerParts(entries.map(([key, value]) => ({ label: normalizeLabel(key), answer: String(value), points: 1 })));
       }
       return [];
     };
@@ -1556,7 +1596,7 @@ export function EditionDetailPage() {
       if (parts.length === 0) {
         const inferredParts = Object.entries(rawEntry)
           .filter(([key, value]) => !reservedKeys.has(key) && typeof value === 'string')
-          .map(([key, value]) => ({ label: normalizeLabel(key), answer: String(value) }));
+          .map(([key, value]) => ({ label: normalizeLabel(key), answer: String(value), points: 1 }));
         parts = sanitizeAnswerParts(inferredParts);
       }
       if (parts.length > 0) partsByOrdinal.set(ordinal, parts);
@@ -1627,22 +1667,22 @@ export function EditionDetailPage() {
           : '';
     const parts: AnswerPart[] = [];
     if (isMusicMashup) {
-      if (artist1) parts.push({ label: 'Artist 1', answer: artist1 });
-      if (artist2) parts.push({ label: 'Artist 2', answer: artist2 });
+      if (artist1) parts.push({ label: 'Artist 1', answer: artist1, points: 1 });
+      if (artist2) parts.push({ label: 'Artist 2', answer: artist2, points: 1 });
       if (!artist1 && !artist2 && artist) {
         const split = artist.split('&').map((value) => value.trim()).filter(Boolean);
-        if (split.length > 0) parts.push({ label: 'Artist 1', answer: split[0] });
-        if (split.length > 1) parts.push({ label: 'Artist 2', answer: split[1] });
-        if (split.length === 1) parts.push({ label: 'Artist 2', answer: '' });
+        if (split.length > 0) parts.push({ label: 'Artist 1', answer: split[0], points: 1 });
+        if (split.length > 1) parts.push({ label: 'Artist 2', answer: split[1], points: 1 });
+        if (split.length === 1) parts.push({ label: 'Artist 2', answer: '', points: 1 });
       }
-      if (song) parts.push({ label: 'Song', answer: song });
+      if (song) parts.push({ label: 'Song', answer: song, points: 1 });
     } else if (isMusicCovers) {
-      if (song) parts.push({ label: 'Song', answer: song });
-      if (coverArtist) parts.push({ label: 'Cover artist', answer: coverArtist });
-      if (originalArtist) parts.push({ label: 'Original artist', answer: originalArtist });
+      if (song) parts.push({ label: 'Song', answer: song, points: 1 });
+      if (coverArtist) parts.push({ label: 'Cover artist', answer: coverArtist, points: 1 });
+      if (originalArtist) parts.push({ label: 'Original artist', answer: originalArtist, points: 1 });
     } else {
-      if (song) parts.push({ label: 'Song', answer: song });
-      if (artist) parts.push({ label: 'Artist', answer: artist });
+      if (song) parts.push({ label: 'Song', answer: song, points: 1 });
+      if (artist) parts.push({ label: 'Artist', answer: artist, points: 1 });
     }
     const normalizedParts = sanitizeAnswerParts(parts);
     if (normalizedParts.length === 0) return null;
@@ -1677,9 +1717,9 @@ export function EditionDetailPage() {
         const mashupParsed = parseArtistPairTitle(rest);
         if (mashupParsed) {
           const parts = sanitizeAnswerParts([
-            { label: 'Artist 1', answer: mashupParsed.artist1 },
-            { label: 'Artist 2', answer: mashupParsed.artist2 },
-            { label: 'Song', answer: mashupParsed.song }
+            { label: 'Artist 1', answer: mashupParsed.artist1, points: 1 },
+            { label: 'Artist 2', answer: mashupParsed.artist2, points: 1 },
+            { label: 'Song', answer: mashupParsed.song, points: 1 }
           ]);
           if (parts.length > 0) entries.push({ ordinal, parts });
         }
@@ -1690,9 +1730,9 @@ export function EditionDetailPage() {
           const coverArtist = coverMatch[2]?.trim() ?? '';
           const originalArtist = coverMatch[3]?.trim() ?? '';
           const parts = sanitizeAnswerParts([
-            { label: 'Song', answer: song },
-            { label: 'Cover artist', answer: coverArtist },
-            { label: 'Original artist', answer: originalArtist }
+            { label: 'Song', answer: song, points: 1 },
+            { label: 'Cover artist', answer: coverArtist, points: 1 },
+            { label: 'Original artist', answer: originalArtist, points: 1 }
           ]);
           if (parts.length > 0) entries.push({ ordinal, parts });
         }
@@ -1702,8 +1742,8 @@ export function EditionDetailPage() {
           const artist = simpleMatch[1]?.trim() ?? '';
           const song = simpleMatch[2]?.trim() ?? '';
           const parts = sanitizeAnswerParts([
-            { label: 'Song', answer: song },
-            { label: 'Artist', answer: artist }
+            { label: 'Song', answer: song, points: 1 },
+            { label: 'Artist', answer: artist, points: 1 }
           ]);
           if (parts.length > 0) entries.push({ ordinal, parts });
         }
@@ -2035,7 +2075,7 @@ export function EditionDetailPage() {
         const answerParts =
           aiParts && aiParts.length > 0
             ? aiParts
-            : heuristic?.parts ?? [{ label: 'Answer', answer: entry.title }];
+            : heuristic?.parts ?? [{ label: 'Answer', answer: entry.title, points: 1 }];
         const answerValue = answerParts.map((part) => part.answer).join(' / ');
         const aiFact = aiFunFactsByOrdinal.get(ordinal) ?? heuristic?.factoid ?? null;
         if (existing) {
@@ -2109,7 +2149,7 @@ export function EditionDetailPage() {
                         : defaultMusicAnswerParts
                       : mode === 'labeled'
                         ? draft.answer_parts.length > 0
-                          ? [{ ...draft.answer_parts[0], label: draft.answer_parts[0].label || 'Connection' }]
+                          ? [{ ...draft.answer_parts[0], label: draft.answer_parts[0].label || 'Connection', points: draft.answer_parts[0].points ?? 1 }]
                           : defaultMusicConnectionPart
                         : [];
                   return {
@@ -2203,7 +2243,7 @@ export function EditionDetailPage() {
               {itemDraft.answer_parts.map((part, idx) => (
                 <div
                   key={`edit-answer-part-${idx}`}
-                  className={`grid gap-2 sm:items-end ${itemDraft.item_mode === 'labeled' ? 'sm:grid-cols-[1fr,2fr]' : 'sm:grid-cols-[1fr,2fr,auto]'}`}
+                  className={`grid gap-2 sm:items-end ${itemDraft.item_mode === 'labeled' ? 'sm:grid-cols-[1fr,2fr,120px]' : 'sm:grid-cols-[1fr,2fr,120px,auto]'}`}
                 >
                   <label className="flex flex-col gap-1 text-[10px] font-display uppercase tracking-[0.25em] text-muted">
                     {itemDraft.item_mode === 'labeled' ? 'Label' : 'Answer type'}
@@ -2233,6 +2273,23 @@ export function EditionDetailPage() {
                       }
                     />
                   </label>
+                  <label className="flex flex-col gap-1 text-[10px] font-display uppercase tracking-[0.25em] text-muted">
+                    Points
+                    <input
+                      className="h-10 px-3"
+                      type="number"
+                      min={0}
+                      step={1}
+                      value={part.points}
+                      onChange={(event) =>
+                        setItemDraft((draft) => {
+                          const next = [...draft.answer_parts];
+                          next[idx] = { ...next[idx], points: Number(event.target.value) };
+                          return { ...draft, answer_parts: next };
+                        })
+                      }
+                    />
+                  </label>
                   {itemDraft.item_mode !== 'labeled' && itemDraft.answer_parts.length > 1 && (
                     <button
                       type="button"
@@ -2257,7 +2314,7 @@ export function EditionDetailPage() {
                     ...draft,
                     answer_parts: [
                       ...draft.answer_parts,
-                      { label: `Answer ${draft.answer_parts.length + 1}`, answer: '' }
+                      { label: `Answer ${draft.answer_parts.length + 1}`, answer: '', points: 1 }
                     ]
                   }))
                 }
@@ -2334,6 +2391,19 @@ export function EditionDetailPage() {
               />
             </label>
             <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+              Answer A Points
+              <input
+                className="h-10 px-3"
+                type="number"
+                min={0}
+                step={1}
+                value={itemDraft.answer_a_points}
+                onChange={(event) =>
+                  setItemDraft((draft) => ({ ...draft, answer_a_points: Number(event.target.value) }))
+                }
+              />
+            </label>
+            <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
               Answer B Label
               <input
                 className="h-10 px-3"
@@ -2349,6 +2419,19 @@ export function EditionDetailPage() {
                 className="h-10 px-3"
                 value={itemDraft.answer_b}
                 onChange={(event) => setItemDraft((draft) => ({ ...draft, answer_b: event.target.value }))}
+              />
+            </label>
+            <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+              Answer B Points
+              <input
+                className="h-10 px-3"
+                type="number"
+                min={0}
+                step={1}
+                value={itemDraft.answer_b_points}
+                onChange={(event) =>
+                  setItemDraft((draft) => ({ ...draft, answer_b_points: Number(event.target.value) }))
+                }
               />
             </label>
           </>
@@ -2643,7 +2726,7 @@ export function EditionDetailPage() {
                         : defaultMusicAnswerParts
                       : mode === 'labeled'
                         ? draft.answer_parts.length > 0
-                          ? [{ ...draft.answer_parts[0], label: draft.answer_parts[0].label || 'Connection' }]
+                          ? [{ ...draft.answer_parts[0], label: draft.answer_parts[0].label || 'Connection', points: draft.answer_parts[0].points ?? 1 }]
                           : defaultMusicConnectionPart
                         : [];
                   return {
@@ -2737,7 +2820,7 @@ export function EditionDetailPage() {
               {itemDraft.answer_parts.map((part, idx) => (
                 <div
                   key={`new-answer-part-${idx}`}
-                  className={`grid gap-2 sm:items-end ${itemDraft.item_mode === 'labeled' ? 'sm:grid-cols-[1fr,2fr]' : 'sm:grid-cols-[1fr,2fr,auto]'}`}
+                  className={`grid gap-2 sm:items-end ${itemDraft.item_mode === 'labeled' ? 'sm:grid-cols-[1fr,2fr,120px]' : 'sm:grid-cols-[1fr,2fr,120px,auto]'}`}
                 >
                   <label className="flex flex-col gap-1 text-[10px] font-display uppercase tracking-[0.25em] text-muted">
                     {itemDraft.item_mode === 'labeled' ? 'Label' : 'Answer type'}
@@ -2767,6 +2850,23 @@ export function EditionDetailPage() {
                       }
                     />
                   </label>
+                  <label className="flex flex-col gap-1 text-[10px] font-display uppercase tracking-[0.25em] text-muted">
+                    Points
+                    <input
+                      className="h-10 px-3"
+                      type="number"
+                      min={0}
+                      step={1}
+                      value={part.points}
+                      onChange={(event) =>
+                        setItemDraft((draft) => {
+                          const next = [...draft.answer_parts];
+                          next[idx] = { ...next[idx], points: Number(event.target.value) };
+                          return { ...draft, answer_parts: next };
+                        })
+                      }
+                    />
+                  </label>
                   {itemDraft.item_mode !== 'labeled' && itemDraft.answer_parts.length > 1 && (
                     <button
                       type="button"
@@ -2791,7 +2891,7 @@ export function EditionDetailPage() {
                     ...draft,
                     answer_parts: [
                       ...draft.answer_parts,
-                      { label: `Answer ${draft.answer_parts.length + 1}`, answer: '' }
+                      { label: `Answer ${draft.answer_parts.length + 1}`, answer: '', points: 1 }
                     ]
                   }))
                 }
@@ -2868,6 +2968,19 @@ export function EditionDetailPage() {
               />
             </label>
             <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+              Answer A Points
+              <input
+                className="h-10 px-3"
+                type="number"
+                min={0}
+                step={1}
+                value={itemDraft.answer_a_points}
+                onChange={(event) =>
+                  setItemDraft((draft) => ({ ...draft, answer_a_points: Number(event.target.value) }))
+                }
+              />
+            </label>
+            <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
               Answer B Label
               <input
                 className="h-10 px-3"
@@ -2883,6 +2996,19 @@ export function EditionDetailPage() {
                 className="h-10 px-3"
                 value={itemDraft.answer_b}
                 onChange={(event) => setItemDraft((draft) => ({ ...draft, answer_b: event.target.value }))}
+              />
+            </label>
+            <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+              Answer B Points
+              <input
+                className="h-10 px-3"
+                type="number"
+                min={0}
+                step={1}
+                value={itemDraft.answer_b_points}
+                onChange={(event) =>
+                  setItemDraft((draft) => ({ ...draft, answer_b_points: Number(event.target.value) }))
+                }
               />
             </label>
           </>
