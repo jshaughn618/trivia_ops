@@ -102,6 +102,11 @@ export const editionItemCreateSchema = editionItemBaseSchema
   })
   .refine((data) => {
     if (data.media_type === 'audio') return true;
+    const isSinglePartLabeledResponse =
+      Array.isArray(data.answer_parts_json) &&
+      data.answer_parts_json.length === 1 &&
+      data.question_type !== 'multiple_choice';
+    if (isSinglePartLabeledResponse) return true;
     return data.prompt.trim().length > 0;
   }, {
     message: 'Question is required',
