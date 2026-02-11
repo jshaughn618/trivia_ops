@@ -179,6 +179,23 @@ const formatAnswer = (item: EditionItem) => {
   return item.answer?.trim() || '—';
 };
 
+const resolveAnswerColumnValues = (item: EditionItem, columnCount: number) => {
+  const parts = parseAnswerPartsJson(item.answer_parts_json);
+  if (parts.length > 0) {
+    return Array.from({ length: columnCount }, (_, index) => parts[index]?.answer?.trim() || '—');
+  }
+
+  const fallbackA = item.answer_a?.trim() || '';
+  const fallbackB = item.answer_b?.trim() || '';
+  if (fallbackA || fallbackB) {
+    const raw = [fallbackA || '—', fallbackB || '—'];
+    return Array.from({ length: columnCount }, (_, index) => raw[index] || '—');
+  }
+
+  const single = item.answer?.trim() || '—';
+  return Array.from({ length: columnCount }, (_, index) => (index === 0 ? single : '—'));
+};
+
 const resolveTotalPossiblePoints = (item: EditionItem) => {
   const parts = parseAnswerPartsJson(item.answer_parts_json);
   if (parts.length > 0) {
@@ -429,8 +446,8 @@ const renderRoundBlock = (
   const numberSize = 9;
   const textSize = mode === 'scoresheet' ? 9 : 8.5;
   const items = bundle.items;
-  const answerColumns = mode === 'scoresheet' ? resolveScoresheetAnswerColumns(items) : [];
-  const hasSplitAnswerColumns = mode === 'scoresheet' && answerColumns.length > 0;
+  const answerColumns = resolveScoresheetAnswerColumns(items);
+  const hasSplitAnswerColumns = answerColumns.length > 0;
   const titleY = cell.y + cell.height - CELL_PADDING - titleSize;
   page.drawText(roundTitle(bundle.round), {
     x: cell.x + CELL_PADDING,
@@ -582,13 +599,30 @@ const renderRoundBlock = (
         size: numberSize,
         font: fonts.regular
       });
-      const answer = truncateText(fonts.regular, formatAnswer(item), responseWidth, textSize);
-      page.drawText(answer, {
-        x: textStartX,
-        y: rowY,
-        size: textSize,
-        font: fonts.regular
-      });
+      if (hasSplitAnswerColumns) {
+        const gap = 12;
+        const colCount = answerColumns.length;
+        const totalGap = gap * Math.max(0, colCount - 1);
+        const colWidth = (responseWidth - totalGap) / colCount;
+        const columnAnswers = resolveAnswerColumnValues(item, colCount);
+        columnAnswers.forEach((columnAnswer, columnIndex) => {
+          const answer = truncateText(fonts.regular, columnAnswer, colWidth, textSize);
+          page.drawText(answer, {
+            x: textStartX + columnIndex * (colWidth + gap),
+            y: rowY,
+            size: textSize,
+            font: fonts.regular
+          });
+        });
+      } else {
+        const answer = truncateText(fonts.regular, formatAnswer(item), responseWidth, textSize);
+        page.drawText(answer, {
+          x: textStartX,
+          y: rowY,
+          size: textSize,
+          font: fonts.regular
+        });
+      }
       const pointsText = String(resolveTotalPossiblePoints(item));
       const pointsWidth = fonts.bold.widthOfTextAtSize(pointsText, textSize);
       page.drawText(pointsText, {
