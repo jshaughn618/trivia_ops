@@ -202,7 +202,7 @@ const drawMusicScoresheetHeader = (
   const centerLaneStartX = PAGE_MARGIN + leftColumnWidth + centerLaneInset;
   const centerLaneEndX = rightX - centerLaneInset;
   const centerLaneWidth = Math.max(68, centerLaneEndX - centerLaneStartX);
-  const qrImageSize = extras?.qrImage ? 36 : 0;
+  const qrImageSize = extras?.qrImage ? 42 : 0;
 
   let logoWidth = 0;
   let logoHeight = 0;
@@ -218,11 +218,11 @@ const drawMusicScoresheetHeader = (
     logoHeight = extras.logoImage.height * scale;
   }
 
-  const verticalGap = logoHeight > 0 && qrImageSize > 0 ? 6 : 0;
+  const verticalGap = logoHeight > 0 && qrImageSize > 0 ? 3 : 0;
   const centerWidth = Math.max(logoWidth, qrImageSize);
   const centerStartX = centerLaneStartX + Math.max(0, (centerLaneWidth - centerWidth) / 2);
   const centerTopY = headerTop - 2;
-  const qrDrop = qrImageSize > 0 ? 4 : 0;
+  const qrDrop = qrImageSize > 0 ? 1 : 0;
   const centerBlockHeight = logoHeight + verticalGap + qrImageSize + qrDrop;
 
   if (extras?.logoImage && logoWidth > 0 && logoHeight > 0) {
