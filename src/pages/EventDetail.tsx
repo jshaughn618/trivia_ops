@@ -600,20 +600,32 @@ const renderRoundBlock = (
         font: fonts.regular
       });
       if (hasSplitAnswerColumns) {
-        const gap = 12;
-        const colCount = answerColumns.length;
-        const totalGap = gap * Math.max(0, colCount - 1);
-        const colWidth = (responseWidth - totalGap) / colCount;
-        const columnAnswers = resolveAnswerColumnValues(item, colCount);
-        columnAnswers.forEach((columnAnswer, columnIndex) => {
-          const answer = truncateText(fonts.regular, columnAnswer, colWidth, textSize);
+        const answerTypeLabels = deriveAnswerTypeLabels(item);
+        const isSingleLabeledResponse = answerTypeLabels.length === 1;
+        if (isSingleLabeledResponse) {
+          const answer = truncateText(fonts.regular, formatAnswer(item), responseWidth, textSize);
           page.drawText(answer, {
-            x: textStartX + columnIndex * (colWidth + gap),
+            x: textStartX,
             y: rowY,
             size: textSize,
             font: fonts.regular
           });
-        });
+        } else {
+          const gap = 12;
+          const colCount = answerColumns.length;
+          const totalGap = gap * Math.max(0, colCount - 1);
+          const colWidth = (responseWidth - totalGap) / colCount;
+          const columnAnswers = resolveAnswerColumnValues(item, colCount);
+          columnAnswers.forEach((columnAnswer, columnIndex) => {
+            const answer = truncateText(fonts.regular, columnAnswer, colWidth, textSize);
+            page.drawText(answer, {
+              x: textStartX + columnIndex * (colWidth + gap),
+              y: rowY,
+              size: textSize,
+              font: fonts.regular
+            });
+          });
+        }
       } else {
         const answer = truncateText(fonts.regular, formatAnswer(item), responseWidth, textSize);
         page.drawText(answer, {
