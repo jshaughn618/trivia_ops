@@ -2180,7 +2180,7 @@ export function EventDetailPage() {
                 role="dialog"
                 aria-modal="true"
                 aria-label="Scan scoresheet QR"
-                className="w-full max-w-xl border-2 border-border bg-panel p-5 sm:p-6"
+                className="w-full max-w-xl border-2 border-border bg-panel2 p-5 sm:p-6"
               >
                 <div className="flex items-center justify-between">
                   <div className="text-sm font-display uppercase tracking-[0.22em] text-text">
@@ -3108,7 +3108,7 @@ export function EventDetailPage() {
               role="dialog"
               aria-modal="true"
               aria-label="Scan scoresheet QR"
-              className="w-full max-w-xl border-2 border-border bg-panel p-5 sm:p-6"
+              className="w-full max-w-xl border-2 border-border bg-panel2 p-5 sm:p-6"
             >
               <div className="flex items-center justify-between">
                 <div className="text-sm font-display uppercase tracking-[0.22em] text-text">
