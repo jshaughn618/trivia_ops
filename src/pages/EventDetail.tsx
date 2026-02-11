@@ -254,13 +254,15 @@ const drawMusicScoresheetHeader = (
     teamCode?: string;
     teamName?: string;
     teamPlaceholder?: boolean;
+    showTeamInfo?: boolean;
   }
 ) => {
   const headerTop = PAGE_HEIGHT - PAGE_MARGIN;
   const titleSize = 14;
   const metaSize = 9.5;
   const leftColumnWidth = 210;
-  const rightColumnWidth = 210;
+  const showTeamInfo = extras?.showTeamInfo ?? true;
+  const rightColumnWidth = showTeamInfo ? 210 : 0;
   const rightX = PAGE_WIDTH - PAGE_MARGIN - rightColumnWidth;
   const titleY = headerTop - titleSize;
   const eventCode = extras?.eventCode ?? event.public_code ?? '';
@@ -296,7 +298,7 @@ const drawMusicScoresheetHeader = (
 
   const centerLaneInset = 10;
   const centerLaneStartX = PAGE_MARGIN + leftColumnWidth + centerLaneInset;
-  const centerLaneEndX = rightX - centerLaneInset;
+  const centerLaneEndX = showTeamInfo ? rightX - centerLaneInset : PAGE_WIDTH - PAGE_MARGIN - centerLaneInset;
   const centerLaneWidth = Math.max(68, centerLaneEndX - centerLaneStartX);
   const qrImageSize = extras?.qrImage ? 42 : 0;
 
@@ -341,52 +343,54 @@ const drawMusicScoresheetHeader = (
     });
   }
 
-  const rawTeamName = extras?.teamName?.trim() ?? '';
-  const teamLabel = 'Team Name:';
-  const teamLabelSize = 10.5;
-  const teamLabelWidth = fonts.bold.widthOfTextAtSize(teamLabel, teamLabelSize);
-  page.drawText(teamLabel, {
-    x: rightX,
-    y: titleY,
-    size: teamLabelSize,
-    font: fonts.bold
-  });
-  if (rawTeamName && !extras?.teamPlaceholder) {
-    const nameText = truncateText(
-      fonts.regular,
-      rawTeamName,
-      Math.max(30, rightColumnWidth - teamLabelWidth - 8),
-      teamLabelSize
-    );
-    page.drawText(nameText, {
-      x: rightX + teamLabelWidth + 6,
+  if (showTeamInfo) {
+    const rawTeamName = extras?.teamName?.trim() ?? '';
+    const teamLabel = 'Team Name:';
+    const teamLabelSize = 10.5;
+    const teamLabelWidth = fonts.bold.widthOfTextAtSize(teamLabel, teamLabelSize);
+    page.drawText(teamLabel, {
+      x: rightX,
       y: titleY,
       size: teamLabelSize,
+      font: fonts.bold
+    });
+    if (rawTeamName && !extras?.teamPlaceholder) {
+      const nameText = truncateText(
+        fonts.regular,
+        rawTeamName,
+        Math.max(30, rightColumnWidth - teamLabelWidth - 8),
+        teamLabelSize
+      );
+      page.drawText(nameText, {
+        x: rightX + teamLabelWidth + 6,
+        y: titleY,
+        size: teamLabelSize,
+        font: fonts.regular
+      });
+    } else {
+      const lineStartX = rightX + teamLabelWidth + 6;
+      page.drawLine({
+        start: { x: lineStartX, y: titleY + 1 },
+        end: { x: rightX + rightColumnWidth, y: titleY + 1 },
+        thickness: 1,
+        color: rgb(0, 0, 0)
+      });
+    }
+
+    const teamCodeLine = truncateText(
+      fonts.regular,
+      `Team Code: ${extras?.teamCode?.trim() || '—'}`,
+      rightColumnWidth,
+      metaSize
+    );
+
+    page.drawText(teamCodeLine, {
+      x: rightX,
+      y: titleY - metaSize - 3,
+      size: metaSize,
       font: fonts.regular
     });
-  } else {
-    const lineStartX = rightX + teamLabelWidth + 6;
-    page.drawLine({
-      start: { x: lineStartX, y: titleY + 1 },
-      end: { x: rightX + rightColumnWidth, y: titleY + 1 },
-      thickness: 1,
-      color: rgb(0, 0, 0)
-    });
   }
-
-  const teamCodeLine = truncateText(
-    fonts.regular,
-    `Team Code: ${extras?.teamCode?.trim() || '—'}`,
-    rightColumnWidth,
-    metaSize
-  );
-
-  page.drawText(teamCodeLine, {
-    x: rightX,
-    y: titleY - metaSize - 3,
-    size: metaSize,
-    font: fonts.regular
-  });
 };
 
 const drawGridLines = (page: any, layout: 'quad' | 'two-up' = 'quad') => {
@@ -782,7 +786,7 @@ const buildPdf = async (
       }
     }
   }
-  if (mode === 'scoresheet' && extras?.logoBytes) {
+  if (extras?.logoBytes) {
     try {
       logoImage = await pdfDoc.embedPng(extras.logoBytes);
     } catch {
@@ -827,83 +831,77 @@ const buildPdf = async (
   };
 
   const hasUpcoming = Boolean(extras?.upcomingLines?.some((line) => line.trim()));
+  const useMusicLayout = event.event_type === 'Music Trivia';
 
-  if (mode === 'scoresheet') {
-    const useMusicLayout = event.event_type === 'Music Trivia';
-    if (useMusicLayout) {
-      let page = createPage(false, 'two-up', false);
+  if (useMusicLayout) {
+    const drawMusicHeader = (page: any) =>
       drawMusicScoresheetHeader(page, event, fonts, {
-        qrImage: qrImage ?? undefined,
+        qrImage: mode === 'scoresheet' ? qrImage ?? undefined : undefined,
         logoImage: logoImage ?? undefined,
         eventCode: extras?.eventCode,
         locationName,
-        teamCode: extras?.teamCode,
-        teamName: extras?.teamName,
-        teamPlaceholder: extras?.teamPlaceholder
-      });
-      let positionIndex = 0;
-      for (let index = 0; index < rounds.length; index += 1) {
-        if (positionIndex >= 2) {
-          page = createPage(false, 'two-up', false);
-          drawMusicScoresheetHeader(page, event, fonts, {
-            qrImage: qrImage ?? undefined,
-            logoImage: logoImage ?? undefined,
-            eventCode: extras?.eventCode,
-            locationName,
-            teamCode: extras?.teamCode,
-            teamName: extras?.teamName,
-            teamPlaceholder: extras?.teamPlaceholder
-          });
-          positionIndex = 0;
-        }
-        const cellIndex = positionIndex;
-        positionIndex += 1;
-        renderRoundBlock(page, rounds[index], getTwoUpCell(cellIndex), fonts, mode);
-      }
-    } else {
-      let pageIndex = -1;
-      let page = createPage(true);
-      pageIndex = 0;
-      let positionIndex = 0;
-      const positionsForPage = (index: number) => {
-        if (index === 0) return [1, 2, 3];
-        if (index === 1 && hasUpcoming) return [0, 1, 2];
-        return [0, 1, 2, 3];
-      };
-
-      for (let index = 0; index < rounds.length; index += 1) {
-        let positions = positionsForPage(pageIndex);
-        if (positionIndex >= positions.length) {
-          page = createPage(false);
-          pageIndex += 1;
-          positionIndex = 0;
-          positions = positionsForPage(pageIndex);
-        }
-        const cellIndex = positions[positionIndex];
-        positionIndex += 1;
-        renderRoundBlock(page, rounds[index], getCell(cellIndex), fonts, mode);
-      }
-
-      const firstPage = pdfDoc.getPages()[0] ?? createPage(true);
-      renderTeamBlock(firstPage, getCell(0), fonts, {
-        qrImage: qrImage ?? undefined,
-        logoImage: logoImage ?? undefined,
-        eventCode: extras?.eventCode,
-        teamCode: extras?.teamCode,
-        teamName: extras?.teamName,
-        teamPlaceholder: extras?.teamPlaceholder
+        teamCode: mode === 'scoresheet' ? extras?.teamCode : undefined,
+        teamName: mode === 'scoresheet' ? extras?.teamName : undefined,
+        teamPlaceholder: mode === 'scoresheet' ? extras?.teamPlaceholder : undefined,
+        showTeamInfo: mode === 'scoresheet'
       });
 
-      if (hasUpcoming) {
-        while (pageCount() < 2) {
-          createPage(false);
-        }
-        const upcomingPage = pdfDoc.getPages()[1];
-        renderUpcomingBlock(upcomingPage, getCell(3), fonts, {
-          upcomingLines: extras?.upcomingLines,
-          locationName: extras?.locationName
-        });
+    let page = createPage(false, 'two-up', false);
+    drawMusicHeader(page);
+    let positionIndex = 0;
+    for (let index = 0; index < rounds.length; index += 1) {
+      if (positionIndex >= 2) {
+        page = createPage(false, 'two-up', false);
+        drawMusicHeader(page);
+        positionIndex = 0;
       }
+      const cellIndex = positionIndex;
+      positionIndex += 1;
+      renderRoundBlock(page, rounds[index], getTwoUpCell(cellIndex), fonts, mode);
+    }
+  } else if (mode === 'scoresheet') {
+    let pageIndex = -1;
+    let page = createPage(true);
+    pageIndex = 0;
+    let positionIndex = 0;
+    const positionsForPage = (index: number) => {
+      if (index === 0) return [1, 2, 3];
+      if (index === 1 && hasUpcoming) return [0, 1, 2];
+      return [0, 1, 2, 3];
+    };
+
+    for (let index = 0; index < rounds.length; index += 1) {
+      let positions = positionsForPage(pageIndex);
+      if (positionIndex >= positions.length) {
+        page = createPage(false);
+        pageIndex += 1;
+        positionIndex = 0;
+        positions = positionsForPage(pageIndex);
+      }
+      const cellIndex = positions[positionIndex];
+      positionIndex += 1;
+      renderRoundBlock(page, rounds[index], getCell(cellIndex), fonts, mode);
+    }
+
+    const firstPage = pdfDoc.getPages()[0] ?? createPage(true);
+    renderTeamBlock(firstPage, getCell(0), fonts, {
+      qrImage: qrImage ?? undefined,
+      logoImage: logoImage ?? undefined,
+      eventCode: extras?.eventCode,
+      teamCode: extras?.teamCode,
+      teamName: extras?.teamName,
+      teamPlaceholder: extras?.teamPlaceholder
+    });
+
+    if (hasUpcoming) {
+      while (pageCount() < 2) {
+        createPage(false);
+      }
+      const upcomingPage = pdfDoc.getPages()[1];
+      renderUpcomingBlock(upcomingPage, getCell(3), fonts, {
+        upcomingLines: extras?.upcomingLines,
+        locationName: extras?.locationName
+      });
     }
   } else {
     for (let index = 0; index < rounds.length; index += 1) {
@@ -958,7 +956,8 @@ export function EventDetailPage() {
   const [scoreSaveError, setScoreSaveError] = useState<string | null>(null);
   const [scoreLoading, setScoreLoading] = useState(false);
   const [scoreScanOpen, setScoreScanOpen] = useState(false);
-  const [scoreScanStatus, setScoreScanStatus] = useState<'idle' | 'requesting' | 'scanning' | 'unsupported'>('idle');
+  const [scoreEntryMode, setScoreEntryMode] = useState<'scan' | 'manual'>('scan');
+  const [scoreScanStatus, setScoreScanStatus] = useState<'idle' | 'requesting' | 'scanning' | 'camera_only' | 'unsupported'>('idle');
   const [scoreScanRoundId, setScoreScanRoundId] = useState('');
   const [scoreScanTeamCodeInput, setScoreScanTeamCodeInput] = useState('');
   const [scoreScanDetectedText, setScoreScanDetectedText] = useState<string | null>(null);
@@ -1621,13 +1620,14 @@ export function EventDetailPage() {
     setScoreScanSaving(false);
   };
 
-  const openScoreScanner = () => {
+  const openScoreScanner = (mode: 'scan' | 'manual' = 'scan') => {
     const defaultRoundId = lastCompletedRoundId || scoreRoundId || rounds[0]?.id || '';
     setScoreScanRoundId(defaultRoundId);
     if (defaultRoundId) {
       setScoreRoundId(defaultRoundId);
       void loadScores(defaultRoundId);
     }
+    setScoreEntryMode(mode);
     setScoreScanOpen(true);
     setScoreScanStatus('idle');
     setScoreScanCameraError(null);
@@ -1637,6 +1637,10 @@ export function EventDetailPage() {
     setScoreScanTeamId('');
     setScoreScanScore('0');
     setScoreScanSaving(false);
+  };
+
+  const openManualScoreEntry = () => {
+    openScoreScanner('manual');
   };
 
   const assignScannedTeam = (teamCode: string, sourceText?: string) => {
@@ -1723,9 +1727,8 @@ export function EventDetailPage() {
   }, [scoreScanOpen]);
 
   useEffect(() => {
-    if (!scoreScanOpen || scoreScanTeamId) return;
-    const BarcodeDetectorCtor = (window as Window & { BarcodeDetector?: any }).BarcodeDetector;
-    if (!navigator.mediaDevices?.getUserMedia || !BarcodeDetectorCtor) {
+    if (!scoreScanOpen || scoreScanTeamId || scoreEntryMode !== 'scan') return;
+    if (!navigator.mediaDevices?.getUserMedia) {
       setScoreScanStatus('unsupported');
       return;
     }
@@ -1753,6 +1756,12 @@ export function EventDetailPage() {
         videoEl.setAttribute('playsinline', 'true');
         await videoEl.play();
         if (cancelled) return;
+
+        const BarcodeDetectorCtor = (window as Window & { BarcodeDetector?: any }).BarcodeDetector;
+        if (!BarcodeDetectorCtor) {
+          setScoreScanStatus('camera_only');
+          return;
+        }
 
         const detector = new BarcodeDetectorCtor({ formats: ['qr_code'] });
         setScoreScanStatus('scanning');
@@ -1809,7 +1818,7 @@ export function EventDetailPage() {
       cancelled = true;
       stopScoreScanner();
     };
-  }, [scoreScanOpen, scoreScanTeamId, event?.public_code, teamByCode]);
+  }, [scoreScanOpen, scoreScanTeamId, scoreEntryMode, event?.public_code, teamByCode]);
 
   useEffect(() => {
     if (!scoreScanOpen || !scoreScanTeamId) return;
@@ -1949,7 +1958,11 @@ export function EventDetailPage() {
         pages.forEach((page) => scoresheetDoc.addPage(page));
       }
       const scoresheetBytes = await scoresheetDoc.save();
-      const answersheetBytes = await buildPdf(event, locationName, bundles, 'answersheet');
+      const answersheetBytes = await buildPdf(event, locationName, bundles, 'answersheet', {
+        eventCode: event.public_code ?? undefined,
+        locationName,
+        logoBytes
+      });
       const baseName = safeFileName(event.title, `event-${event.id.slice(0, 8)}`);
       const scoresheetLabel = teams.length > 1 ? `${baseName}-scoresheets.pdf` : `${baseName}-scoresheet.pdf`;
       const scoresheetFile = new File([scoresheetBytes], scoresheetLabel, {
@@ -2051,10 +2064,17 @@ export function EventDetailPage() {
               <div className="flex flex-wrap items-center gap-2">
                 <SecondaryButton
                   className="h-9 px-3 text-xs"
-                  onClick={openScoreScanner}
+                  onClick={() => openScoreScanner('scan')}
                   disabled={rounds.length === 0 || teams.length === 0}
                 >
                   Scan Scoresheet QR
+                </SecondaryButton>
+                <SecondaryButton
+                  className="h-9 px-3 text-xs"
+                  onClick={openManualScoreEntry}
+                  disabled={rounds.length === 0 || teams.length === 0}
+                >
+                  Enter Score
                 </SecondaryButton>
                 <span className="text-xs text-muted">Defaults to the last completed round.</span>
               </div>
@@ -2096,7 +2116,9 @@ export function EventDetailPage() {
                 className="w-full max-w-xl border-2 border-border bg-panel p-5 sm:p-6"
               >
                 <div className="flex items-center justify-between">
-                  <div className="text-sm font-display uppercase tracking-[0.22em] text-text">Scan Scoresheet QR</div>
+                  <div className="text-sm font-display uppercase tracking-[0.22em] text-text">
+                    {scoreEntryMode === 'manual' ? 'Enter Team Score' : 'Scan Scoresheet QR'}
+                  </div>
                   <button
                     type="button"
                     onClick={closeScoreScanner}
@@ -2130,7 +2152,7 @@ export function EventDetailPage() {
 
                   {!scoreScanTeamId && (
                     <div className="space-y-3">
-                      {scoreScanStatus !== 'unsupported' && (
+                      {scoreEntryMode === 'scan' && scoreScanStatus !== 'unsupported' && (
                         <div className="overflow-hidden rounded-md border border-border bg-black">
                           <video
                             ref={scoreScanVideoRef}
@@ -2142,8 +2164,10 @@ export function EventDetailPage() {
                         </div>
                       )}
                       <div className="text-xs text-muted">
+                        {scoreEntryMode === 'manual' && 'Enter the 4-digit team code from the scoresheet.'}
                         {scoreScanStatus === 'requesting' && 'Requesting camera access…'}
                         {scoreScanStatus === 'scanning' && 'Point the camera at a scoresheet QR code.'}
+                        {scoreScanStatus === 'camera_only' && 'Camera access granted. QR scanning is not supported in this browser; use team code entry below.'}
                         {scoreScanStatus === 'unsupported' && 'Camera scanning is unavailable in this browser.'}
                       </div>
                       <div className="grid gap-2 sm:grid-cols-[1fr,auto]">
@@ -2569,10 +2593,17 @@ export function EventDetailPage() {
       <div className="flex flex-wrap items-center gap-2">
         <SecondaryButton
           className="h-9 px-3 text-xs"
-          onClick={openScoreScanner}
+          onClick={() => openScoreScanner('scan')}
           disabled={rounds.length === 0 || teams.length === 0}
         >
           Scan Scoresheet QR
+        </SecondaryButton>
+        <SecondaryButton
+          className="h-9 px-3 text-xs"
+          onClick={openManualScoreEntry}
+          disabled={rounds.length === 0 || teams.length === 0}
+        >
+          Enter Score
         </SecondaryButton>
         <span className="text-xs text-muted">Defaults to the last completed round.</span>
       </div>
@@ -2977,7 +3008,7 @@ export function EventDetailPage() {
               <AccordionSection title="Rounds" defaultOpen>
                 {roundsContent}
               </AccordionSection>
-              <AccordionSection title="Teams" defaultOpen>
+              <AccordionSection title="Teams">
                 {teamsContent}
               </AccordionSection>
               <AccordionSection title="Round Scores">
@@ -3014,7 +3045,9 @@ export function EventDetailPage() {
               className="w-full max-w-xl border-2 border-border bg-panel p-5 sm:p-6"
             >
               <div className="flex items-center justify-between">
-                <div className="text-sm font-display uppercase tracking-[0.22em] text-text">Scan Scoresheet QR</div>
+                <div className="text-sm font-display uppercase tracking-[0.22em] text-text">
+                  {scoreEntryMode === 'manual' ? 'Enter Team Score' : 'Scan Scoresheet QR'}
+                </div>
                 <button
                   type="button"
                   onClick={closeScoreScanner}
@@ -3048,7 +3081,7 @@ export function EventDetailPage() {
 
                 {!scannedTeam && (
                   <div className="space-y-3">
-                    {scoreScanStatus !== 'unsupported' && (
+                    {scoreEntryMode === 'scan' && scoreScanStatus !== 'unsupported' && (
                       <div className="overflow-hidden rounded-md border border-border bg-black">
                         <video
                           ref={scoreScanVideoRef}
@@ -3060,8 +3093,10 @@ export function EventDetailPage() {
                       </div>
                     )}
                     <div className="text-xs text-muted">
+                      {scoreEntryMode === 'manual' && 'Enter the 4-digit team code from the scoresheet.'}
                       {scoreScanStatus === 'requesting' && 'Requesting camera access…'}
                       {scoreScanStatus === 'scanning' && 'Point the camera at a scoresheet QR code.'}
+                      {scoreScanStatus === 'camera_only' && 'Camera access granted. QR scanning is not supported in this browser; use team code entry below.'}
                       {scoreScanStatus === 'unsupported' && 'Camera scanning is unavailable in this browser.'}
                     </div>
                     <div className="grid gap-2 sm:grid-cols-[1fr,auto]">
@@ -3108,10 +3143,10 @@ export function EventDetailPage() {
                           setScoreScanTeamId('');
                           setScoreScanError(null);
                           setScoreScanDetectedText(null);
-                          setScoreScanStatus('idle');
+                          setScoreScanStatus(scoreEntryMode === 'scan' ? 'idle' : 'unsupported');
                         }}
                       >
-                        Scan Another
+                        {scoreEntryMode === 'manual' ? 'Change Team' : 'Scan Another'}
                       </SecondaryButton>
                     </div>
                   </div>
