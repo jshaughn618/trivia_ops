@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, useId, useRef } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import QRCode from 'qrcode';
+import jsQR from 'jsqr';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { api, formatApiError } from '../api';
 import logoLight from '../assets/trivia_ops_logo_light.png';
@@ -1003,7 +1004,7 @@ export function EventDetailPage() {
   const [scoreLoading, setScoreLoading] = useState(false);
   const [scoreScanOpen, setScoreScanOpen] = useState(false);
   const [scoreEntryMode, setScoreEntryMode] = useState<'scan' | 'manual'>('scan');
-  const [scoreScanStatus, setScoreScanStatus] = useState<'idle' | 'requesting' | 'scanning' | 'camera_only' | 'unsupported'>('idle');
+  const [scoreScanStatus, setScoreScanStatus] = useState<'idle' | 'requesting' | 'scanning' | 'unsupported'>('idle');
   const [scoreScanRoundId, setScoreScanRoundId] = useState('');
   const [scoreScanTeamCodeInput, setScoreScanTeamCodeInput] = useState('');
   const [scoreScanDetectedText, setScoreScanDetectedText] = useState<string | null>(null);
@@ -1803,13 +1804,15 @@ export function EventDetailPage() {
         await videoEl.play();
         if (cancelled) return;
 
-        const BarcodeDetectorCtor = (window as Window & { BarcodeDetector?: any }).BarcodeDetector;
-        if (!BarcodeDetectorCtor) {
-          setScoreScanStatus('camera_only');
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d', { willReadFrequently: true });
+        if (!context) {
+          setScoreScanStatus('unsupported');
           return;
         }
 
-        const detector = new BarcodeDetectorCtor({ formats: ['qr_code'] });
+        const BarcodeDetectorCtor = (window as Window & { BarcodeDetector?: any }).BarcodeDetector;
+        const detector = BarcodeDetectorCtor ? new BarcodeDetectorCtor({ formats: ['qr_code'] }) : null;
         setScoreScanStatus('scanning');
 
         const scanFrame = async () => {
@@ -1819,10 +1822,28 @@ export function EventDetailPage() {
 
           try {
             if (activeVideo.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
-              const results = await detector.detect(activeVideo);
-              const rawValue = results
-                .find((entry: { rawValue?: string }) => typeof entry.rawValue === 'string' && entry.rawValue.trim())
-                ?.rawValue?.trim();
+              let rawValue: string | null = null;
+              if (detector) {
+                const results = await detector.detect(activeVideo);
+                rawValue =
+                  results.find((entry: { rawValue?: string }) => typeof entry.rawValue === 'string' && entry.rawValue.trim())
+                    ?.rawValue?.trim() ?? null;
+              }
+
+              if (!rawValue) {
+                const width = activeVideo.videoWidth;
+                const height = activeVideo.videoHeight;
+                if (width > 0 && height > 0) {
+                  if (canvas.width !== width || canvas.height !== height) {
+                    canvas.width = width;
+                    canvas.height = height;
+                  }
+                  context.drawImage(activeVideo, 0, 0, width, height);
+                  const imageData = context.getImageData(0, 0, width, height);
+                  const decoded = jsQR(imageData.data, width, height, { inversionAttempts: 'attemptBoth' });
+                  rawValue = decoded?.data?.trim() ?? null;
+                }
+              }
 
               if (rawValue) {
                 setScoreScanDetectedText(rawValue);
@@ -2213,7 +2234,6 @@ export function EventDetailPage() {
                         {scoreEntryMode === 'manual' && 'Enter the 4-digit team code from the scoresheet.'}
                         {scoreScanStatus === 'requesting' && 'Requesting camera access…'}
                         {scoreScanStatus === 'scanning' && 'Point the camera at a scoresheet QR code.'}
-                        {scoreScanStatus === 'camera_only' && 'Camera access granted. QR scanning is not supported in this browser; use team code entry below.'}
                         {scoreScanStatus === 'unsupported' && 'Camera scanning is unavailable in this browser.'}
                       </div>
                       <div className="grid gap-2 sm:grid-cols-[1fr,auto]">
@@ -3142,7 +3162,6 @@ export function EventDetailPage() {
                       {scoreEntryMode === 'manual' && 'Enter the 4-digit team code from the scoresheet.'}
                       {scoreScanStatus === 'requesting' && 'Requesting camera access…'}
                       {scoreScanStatus === 'scanning' && 'Point the camera at a scoresheet QR code.'}
-                      {scoreScanStatus === 'camera_only' && 'Camera access granted. QR scanning is not supported in this browser; use team code entry below.'}
                       {scoreScanStatus === 'unsupported' && 'Camera scanning is unavailable in this browser.'}
                     </div>
                     <div className="grid gap-2 sm:grid-cols-[1fr,auto]">
