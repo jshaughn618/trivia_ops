@@ -175,6 +175,8 @@ const drawMusicScoresheetHeader = (
   const titleSize = 14;
   const metaSize = 9.5;
   const leftColumnWidth = 210;
+  const rightColumnWidth = 210;
+  const rightX = PAGE_WIDTH - PAGE_MARGIN - rightColumnWidth;
   const titleY = headerTop - titleSize;
   const eventCode = extras?.eventCode ?? event.public_code ?? '';
 
@@ -196,11 +198,21 @@ const drawMusicScoresheetHeader = (
     });
   }
 
+  const centerLaneInset = 10;
+  const centerLaneStartX = PAGE_MARGIN + leftColumnWidth + centerLaneInset;
+  const centerLaneEndX = rightX - centerLaneInset;
+  const centerLaneWidth = Math.max(68, centerLaneEndX - centerLaneStartX);
+  const qrImageSize = extras?.qrImage ? 36 : 0;
+  const qrPadding = extras?.qrImage ? 3 : 0;
+  const qrFrameSize = qrImageSize > 0 ? qrImageSize + qrPadding * 2 : 0;
+
   let logoWidth = 0;
   let logoHeight = 0;
   if (extras?.logoImage) {
-    const maxLogoWidth = 84;
-    const maxLogoHeight = 24;
+    const maxLogoWidth = extras?.qrImage
+      ? Math.min(62, Math.max(40, centerLaneWidth - qrFrameSize - 12))
+      : Math.min(84, centerLaneWidth);
+    const maxLogoHeight = 20;
     const scale = Math.min(
       maxLogoWidth / extras.logoImage.width,
       maxLogoHeight / extras.logoImage.height,
@@ -210,12 +222,11 @@ const drawMusicScoresheetHeader = (
     logoHeight = extras.logoImage.height * scale;
   }
 
-  const qrSize = extras?.qrImage ? 44 : 0;
-  const centerGap = logoWidth > 0 && qrSize > 0 ? 8 : 0;
-  const centerWidth = logoWidth + centerGap + qrSize;
-  const centerStartX = PAGE_WIDTH / 2 - centerWidth / 2;
+  const centerGap = logoWidth > 0 && qrFrameSize > 0 ? 10 : 0;
+  const centerWidth = logoWidth + centerGap + qrFrameSize;
+  const centerStartX = centerLaneStartX + Math.max(0, (centerLaneWidth - centerWidth) / 2);
   const centerTopY = headerTop - 2;
-  const centerBlockHeight = Math.max(logoHeight, qrSize);
+  const centerBlockHeight = Math.max(logoHeight, qrFrameSize);
 
   if (extras?.logoImage && logoWidth > 0 && logoHeight > 0) {
     const logoY = centerTopY - (centerBlockHeight - logoHeight) / 2 - logoHeight;
@@ -227,19 +238,28 @@ const drawMusicScoresheetHeader = (
     });
   }
 
-  if (extras?.qrImage && qrSize > 0) {
-    const qrX = centerStartX + logoWidth + centerGap;
-    const qrY = centerTopY - (centerBlockHeight - qrSize) / 2 - qrSize;
+  if (extras?.qrImage && qrFrameSize > 0) {
+    const qrFrameX = centerStartX + logoWidth + centerGap;
+    const qrFrameY = centerTopY - (centerBlockHeight - qrFrameSize) / 2 - qrFrameSize;
+    page.drawRectangle({
+      x: qrFrameX,
+      y: qrFrameY,
+      width: qrFrameSize,
+      height: qrFrameSize,
+      color: rgb(1, 1, 1),
+      borderColor: rgb(0.78, 0.78, 0.78),
+      borderWidth: 0.8
+    });
+    const qrX = qrFrameX + qrPadding;
+    const qrY = qrFrameY + qrPadding;
     page.drawImage(extras.qrImage, {
       x: qrX,
       y: qrY,
-      width: qrSize,
-      height: qrSize
+      width: qrImageSize,
+      height: qrImageSize
     });
   }
 
-  const rightColumnWidth = 210;
-  const rightX = PAGE_WIDTH - PAGE_MARGIN - rightColumnWidth;
   const rawTeamName = extras?.teamName?.trim() ?? '';
   const teamLabel = 'Team Name:';
   const teamLabelSize = 10.5;
@@ -490,12 +510,15 @@ const renderTeamBlock = (
   const leftColumnWidth = Math.min(220, Math.max(160, contentWidth * 0.55));
   const rightX = leftX + leftColumnWidth + 12;
   const rightWidth = Math.max(60, cell.x + cell.width - padding - rightX);
+  const qrImageSize = extras.qrImage ? 78 : 0;
+  const qrPadding = extras.qrImage ? 4 : 0;
+  const qrFrameSize = qrImageSize > 0 ? qrImageSize + qrPadding * 2 : 0;
 
   let logoWidth = 0;
   let logoHeight = 0;
   if (extras.logoImage) {
-    const maxLogoWidth = Math.min(120, leftColumnWidth - 96);
-    const maxLogoHeight = 42;
+    const maxLogoWidth = Math.min(112, Math.max(56, leftColumnWidth - qrFrameSize - 14));
+    const maxLogoHeight = 34;
     const scale = Math.min(
       maxLogoWidth / extras.logoImage.width,
       maxLogoHeight / extras.logoImage.height,
@@ -503,22 +526,39 @@ const renderTeamBlock = (
     );
     logoWidth = extras.logoImage.width * scale;
     logoHeight = extras.logoImage.height * scale;
+  }
+
+  const clusterGap = logoWidth > 0 && qrFrameSize > 0 ? 10 : 0;
+  const clusterHeight = Math.max(logoHeight, qrFrameSize);
+  if (extras.logoImage && logoWidth > 0 && logoHeight > 0) {
+    const logoY = topY - (clusterHeight - logoHeight) / 2 - logoHeight;
     page.drawImage(extras.logoImage, {
       x: leftX,
-      y: topY - logoHeight,
+      y: logoY,
       width: logoWidth,
       height: logoHeight
     });
   }
 
-  const qrSize = extras.qrImage ? 86 : 0;
-  if (extras.qrImage) {
-    const qrX = leftX + (logoWidth > 0 ? logoWidth + 8 : 0);
+  if (extras.qrImage && qrFrameSize > 0) {
+    const qrFrameX = leftX + (logoWidth > 0 ? logoWidth + clusterGap : 0);
+    const qrFrameY = topY - (clusterHeight - qrFrameSize) / 2 - qrFrameSize;
+    page.drawRectangle({
+      x: qrFrameX,
+      y: qrFrameY,
+      width: qrFrameSize,
+      height: qrFrameSize,
+      color: rgb(1, 1, 1),
+      borderColor: rgb(0.78, 0.78, 0.78),
+      borderWidth: 0.8
+    });
+    const qrX = qrFrameX + qrPadding;
+    const qrY = qrFrameY + qrPadding;
     page.drawImage(extras.qrImage, {
       x: qrX,
-      y: topY - qrSize,
-      width: qrSize,
-      height: qrSize
+      y: qrY,
+      width: qrImageSize,
+      height: qrImageSize
     });
   }
 
@@ -1103,7 +1143,7 @@ export function EventDetailPage() {
     if (!publicUrl) return;
     setQrLoading(true);
     setQrError(null);
-    QRCode.toDataURL(publicUrl, { margin: 1, width: 320 })
+    QRCode.toDataURL(publicUrl, { margin: 2, width: 320 })
       .then((url) => {
         setQrUrl(url);
         setQrLoading(false);
@@ -1511,7 +1551,7 @@ export function EventDetailPage() {
           if (team?.team_code) params.set('team', team.team_code);
           const qrTarget = `https://triviaops.com/login?${params.toString()}`;
           try {
-            qrDataUrl = await QRCode.toDataURL(qrTarget, { margin: 1, width: 240 });
+            qrDataUrl = await QRCode.toDataURL(qrTarget, { margin: 2, width: 240 });
           } catch {
             qrDataUrl = undefined;
           }
