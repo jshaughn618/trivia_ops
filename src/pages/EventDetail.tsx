@@ -207,8 +207,8 @@ const drawMusicScoresheetHeader = (
   let logoWidth = 0;
   let logoHeight = 0;
   if (extras?.logoImage) {
-    const maxLogoWidth = extras?.qrImage ? Math.min(72, centerLaneWidth) : Math.min(84, centerLaneWidth);
-    const maxLogoHeight = 20;
+    const maxLogoWidth = Math.min(120, centerLaneWidth);
+    const maxLogoHeight = 30;
     const scale = Math.min(
       maxLogoWidth / extras.logoImage.width,
       maxLogoHeight / extras.logoImage.height,
@@ -218,12 +218,10 @@ const drawMusicScoresheetHeader = (
     logoHeight = extras.logoImage.height * scale;
   }
 
-  const verticalGap = logoHeight > 0 && qrImageSize > 0 ? 3 : 0;
-  const centerWidth = Math.max(logoWidth, qrImageSize);
+  const centerWidth = logoWidth;
   const centerStartX = centerLaneStartX + Math.max(0, (centerLaneWidth - centerWidth) / 2);
   const centerTopY = headerTop - 2;
-  const qrDrop = qrImageSize > 0 ? 1 : 0;
-  const centerBlockHeight = logoHeight + verticalGap + qrImageSize + qrDrop;
+  const centerBlockHeight = logoHeight;
 
   if (extras?.logoImage && logoWidth > 0 && logoHeight > 0) {
     const logoX = centerStartX + (centerWidth - logoWidth) / 2;
@@ -237,8 +235,8 @@ const drawMusicScoresheetHeader = (
   }
 
   if (extras?.qrImage && qrImageSize > 0) {
-    const qrX = centerStartX + (centerWidth - qrImageSize) / 2;
-    const qrY = centerTopY - logoHeight - verticalGap - qrImageSize - qrDrop;
+    const qrX = rightX;
+    const qrY = titleY - metaSize - 3 - qrImageSize - 6;
     page.drawImage(extras.qrImage, {
       x: qrX,
       y: qrY,
