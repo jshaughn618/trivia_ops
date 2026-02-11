@@ -1179,26 +1179,43 @@ export function EditionDetailPage() {
   };
 
   const generateFunFact = async () => {
-    if (!itemDraft.prompt.trim()) return;
     setFactLoading(true);
     setFactError(null);
+    const question = itemDraft.prompt.trim();
+    const answer = itemDraft.answer.trim();
+    const answerA = itemDraft.answer_a.trim();
+    const answerB = itemDraft.answer_b.trim();
+    const answerALabel = itemDraft.answer_a_label.trim();
+    const answerBLabel = itemDraft.answer_b_label.trim();
+    const answerParts = sanitizeAnswerParts(itemDraft.answer_parts);
     const themeLine = theme.trim() ? `Theme: ${theme.trim()}` : '';
     const parts = [
       'Write one short, interesting pub-trivia factoid. Keep it under 20 words.',
       'Use the question and answer as context. Do not repeat them verbatim; give a specific, related fact.',
-      themeLine,
-      `Question: ${itemDraft.prompt.trim()}`
+      themeLine
     ];
+    if (question) parts.push(`Question: ${question}`);
     if (gameTypeId === 'audio') {
-      if (itemDraft.answer_a.trim()) parts.push(`Answer A: ${itemDraft.answer_a.trim()}`);
-      if (itemDraft.answer_b.trim()) parts.push(`Answer B: ${itemDraft.answer_b.trim()}`);
-      if (itemDraft.answer_a_label.trim()) parts.push(`Answer A Label: ${itemDraft.answer_a_label.trim()}`);
-      if (itemDraft.answer_b_label.trim()) parts.push(`Answer B Label: ${itemDraft.answer_b_label.trim()}`);
+      if (answerA) parts.push(`Answer A: ${answerA}`);
+      if (answerB) parts.push(`Answer B: ${answerB}`);
+      if (answerALabel) parts.push(`Answer A Label: ${answerALabel}`);
+      if (answerBLabel) parts.push(`Answer B Label: ${answerBLabel}`);
     } else if (gameTypeId === 'music' && itemDraft.item_mode !== 'text') {
-      const partsClean = sanitizeAnswerParts(itemDraft.answer_parts);
-      partsClean.forEach((part) => parts.push(`${part.label}: ${part.answer}`));
-    } else if (itemDraft.answer.trim()) {
-      parts.push(`Answer: ${itemDraft.answer.trim()}`);
+      answerParts.forEach((part) => parts.push(`${part.label}: ${part.answer}`));
+    } else if (answer) {
+      parts.push(`Answer: ${answer}`);
+    }
+
+    const hasContext =
+      Boolean(question) ||
+      Boolean(answer) ||
+      Boolean(answerA) ||
+      Boolean(answerB) ||
+      answerParts.length > 0;
+    if (!hasContext) {
+      setFactLoading(false);
+      setFactError('Add a question or answer context first.');
+      return;
     }
     const prompt = parts.filter(Boolean).join('\n');
     const res = await api.aiGenerate({ prompt, max_output_tokens: 200 });
