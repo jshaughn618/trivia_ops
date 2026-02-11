@@ -1816,6 +1816,11 @@ export function EventDetailPage() {
     setScoreScanScore(String(Number(scoreMap[scoreScanTeamId] ?? 0)));
   }, [scoreScanOpen, scoreScanTeamId, scoreMap, scoreScanRoundId]);
 
+  const scannedTeam = useMemo(() => {
+    if (!scoreScanTeamId) return null;
+    return teams.find((team) => team.id === scoreScanTeamId) ?? null;
+  }, [teams, scoreScanTeamId]);
+
   const uploadDocument = async (type: 'scoresheet' | 'answersheet', file: File) => {
     if (!eventId) return;
     const setUploading = type === 'scoresheet' ? setScoresheetUploading : setAnswersheetUploading;
@@ -2539,11 +2544,6 @@ export function EventDetailPage() {
       </div>
     </div>
   );
-
-  const scannedTeam = useMemo(() => {
-    if (!scoreScanTeamId) return null;
-    return teams.find((team) => team.id === scoreScanTeamId) ?? null;
-  }, [teams, scoreScanTeamId]);
 
   const scoresContent = (
     <div className="space-y-3">
