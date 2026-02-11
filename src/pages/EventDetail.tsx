@@ -47,6 +47,56 @@ const roundTitle = (round: EventRound) => {
   return title ? `${round.round_number}. ${title}` : `${round.round_number}.`;
 };
 
+const formatEventDateOnly = (startsAt?: string | null) => {
+  if (!startsAt) return '';
+  const parsed = new Date(startsAt);
+  if (Number.isNaN(parsed.getTime())) return '';
+  return parsed.toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  });
+};
+
+const formatHeaderMetaLine = (event: Event, locationName: string) => {
+  const parts: string[] = [];
+  const dateText = formatEventDateOnly(event.starts_at);
+  const locationText = locationName.trim();
+  if (dateText) parts.push(dateText);
+  if (locationText) parts.push(locationText);
+  return parts.join(' • ');
+};
+
+const parseScoresheetQr = (rawValue: string) => {
+  const trimmed = rawValue.trim();
+  if (!trimmed) return { teamCode: null, eventCode: null } as { teamCode: string | null; eventCode: string | null };
+  if (/^\d{4}$/.test(trimmed)) return { teamCode: trimmed, eventCode: null };
+
+  const parseTeamCode = (value: string | null | undefined) => {
+    const next = (value ?? '').trim();
+    return /^\d{4}$/.test(next) ? next : null;
+  };
+  const parseEventCode = (value: string | null | undefined) => {
+    const next = (value ?? '').trim();
+    return next ? next : null;
+  };
+
+  try {
+    const url = new URL(trimmed);
+    return {
+      teamCode: parseTeamCode(url.searchParams.get('team')),
+      eventCode: parseEventCode(url.searchParams.get('event'))
+    };
+  } catch {
+    const teamMatch = trimmed.match(/[?&]team=(\d{4})/i);
+    const eventMatch = trimmed.match(/[?&]event=([A-Za-z0-9_-]+)/i);
+    return {
+      teamCode: teamMatch?.[1] ?? null,
+      eventCode: eventMatch?.[1] ?? null
+    };
+  }
+};
+
 const parseAnswerPartsJson = (value?: string | null): ParsedAnswerPart[] => {
   if (!value) return [];
   try {
@@ -163,6 +213,7 @@ const drawPageHeader = (
   const metaSize = 9;
   const headerTop = PAGE_HEIGHT - PAGE_MARGIN;
   const titleY = headerTop - titleSize;
+  const metaLine = formatHeaderMetaLine(event, locationName);
   page.drawText(event.title, {
     x: PAGE_MARGIN,
     y: titleY,
@@ -170,12 +221,21 @@ const drawPageHeader = (
     font: fonts.bold
   });
 
+  if (metaLine) {
+    page.drawText(metaLine, {
+      x: PAGE_MARGIN,
+      y: titleY - metaSize - 4,
+      size: metaSize,
+      font: fonts.regular
+    });
+  }
+
   if (options?.showEventCode && event.public_code) {
     const codeText = `Event Code: ${event.public_code}`;
     const codeSize = metaSize;
     page.drawText(codeText, {
       x: PAGE_MARGIN,
-      y: titleY - codeSize - 4,
+      y: titleY - codeSize * (metaLine ? 2 : 1) - (metaLine ? 8 : 4),
       size: codeSize,
       font: fonts.regular
     });
@@ -190,6 +250,7 @@ const drawMusicScoresheetHeader = (
     qrImage?: any;
     logoImage?: any;
     eventCode?: string;
+    locationName?: string;
     teamCode?: string;
     teamName?: string;
     teamPlaceholder?: boolean;
@@ -203,6 +264,7 @@ const drawMusicScoresheetHeader = (
   const rightX = PAGE_WIDTH - PAGE_MARGIN - rightColumnWidth;
   const titleY = headerTop - titleSize;
   const eventCode = extras?.eventCode ?? event.public_code ?? '';
+  const metaLine = formatHeaderMetaLine(event, extras?.locationName ?? '');
 
   const title = truncateText(fonts.bold, event.title, leftColumnWidth, titleSize);
   page.drawText(title, {
@@ -212,11 +274,21 @@ const drawMusicScoresheetHeader = (
     font: fonts.bold
   });
 
+  if (metaLine) {
+    const metaText = truncateText(fonts.regular, metaLine, leftColumnWidth, metaSize);
+    page.drawText(metaText, {
+      x: PAGE_MARGIN,
+      y: titleY - metaSize - 3,
+      size: metaSize,
+      font: fonts.regular
+    });
+  }
+
   if (eventCode) {
     const codeText = truncateText(fonts.regular, `Event Code: ${eventCode}`, leftColumnWidth, metaSize);
     page.drawText(codeText, {
       x: PAGE_MARGIN,
-      y: titleY - metaSize - 3,
+      y: titleY - (metaSize + 3) * (metaLine ? 2 : 1),
       size: metaSize,
       font: fonts.regular
     });
@@ -764,6 +836,7 @@ const buildPdf = async (
         qrImage: qrImage ?? undefined,
         logoImage: logoImage ?? undefined,
         eventCode: extras?.eventCode,
+        locationName,
         teamCode: extras?.teamCode,
         teamName: extras?.teamName,
         teamPlaceholder: extras?.teamPlaceholder
@@ -776,6 +849,7 @@ const buildPdf = async (
             qrImage: qrImage ?? undefined,
             logoImage: logoImage ?? undefined,
             eventCode: extras?.eventCode,
+            locationName,
             teamCode: extras?.teamCode,
             teamName: extras?.teamName,
             teamPlaceholder: extras?.teamPlaceholder
@@ -883,6 +957,16 @@ export function EventDetailPage() {
   const [scoreSaveState, setScoreSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [scoreSaveError, setScoreSaveError] = useState<string | null>(null);
   const [scoreLoading, setScoreLoading] = useState(false);
+  const [scoreScanOpen, setScoreScanOpen] = useState(false);
+  const [scoreScanStatus, setScoreScanStatus] = useState<'idle' | 'requesting' | 'scanning' | 'unsupported'>('idle');
+  const [scoreScanRoundId, setScoreScanRoundId] = useState('');
+  const [scoreScanTeamCodeInput, setScoreScanTeamCodeInput] = useState('');
+  const [scoreScanDetectedText, setScoreScanDetectedText] = useState<string | null>(null);
+  const [scoreScanTeamId, setScoreScanTeamId] = useState('');
+  const [scoreScanScore, setScoreScanScore] = useState('0');
+  const [scoreScanError, setScoreScanError] = useState<string | null>(null);
+  const [scoreScanCameraError, setScoreScanCameraError] = useState<string | null>(null);
+  const [scoreScanSaving, setScoreScanSaving] = useState(false);
   const [qrUrl, setQrUrl] = useState<string | null>(null);
   const [qrLoading, setQrLoading] = useState(false);
   const [qrError, setQrError] = useState<string | null>(null);
@@ -916,6 +1000,9 @@ export function EventDetailPage() {
   const scoresheetInputId = useId();
   const answersheetInputId = useId();
   const documentMenuRef = useRef<HTMLDivElement | null>(null);
+  const scoreScanVideoRef = useRef<HTMLVideoElement | null>(null);
+  const scoreScanStreamRef = useRef<MediaStream | null>(null);
+  const scoreScanTimeoutRef = useRef<number | null>(null);
 
   const loadCore = async (isActive: () => boolean = () => true) => {
     if (!eventId) return;
@@ -1134,6 +1221,22 @@ export function EventDetailPage() {
     if (!event?.location_id) return '';
     return locations.find((location) => location.id === event.location_id)?.name ?? '';
   }, [event?.location_id, locations]);
+
+  const teamByCode = useMemo(() => {
+    const map = new Map<string, Team>();
+    teams.forEach((team) => {
+      const code = team.team_code?.trim();
+      if (code) map.set(code, team);
+    });
+    return map;
+  }, [teams]);
+
+  const lastCompletedRoundId = useMemo(() => {
+    const completed = [...rounds]
+      .filter((round) => round.status === 'completed')
+      .sort((a, b) => a.round_number - b.round_number);
+    return completed.length > 0 ? completed[completed.length - 1].id : '';
+  }, [rounds]);
 
   const copyEventCode = async () => {
     if (!event?.public_code) return;
@@ -1490,6 +1593,229 @@ export function EventDetailPage() {
     return () => window.clearTimeout(timeout);
   }, [scoreSaveState]);
 
+  const stopScoreScanner = () => {
+    if (scoreScanTimeoutRef.current !== null) {
+      window.clearTimeout(scoreScanTimeoutRef.current);
+      scoreScanTimeoutRef.current = null;
+    }
+    if (scoreScanStreamRef.current) {
+      scoreScanStreamRef.current.getTracks().forEach((track) => track.stop());
+      scoreScanStreamRef.current = null;
+    }
+    if (scoreScanVideoRef.current) {
+      scoreScanVideoRef.current.pause();
+      scoreScanVideoRef.current.srcObject = null;
+    }
+  };
+
+  const closeScoreScanner = () => {
+    stopScoreScanner();
+    setScoreScanOpen(false);
+    setScoreScanStatus('idle');
+    setScoreScanCameraError(null);
+    setScoreScanError(null);
+    setScoreScanDetectedText(null);
+    setScoreScanTeamCodeInput('');
+    setScoreScanTeamId('');
+    setScoreScanScore('0');
+    setScoreScanSaving(false);
+  };
+
+  const openScoreScanner = () => {
+    const defaultRoundId = lastCompletedRoundId || scoreRoundId || rounds[0]?.id || '';
+    setScoreScanRoundId(defaultRoundId);
+    if (defaultRoundId) {
+      setScoreRoundId(defaultRoundId);
+      void loadScores(defaultRoundId);
+    }
+    setScoreScanOpen(true);
+    setScoreScanStatus('idle');
+    setScoreScanCameraError(null);
+    setScoreScanError(null);
+    setScoreScanDetectedText(null);
+    setScoreScanTeamCodeInput('');
+    setScoreScanTeamId('');
+    setScoreScanScore('0');
+    setScoreScanSaving(false);
+  };
+
+  const assignScannedTeam = (teamCode: string, sourceText?: string) => {
+    const normalizedCode = teamCode.trim();
+    if (!/^\d{4}$/.test(normalizedCode)) {
+      setScoreScanError('Team code must be 4 digits.');
+      return false;
+    }
+    const team = teamByCode.get(normalizedCode);
+    setScoreScanTeamCodeInput(normalizedCode);
+    if (sourceText) setScoreScanDetectedText(sourceText);
+    if (!team) {
+      setScoreScanTeamId('');
+      setScoreScanError(`No team found for code ${normalizedCode}.`);
+      return false;
+    }
+    setScoreScanTeamId(team.id);
+    setScoreScanScore(String(Number(scoreMap[team.id] ?? 0)));
+    setScoreScanError(null);
+    return true;
+  };
+
+  const applyManualTeamCode = () => {
+    const normalizedCode = scoreScanTeamCodeInput.replace(/\D/g, '').slice(0, 4);
+    if (!normalizedCode) {
+      setScoreScanError('Enter a team code to continue.');
+      return;
+    }
+    assignScannedTeam(normalizedCode);
+  };
+
+  const saveScannedTeamScore = async () => {
+    if (!scoreScanRoundId) {
+      setScoreScanError('Select a round first.');
+      return;
+    }
+    if (!scoreScanTeamId) {
+      setScoreScanError('Scan a team QR code first.');
+      return;
+    }
+    const parsedScore = Number(scoreScanScore);
+    if (!Number.isFinite(parsedScore)) {
+      setScoreScanError('Enter a valid score.');
+      return;
+    }
+
+    setScoreScanSaving(true);
+    setScoreScanError(null);
+    setScoreSaveState('saving');
+    setScoreSaveError(null);
+    const res = await api.updateRoundScores(scoreScanRoundId, [{ team_id: scoreScanTeamId, score: parsedScore }]);
+    setScoreScanSaving(false);
+    if (!res.ok) {
+      const message = formatApiError(res, 'Failed to save score.');
+      setScoreSaveState('error');
+      setScoreSaveError(message);
+      setScoreScanError(message);
+      return;
+    }
+
+    const map: Record<string, number> = {};
+    res.data.forEach((row) => {
+      map[row.team_id] = row.score;
+    });
+    setScoreRoundId(scoreScanRoundId);
+    setScoreMap(map);
+    setScoreMapBaseline(map);
+    setScoreBaselineRoundId(scoreScanRoundId);
+    setScoreSaveState('saved');
+    closeScoreScanner();
+  };
+
+  useEffect(() => {
+    if (!scoreScanOpen) return;
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        closeScoreScanner();
+      }
+    };
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [scoreScanOpen]);
+
+  useEffect(() => {
+    if (!scoreScanOpen || scoreScanTeamId) return;
+    const BarcodeDetectorCtor = (window as Window & { BarcodeDetector?: any }).BarcodeDetector;
+    if (!navigator.mediaDevices?.getUserMedia || !BarcodeDetectorCtor) {
+      setScoreScanStatus('unsupported');
+      return;
+    }
+
+    let cancelled = false;
+    setScoreScanStatus('requesting');
+    setScoreScanCameraError(null);
+
+    const start = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: 'environment' } }
+        });
+        if (cancelled) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+        scoreScanStreamRef.current = stream;
+        const videoEl = scoreScanVideoRef.current;
+        if (!videoEl) {
+          setScoreScanStatus('idle');
+          return;
+        }
+        videoEl.srcObject = stream;
+        videoEl.setAttribute('playsinline', 'true');
+        await videoEl.play();
+        if (cancelled) return;
+
+        const detector = new BarcodeDetectorCtor({ formats: ['qr_code'] });
+        setScoreScanStatus('scanning');
+
+        const scanFrame = async () => {
+          if (cancelled) return;
+          const activeVideo = scoreScanVideoRef.current;
+          if (!activeVideo) return;
+
+          try {
+            if (activeVideo.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+              const results = await detector.detect(activeVideo);
+              const rawValue = results
+                .find((entry: { rawValue?: string }) => typeof entry.rawValue === 'string' && entry.rawValue.trim())
+                ?.rawValue?.trim();
+
+              if (rawValue) {
+                setScoreScanDetectedText(rawValue);
+                const parsed = parseScoresheetQr(rawValue);
+                if (!parsed.teamCode) {
+                  setScoreScanError('QR code does not contain a team code.');
+                } else if (
+                  parsed.eventCode &&
+                  event?.public_code &&
+                  parsed.eventCode.toLowerCase() !== event.public_code.toLowerCase()
+                ) {
+                  setScoreScanError('This QR code belongs to a different event.');
+                } else if (assignScannedTeam(parsed.teamCode, rawValue)) {
+                  stopScoreScanner();
+                  setScoreScanStatus('idle');
+                  return;
+                }
+              }
+            }
+          } catch {
+            // Scanner errors are expected on occasional frames.
+          }
+
+          scoreScanTimeoutRef.current = window.setTimeout(() => {
+            void scanFrame();
+          }, 220);
+        };
+
+        void scanFrame();
+      } catch {
+        if (cancelled) return;
+        setScoreScanStatus('idle');
+        setScoreScanCameraError('Unable to access camera. Enter the team code manually.');
+      }
+    };
+
+    void start();
+    return () => {
+      cancelled = true;
+      stopScoreScanner();
+    };
+  }, [scoreScanOpen, scoreScanTeamId, event?.public_code, teamByCode]);
+
+  useEffect(() => {
+    if (!scoreScanOpen || !scoreScanTeamId) return;
+    setScoreScanScore(String(Number(scoreMap[scoreScanTeamId] ?? 0)));
+  }, [scoreScanOpen, scoreScanTeamId, scoreMap, scoreScanRoundId]);
+
   const uploadDocument = async (type: 'scoresheet' | 'answersheet', file: File) => {
     if (!eventId) return;
     const setUploading = type === 'scoresheet' ? setScoresheetUploading : setAnswersheetUploading;
@@ -1696,6 +2022,195 @@ export function EventDetailPage() {
               </List>
             )}
           </Section>
+          <Section title="Round Scores">
+            <div className="space-y-3">
+              <label className="flex flex-col gap-2 text-sm text-muted">
+                <span>Select round</span>
+                <select
+                  className="h-10 px-3"
+                  value={scoreRoundId}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    setScoreRoundId(value);
+                    loadScores(value);
+                  }}
+                >
+                  <option value="">Choose round</option>
+                  {rounds.map((round) => (
+                    <option key={round.id} value={round.id}>
+                      {roundDisplay(round).title} — {roundDisplay(round).detail}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="flex flex-wrap items-center gap-2">
+                <SecondaryButton
+                  className="h-9 px-3 text-xs"
+                  onClick={openScoreScanner}
+                  disabled={rounds.length === 0 || teams.length === 0}
+                >
+                  Scan Scoresheet QR
+                </SecondaryButton>
+                <span className="text-xs text-muted">Defaults to the last completed round.</span>
+              </div>
+              {teams.length === 0 && <div className="text-sm text-muted">Add teams to score.</div>}
+              {teams.length > 0 && (
+                <List>
+                  {teams.map((team) => (
+                    <ListRow key={team.id} className="items-center">
+                      <div className="text-sm">{team.name}</div>
+                      <input
+                        type="number"
+                        className="h-9 w-20 px-2 text-right"
+                        value={scoreMap[team.id] ?? 0}
+                        onChange={(event) =>
+                          setScoreMap((prev) => ({ ...prev, [team.id]: Number(event.target.value) }))
+                        }
+                      />
+                    </ListRow>
+                  ))}
+                </List>
+              )}
+              <div className="flex justify-end">
+                <div className="text-xs" aria-live="polite">
+                  {scoreSaveState === 'saving' && <span className="text-muted">Saving changes…</span>}
+                  {scoreSaveState === 'saved' && <span className="text-accent-ink">All changes saved.</span>}
+                  {scoreSaveState === 'error' && (
+                    <span className="text-danger-ink">{scoreSaveError ?? 'Save failed.'}</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </Section>
+          {scoreScanOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-label="Scan scoresheet QR"
+                className="w-full max-w-xl border-2 border-border bg-panel p-5 sm:p-6"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="text-sm font-display uppercase tracking-[0.22em] text-text">Scan Scoresheet QR</div>
+                  <button
+                    type="button"
+                    onClick={closeScoreScanner}
+                    className="text-xs uppercase tracking-[0.2em] text-muted"
+                  >
+                    Close
+                  </button>
+                </div>
+
+                <div className="mt-4 space-y-3">
+                  <label className="flex flex-col gap-2 text-sm text-muted">
+                    <span>Round</span>
+                    <select
+                      className="h-10 px-3"
+                      value={scoreScanRoundId}
+                      onChange={(event) => {
+                        const value = event.target.value;
+                        setScoreScanRoundId(value);
+                        setScoreRoundId(value);
+                        void loadScores(value);
+                      }}
+                    >
+                      <option value="">Choose round</option>
+                      {rounds.map((round) => (
+                        <option key={round.id} value={round.id}>
+                          {roundDisplay(round).title} — {roundDisplay(round).detail}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  {!scoreScanTeamId && (
+                    <div className="space-y-3">
+                      {scoreScanStatus !== 'unsupported' && (
+                        <div className="overflow-hidden rounded-md border border-border bg-black">
+                          <video
+                            ref={scoreScanVideoRef}
+                            className="h-56 w-full object-cover"
+                            autoPlay
+                            muted
+                            playsInline
+                          />
+                        </div>
+                      )}
+                      <div className="text-xs text-muted">
+                        {scoreScanStatus === 'requesting' && 'Requesting camera access…'}
+                        {scoreScanStatus === 'scanning' && 'Point the camera at a scoresheet QR code.'}
+                        {scoreScanStatus === 'unsupported' && 'Camera scanning is unavailable in this browser.'}
+                      </div>
+                      <div className="grid gap-2 sm:grid-cols-[1fr,auto]">
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          maxLength={4}
+                          className="h-10 px-3"
+                          placeholder="Enter 4-digit team code"
+                          value={scoreScanTeamCodeInput}
+                          onChange={(event) =>
+                            setScoreScanTeamCodeInput(event.target.value.replace(/\D/g, '').slice(0, 4))
+                          }
+                        />
+                        <SecondaryButton className="h-10 px-4 text-xs" onClick={applyManualTeamCode}>
+                          Use Code
+                        </SecondaryButton>
+                      </div>
+                    </div>
+                  )}
+
+                  {scoreScanTeamId && (
+                    <div className="space-y-3 rounded-md border border-border bg-panel2 p-3">
+                      <div className="text-xs uppercase tracking-[0.2em] text-muted">Team</div>
+                      <div className="text-sm font-medium text-text">{teams.find((team) => team.id === scoreScanTeamId)?.name ?? 'Unknown team'}</div>
+                      <div className="text-xs text-muted">Code: {scoreScanTeamCodeInput}</div>
+                      <label className="flex flex-col gap-2 text-sm text-muted">
+                        <span>Score</span>
+                        <input
+                          type="number"
+                          className="h-10 w-28 px-3 text-right"
+                          value={scoreScanScore}
+                          onChange={(event) => setScoreScanScore(event.target.value)}
+                        />
+                      </label>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <PrimaryButton className="h-10 px-4 text-xs" onClick={saveScannedTeamScore} disabled={scoreScanSaving}>
+                          {scoreScanSaving ? 'Saving…' : 'Save Score'}
+                        </PrimaryButton>
+                        <SecondaryButton
+                          className="h-10 px-4 text-xs"
+                          onClick={() => {
+                            setScoreScanTeamId('');
+                            setScoreScanError(null);
+                            setScoreScanDetectedText(null);
+                            setScoreScanStatus('idle');
+                          }}
+                        >
+                          Scan Another
+                        </SecondaryButton>
+                      </div>
+                    </div>
+                  )}
+
+                  {scoreScanDetectedText && (
+                    <div className="text-[11px] text-muted">Scanned value: {scoreScanDetectedText}</div>
+                  )}
+                  {scoreScanCameraError && (
+                    <div className="border border-danger bg-panel2 px-3 py-2 text-xs text-danger-ink">
+                      {scoreScanCameraError}
+                    </div>
+                  )}
+                  {scoreScanError && (
+                    <div className="border border-danger bg-panel2 px-3 py-2 text-xs text-danger-ink">
+                      {scoreScanError}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </AppShell>
     );
@@ -2025,6 +2540,11 @@ export function EventDetailPage() {
     </div>
   );
 
+  const scannedTeam = useMemo(() => {
+    if (!scoreScanTeamId) return null;
+    return teams.find((team) => team.id === scoreScanTeamId) ?? null;
+  }, [teams, scoreScanTeamId]);
+
   const scoresContent = (
     <div className="space-y-3">
       <label className="flex flex-col gap-2 text-sm text-muted">
@@ -2046,6 +2566,16 @@ export function EventDetailPage() {
           ))}
         </select>
       </label>
+      <div className="flex flex-wrap items-center gap-2">
+        <SecondaryButton
+          className="h-9 px-3 text-xs"
+          onClick={openScoreScanner}
+          disabled={rounds.length === 0 || teams.length === 0}
+        >
+          Scan Scoresheet QR
+        </SecondaryButton>
+        <span className="text-xs text-muted">Defaults to the last completed round.</span>
+      </div>
       {teams.length === 0 && <div className="text-sm text-muted">Add teams to score.</div>}
       {teams.length > 0 && (
         <List>
@@ -2474,6 +3004,136 @@ export function EventDetailPage() {
           <AccordionSection title="Documents & Share">{documentsContent}</AccordionSection>
           <AccordionSection title="Event Settings">{settingsContent}</AccordionSection>
         </div>
+
+        {scoreScanOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label="Scan scoresheet QR"
+              className="w-full max-w-xl border-2 border-border bg-panel p-5 sm:p-6"
+            >
+              <div className="flex items-center justify-between">
+                <div className="text-sm font-display uppercase tracking-[0.22em] text-text">Scan Scoresheet QR</div>
+                <button
+                  type="button"
+                  onClick={closeScoreScanner}
+                  className="text-xs uppercase tracking-[0.2em] text-muted"
+                >
+                  Close
+                </button>
+              </div>
+
+              <div className="mt-4 space-y-3">
+                <label className="flex flex-col gap-2 text-sm text-muted">
+                  <span>Round</span>
+                  <select
+                    className="h-10 px-3"
+                    value={scoreScanRoundId}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      setScoreScanRoundId(value);
+                      setScoreRoundId(value);
+                      void loadScores(value);
+                    }}
+                  >
+                    <option value="">Choose round</option>
+                    {rounds.map((round) => (
+                      <option key={round.id} value={round.id}>
+                        {roundDisplay(round).title} — {roundDisplay(round).detail}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                {!scannedTeam && (
+                  <div className="space-y-3">
+                    {scoreScanStatus !== 'unsupported' && (
+                      <div className="overflow-hidden rounded-md border border-border bg-black">
+                        <video
+                          ref={scoreScanVideoRef}
+                          className="h-56 w-full object-cover"
+                          autoPlay
+                          muted
+                          playsInline
+                        />
+                      </div>
+                    )}
+                    <div className="text-xs text-muted">
+                      {scoreScanStatus === 'requesting' && 'Requesting camera access…'}
+                      {scoreScanStatus === 'scanning' && 'Point the camera at a scoresheet QR code.'}
+                      {scoreScanStatus === 'unsupported' && 'Camera scanning is unavailable in this browser.'}
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-[1fr,auto]">
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        maxLength={4}
+                        className="h-10 px-3"
+                        placeholder="Enter 4-digit team code"
+                        value={scoreScanTeamCodeInput}
+                        onChange={(event) =>
+                          setScoreScanTeamCodeInput(event.target.value.replace(/\D/g, '').slice(0, 4))
+                        }
+                      />
+                      <SecondaryButton className="h-10 px-4 text-xs" onClick={applyManualTeamCode}>
+                        Use Code
+                      </SecondaryButton>
+                    </div>
+                  </div>
+                )}
+
+                {scannedTeam && (
+                  <div className="space-y-3 rounded-md border border-border bg-panel2 p-3">
+                    <div className="text-xs uppercase tracking-[0.2em] text-muted">Team</div>
+                    <div className="text-sm font-medium text-text">{scannedTeam.name}</div>
+                    <div className="text-xs text-muted">Code: {scannedTeam.team_code ?? scoreScanTeamCodeInput}</div>
+                    <label className="flex flex-col gap-2 text-sm text-muted">
+                      <span>Score</span>
+                      <input
+                        type="number"
+                        className="h-10 w-28 px-3 text-right"
+                        value={scoreScanScore}
+                        onChange={(event) => setScoreScanScore(event.target.value)}
+                      />
+                    </label>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <PrimaryButton className="h-10 px-4 text-xs" onClick={saveScannedTeamScore} disabled={scoreScanSaving}>
+                        {scoreScanSaving ? 'Saving…' : 'Save Score'}
+                      </PrimaryButton>
+                      <SecondaryButton
+                        className="h-10 px-4 text-xs"
+                        onClick={() => {
+                          setScoreScanTeamId('');
+                          setScoreScanError(null);
+                          setScoreScanDetectedText(null);
+                          setScoreScanStatus('idle');
+                        }}
+                      >
+                        Scan Another
+                      </SecondaryButton>
+                    </div>
+                  </div>
+                )}
+
+                {scoreScanDetectedText && (
+                  <div className="text-[11px] text-muted">Scanned value: {scoreScanDetectedText}</div>
+                )}
+                {scoreScanCameraError && (
+                  <div className="border border-danger bg-panel2 px-3 py-2 text-xs text-danger-ink">
+                    {scoreScanCameraError}
+                  </div>
+                )}
+                {scoreScanError && (
+                  <div className="border border-danger bg-panel2 px-3 py-2 text-xs text-danger-ink">
+                    {scoreScanError}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </AppShell>
   );
