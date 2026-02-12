@@ -92,9 +92,9 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request }
     return jsonError({ code: 'forbidden', message: 'Participant audio stop is not enabled for this game.' }, 403);
   }
 
-  const team = await queryFirst<{ id: string; team_session_token: string | null }>(
+  const team = await queryFirst<{ id: string; name: string; team_session_token: string | null }>(
     env,
-    'SELECT id, team_session_token FROM teams WHERE id = ? AND event_id = ? AND COALESCE(deleted, 0) = 0',
+    'SELECT id, name, team_session_token FROM teams WHERE id = ? AND event_id = ? AND COALESCE(deleted, 0) = 0',
     [parsed.data.team_id, event.id]
   );
   if (!team) {
@@ -110,10 +110,17 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request }
     return jsonOk({ ok: true, stopped: false });
   }
 
+  const stoppedAt = nowIso();
   await execute(
     env,
-    'UPDATE event_live_state SET audio_playing = 0, updated_at = ? WHERE event_id = ?',
-    [nowIso(), event.id]
+    `UPDATE event_live_state
+     SET audio_playing = 0,
+         participant_audio_stopped_by_team_id = ?,
+         participant_audio_stopped_by_team_name = ?,
+         participant_audio_stopped_at = ?,
+         updated_at = ?
+     WHERE event_id = ?`,
+    [team.id, team.name, stoppedAt, stoppedAt, event.id]
   );
 
   return jsonOk({ ok: true, stopped: true });

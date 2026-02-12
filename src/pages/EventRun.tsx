@@ -61,6 +61,7 @@ export function EventRunPage() {
   const [audioRequestId, setAudioRequestId] = useState<string | null>(null);
   const [audioRetryToken, setAudioRetryToken] = useState(0);
   const [localAudioPlaying, setLocalAudioPlaying] = useState(false);
+  const [audioStoppedByTeamNotice, setAudioStoppedByTeamNotice] = useState<string | null>(null);
   const remoteAudioPlayingSeenRef = useRef(false);
   const [waitingMessage, setWaitingMessage] = useState('');
   const [waitingShowLeaderboard, setWaitingShowLeaderboard] = useState(false);
@@ -85,7 +86,16 @@ export function EventRunPage() {
   const isAdmin = auth.user?.user_type === 'admin';
   const syncAudioPlaying = useCallback((playing: boolean) => {
     if (!eventId) return;
-    void api.updateLiveState(eventId, { audio_playing: playing });
+    void api.updateLiveState(eventId, {
+      audio_playing: playing,
+      ...(playing
+        ? {
+            participant_audio_stopped_by_team_id: null,
+            participant_audio_stopped_by_team_name: null,
+            participant_audio_stopped_at: null
+          }
+        : {})
+    });
   }, [eventId]);
 
   const load = async () => {
@@ -273,6 +283,7 @@ export function EventRunPage() {
       syncAudioPlaying(false);
       return;
     }
+    setAudioStoppedByTeamNotice(null);
     const requestId = createRequestId();
     const base = api.mediaUrl(effectiveAudioKey);
     const joiner = base.includes('?') ? '&' : '?';
@@ -302,6 +313,11 @@ export function EventRunPage() {
       if (remoteAudioPlayingSeenRef.current && !res.data.audio_playing) {
         audioRef.current?.pause();
         setLocalAudioPlaying(false);
+        if (res.data.participant_audio_stopped_by_team_name) {
+          setAudioStoppedByTeamNotice(`Stopped by ${res.data.participant_audio_stopped_by_team_name}`);
+        } else if (res.data.participant_audio_stopped_by_team_id) {
+          setAudioStoppedByTeamNotice('Stopped by a team');
+        }
         remoteAudioPlayingSeenRef.current = false;
       }
     };
@@ -790,6 +806,11 @@ export function EventRunPage() {
                           {audioRequestId ? ` (ref ${audioRequestId})` : ''}
                         </div>
                       )}
+                      {audioStoppedByTeamNotice && !audioError && (
+                        <div className="rounded-lg border border-accent-ink bg-panel px-3 py-2 text-sm text-accent-ink">
+                          {audioStoppedByTeamNotice}
+                        </div>
+                      )}
                       <audio
                         ref={audioRef}
                         className="w-full"
@@ -801,6 +822,7 @@ export function EventRunPage() {
                         onPlay={() => {
                           handleAudioEvent('audio_play_click');
                           remoteAudioPlayingSeenRef.current = false;
+                          setAudioStoppedByTeamNotice(null);
                           setLocalAudioPlaying(true);
                           syncAudioPlaying(true);
                         }}

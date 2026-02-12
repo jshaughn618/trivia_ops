@@ -1,0 +1,3 @@
+ALTER TABLE event_live_state ADD COLUMN participant_audio_stopped_by_team_id TEXT;
+ALTER TABLE event_live_state ADD COLUMN participant_audio_stopped_by_team_name TEXT;
+ALTER TABLE event_live_state ADD COLUMN participant_audio_stopped_at TEXT;

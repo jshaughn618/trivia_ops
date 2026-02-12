@@ -24,11 +24,15 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params, data }) =>
     show_full_leaderboard: number;
     timer_started_at: string | null;
     timer_duration_seconds: number | null;
+    participant_audio_stopped_by_team_id: string | null;
+    participant_audio_stopped_by_team_name: string | null;
+    participant_audio_stopped_at: string | null;
     updated_at: string;
   }>(
     env,
     `SELECT id, event_id, active_round_id, current_item_ordinal, reveal_answer, reveal_fun_fact,
-            audio_playing, waiting_message, waiting_show_leaderboard, waiting_show_next_round, show_full_leaderboard, timer_started_at, timer_duration_seconds, updated_at
+            audio_playing, waiting_message, waiting_show_leaderboard, waiting_show_next_round, show_full_leaderboard, timer_started_at, timer_duration_seconds,
+            participant_audio_stopped_by_team_id, participant_audio_stopped_by_team_name, participant_audio_stopped_at, updated_at
      FROM event_live_state WHERE event_id = ? AND COALESCE(deleted, 0) = 0`,
     [params.id]
   );
@@ -44,7 +48,10 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params, data }) =>
           waiting_show_next_round: Boolean(row.waiting_show_next_round),
           show_full_leaderboard: Boolean(row.show_full_leaderboard),
           timer_started_at: row.timer_started_at ?? null,
-          timer_duration_seconds: row.timer_duration_seconds ?? null
+          timer_duration_seconds: row.timer_duration_seconds ?? null,
+          participant_audio_stopped_by_team_id: row.participant_audio_stopped_by_team_id ?? null,
+          participant_audio_stopped_by_team_name: row.participant_audio_stopped_by_team_name ?? null,
+          participant_audio_stopped_at: row.participant_audio_stopped_at ?? null
         }
       : null
   );
@@ -74,6 +81,9 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
     const waitingMessageProvided = payloadData.waiting_message !== undefined;
     const timerStartedProvided = payloadData.timer_started_at !== undefined;
     const timerDurationProvided = payloadData.timer_duration_seconds !== undefined;
+    const stoppedByTeamIdProvided = payloadData.participant_audio_stopped_by_team_id !== undefined;
+    const stoppedByTeamNameProvided = payloadData.participant_audio_stopped_by_team_name !== undefined;
+    const stoppedAtProvided = payloadData.participant_audio_stopped_at !== undefined;
     await execute(
       env,
       `UPDATE event_live_state
@@ -88,6 +98,9 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
            show_full_leaderboard = COALESCE(?, show_full_leaderboard),
            timer_started_at = CASE WHEN ? = 1 THEN ? ELSE timer_started_at END,
            timer_duration_seconds = CASE WHEN ? = 1 THEN ? ELSE timer_duration_seconds END,
+           participant_audio_stopped_by_team_id = CASE WHEN ? = 1 THEN ? ELSE participant_audio_stopped_by_team_id END,
+           participant_audio_stopped_by_team_name = CASE WHEN ? = 1 THEN ? ELSE participant_audio_stopped_by_team_name END,
+           participant_audio_stopped_at = CASE WHEN ? = 1 THEN ? ELSE participant_audio_stopped_at END,
            updated_at = ?
        WHERE event_id = ?`,
       [
@@ -105,6 +118,12 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
         payloadData.timer_started_at ?? null,
         timerDurationProvided ? 1 : 0,
         payloadData.timer_duration_seconds ?? null,
+        stoppedByTeamIdProvided ? 1 : 0,
+        payloadData.participant_audio_stopped_by_team_id ?? null,
+        stoppedByTeamNameProvided ? 1 : 0,
+        payloadData.participant_audio_stopped_by_team_name ?? null,
+        stoppedAtProvided ? 1 : 0,
+        payloadData.participant_audio_stopped_at ?? null,
         now,
         params.id
       ]
@@ -115,8 +134,9 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
       env,
       `INSERT INTO event_live_state
        (id, event_id, active_round_id, current_item_ordinal, audio_playing, reveal_answer, reveal_fun_fact,
-        waiting_message, waiting_show_leaderboard, waiting_show_next_round, show_full_leaderboard, timer_started_at, timer_duration_seconds, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        waiting_message, waiting_show_leaderboard, waiting_show_next_round, show_full_leaderboard, timer_started_at, timer_duration_seconds,
+        participant_audio_stopped_by_team_id, participant_audio_stopped_by_team_name, participant_audio_stopped_at, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id,
         params.id,
@@ -131,6 +151,9 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
         payloadData.show_full_leaderboard ? 1 : 0,
         payloadData.timer_started_at ?? null,
         payloadData.timer_duration_seconds ?? null,
+        payloadData.participant_audio_stopped_by_team_id ?? null,
+        payloadData.participant_audio_stopped_by_team_name ?? null,
+        payloadData.participant_audio_stopped_at ?? null,
         now,
         now
       ]
@@ -151,11 +174,15 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
     show_full_leaderboard: number;
     timer_started_at: string | null;
     timer_duration_seconds: number | null;
+    participant_audio_stopped_by_team_id: string | null;
+    participant_audio_stopped_by_team_name: string | null;
+    participant_audio_stopped_at: string | null;
     updated_at: string;
   }>(
     env,
     `SELECT id, event_id, active_round_id, current_item_ordinal, reveal_answer, reveal_fun_fact,
-            audio_playing, waiting_message, waiting_show_leaderboard, waiting_show_next_round, show_full_leaderboard, timer_started_at, timer_duration_seconds, updated_at
+            audio_playing, waiting_message, waiting_show_leaderboard, waiting_show_next_round, show_full_leaderboard, timer_started_at, timer_duration_seconds,
+            participant_audio_stopped_by_team_id, participant_audio_stopped_by_team_name, participant_audio_stopped_at, updated_at
      FROM event_live_state WHERE event_id = ? AND COALESCE(deleted, 0) = 0`,
     [params.id]
   );
@@ -172,7 +199,10 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
           waiting_show_next_round: Boolean(row.waiting_show_next_round),
           show_full_leaderboard: Boolean(row.show_full_leaderboard),
           timer_started_at: row.timer_started_at ?? null,
-          timer_duration_seconds: row.timer_duration_seconds ?? null
+          timer_duration_seconds: row.timer_duration_seconds ?? null,
+          participant_audio_stopped_by_team_id: row.participant_audio_stopped_by_team_id ?? null,
+          participant_audio_stopped_by_team_name: row.participant_audio_stopped_by_team_name ?? null,
+          participant_audio_stopped_at: row.participant_audio_stopped_at ?? null
         }
       : null
   );

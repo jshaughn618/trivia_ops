@@ -153,6 +153,9 @@ export type EventLiveState = {
   show_full_leaderboard: boolean;
   timer_started_at: string | null;
   timer_duration_seconds: number | null;
+  participant_audio_stopped_by_team_id: Id | null;
+  participant_audio_stopped_by_team_name: string | null;
+  participant_audio_stopped_at: string | null;
   updated_at: string;
 };
 

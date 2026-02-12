@@ -293,7 +293,10 @@ export const liveStateUpdateSchema = z.object({
   waiting_show_next_round: z.boolean().optional(),
   show_full_leaderboard: z.boolean().optional(),
   timer_started_at: z.string().nullable().optional(),
-  timer_duration_seconds: z.number().int().min(5).max(600).nullable().optional()
+  timer_duration_seconds: z.number().int().min(5).max(600).nullable().optional(),
+  participant_audio_stopped_by_team_id: idSchema.nullable().optional(),
+  participant_audio_stopped_by_team_name: z.string().nullable().optional(),
+  participant_audio_stopped_at: z.string().nullable().optional()
 });
 
 export type LocationCreate = z.infer<typeof locationCreateSchema>;

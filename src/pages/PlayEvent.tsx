@@ -664,8 +664,8 @@ export function PlayEventPage() {
   const showAudioClue = speedRoundMode || displayItem?.media_type === 'audio';
   const canRequestAudioStop = Boolean(
     showAudioClue &&
-    data?.live?.audio_playing &&
     activeRound?.allow_participant_audio_stop &&
+    data?.live?.audio_playing &&
     teamId &&
     teamSession
   );
