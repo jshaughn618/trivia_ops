@@ -17,6 +17,10 @@ import { createRequestId, logError, logInfo, logWarn } from './lib/log';
 
 type AnswerPartPayload = { label: string; answer: string; points?: number };
 type EditionItemPayload = Partial<EditionItem> & { answer_parts_json?: AnswerPartPayload[] };
+type GameMutationPayload = Partial<Omit<Game, 'show_theme' | 'allow_participant_audio_stop'>> & {
+  show_theme?: boolean | number | null;
+  allow_participant_audio_stop?: boolean | number | null;
+};
 
 async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<ApiEnvelope<T>> {
   const requestId = createRequestId();
@@ -172,10 +176,10 @@ export const api = {
     apiFetch<Location>(`/api/locations/${locationId}/logo`, { method: 'DELETE' }),
 
   listGames: () => apiFetch<Game[]>('/api/games'),
-  createGame: (payload: Partial<Game>) =>
+  createGame: (payload: GameMutationPayload) =>
     apiFetch<Game>('/api/games', { method: 'POST', body: JSON.stringify(payload) }),
   getGame: (id: string) => apiFetch<Game>(`/api/games/${id}`),
-  updateGame: (id: string, payload: Partial<Game>) =>
+  updateGame: (id: string, payload: GameMutationPayload) =>
     apiFetch<Game>(`/api/games/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
   deleteGame: (id: string) => apiFetch<{ ok: true }>(`/api/games/${id}`, { method: 'DELETE' }),
 
@@ -315,6 +319,11 @@ export const api = {
     }),
   publicSubmitChoice: (code: string, payload: { team_id: string; item_id: string; choice_index: number; session_token: string }) =>
     apiFetch<{ ok: true; choice_index: number; choice_text: string }>(`/api/public/event/${code}/responses`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    }),
+  publicStopAudio: (code: string, payload: { team_id: string; session_token: string }) =>
+    apiFetch<{ ok: true; stopped: boolean }>(`/api/public/event/${code}/audio-stop`, {
       method: 'POST',
       body: JSON.stringify(payload)
     }),

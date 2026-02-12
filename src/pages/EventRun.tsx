@@ -60,6 +60,7 @@ export function EventRunPage() {
   const [audioError, setAudioError] = useState<string | null>(null);
   const [audioRequestId, setAudioRequestId] = useState<string | null>(null);
   const [audioRetryToken, setAudioRetryToken] = useState(0);
+  const [localAudioPlaying, setLocalAudioPlaying] = useState(false);
   const [waitingMessage, setWaitingMessage] = useState('');
   const [waitingShowLeaderboard, setWaitingShowLeaderboard] = useState(false);
   const [waitingShowNextRound, setWaitingShowNextRound] = useState(true);
@@ -266,6 +267,7 @@ export function EventRunPage() {
     if (!isAudioItem || !effectiveAudioKey) {
       setAudioLoading(false);
       setAudioUrl(null);
+      setLocalAudioPlaying(false);
       syncAudioPlaying(false);
       return;
     }
@@ -283,6 +285,27 @@ export function EventRunPage() {
       syncAudioPlaying(false);
     };
   }, [syncAudioPlaying]);
+
+  useEffect(() => {
+    if (!eventId || !localAudioPlaying) return;
+    let closed = false;
+    const poll = async () => {
+      const res = await api.getLiveState(eventId);
+      if (closed || !res.ok || !res.data) return;
+      if (!res.data.audio_playing) {
+        audioRef.current?.pause();
+        setLocalAudioPlaying(false);
+      }
+    };
+    void poll();
+    const timer = window.setInterval(() => {
+      void poll();
+    }, 1000);
+    return () => {
+      closed = true;
+      window.clearInterval(timer);
+    };
+  }, [eventId, localAudioPlaying]);
 
   const handleAudioEvent = (event: string) => {
     const error = audioRef.current?.error;
@@ -311,6 +334,7 @@ export function EventRunPage() {
     });
     setAudioLoading(false);
     setAudioError('Audio unavailable.');
+    setLocalAudioPlaying(false);
     syncAudioPlaying(false);
   };
 
@@ -762,14 +786,17 @@ export function EventRunPage() {
                         onCanPlay={() => handleAudioReady('canplay')}
                         onPlay={() => {
                           handleAudioEvent('audio_play_click');
+                          setLocalAudioPlaying(true);
                           syncAudioPlaying(true);
                         }}
                         onPause={() => {
                           handleAudioEvent('pause');
+                          setLocalAudioPlaying(false);
                           syncAudioPlaying(false);
                         }}
                         onEnded={() => {
                           handleAudioEvent('ended');
+                          setLocalAudioPlaying(false);
                           syncAudioPlaying(false);
                         }}
                         onError={handleAudioError}

@@ -21,6 +21,7 @@ export type PublicEventPayload = {
     status: string;
     timer_seconds: number | null;
     is_speed_round: boolean;
+    allow_participant_audio_stop: boolean;
     round_audio_key: string | null;
     round_audio_name: string | null;
   }[];
@@ -102,6 +103,7 @@ export async function getPublicEventPayload(env: Env, rawCode: string, view?: Pu
     status: string;
     timer_seconds: number | null;
     is_speed_round: number;
+    allow_participant_audio_stop: number;
     round_audio_key: string | null;
     round_audio_name: string | null;
   }>(
@@ -112,11 +114,13 @@ export async function getPublicEventPayload(env: Env, rawCode: string, view?: Pu
             er.status,
             ed.timer_seconds,
             CASE WHEN g.subtype = 'speed_round' THEN 1 ELSE 0 END AS is_speed_round,
+            CASE WHEN gt.code = 'music' THEN COALESCE(g.allow_participant_audio_stop, 0) ELSE 0 END AS allow_participant_audio_stop,
             ed.speed_round_audio_key AS round_audio_key,
             ed.speed_round_audio_name AS round_audio_name
      FROM event_rounds er
      JOIN editions ed ON ed.id = er.edition_id
      JOIN games g ON g.id = ed.game_id
+     JOIN game_types gt ON gt.id = g.game_type_id
      WHERE er.event_id = ? AND COALESCE(er.deleted, 0) = 0
      ORDER BY er.round_number ASC`,
     [event.id]
@@ -124,6 +128,7 @@ export async function getPublicEventPayload(env: Env, rawCode: string, view?: Pu
   const rounds = roundsRaw.map((round) => ({
     ...round,
     is_speed_round: Boolean(round.is_speed_round),
+    allow_participant_audio_stop: Boolean(round.allow_participant_audio_stop),
     round_audio_key: round.round_audio_key ?? null,
     round_audio_name: round.round_audio_name ?? null
   }));

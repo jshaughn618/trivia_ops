@@ -25,6 +25,7 @@ export function GameDetailPage() {
   const [subtype, setSubtype] = useState('');
   const [description, setDescription] = useState('');
   const [showTheme, setShowTheme] = useState(true);
+  const [allowParticipantAudioStop, setAllowParticipantAudioStop] = useState(false);
   const [descLoading, setDescLoading] = useState(false);
   const [descError, setDescError] = useState<string | null>(null);
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
@@ -46,6 +47,7 @@ export function GameDetailPage() {
         setDescription(gameRes.data.description ?? '');
         setSubtype(gameRes.data.subtype ?? '');
         setShowTheme(Boolean(gameRes.data.show_theme ?? 1));
+        setAllowParticipantAudioStop(Boolean(gameRes.data.allow_participant_audio_stop ?? 0));
       }
       if (editionsRes.ok) setEditions(editionsRes.data);
       if (typesRes.ok) setGameTypes(typesRes.data);
@@ -60,9 +62,10 @@ export function GameDetailPage() {
       description,
       game_type_id: gameTypeId,
       subtype: subtype.trim() || '',
-      show_theme: showTheme ? 1 : 0
+      show_theme: showTheme ? 1 : 0,
+      allow_participant_audio_stop: allowParticipantAudioStop ? 1 : 0
     }),
-    [name, gameCode, description, gameTypeId, subtype, showTheme]
+    [name, gameCode, description, gameTypeId, subtype, showTheme, allowParticipantAudioStop]
   );
 
   const gameSaved = useMemo(
@@ -74,7 +77,8 @@ export function GameDetailPage() {
             description: game.description ?? '',
             game_type_id: game.game_type_id,
             subtype: game.subtype ?? '',
-            show_theme: game.show_theme ? 1 : 0
+            show_theme: game.show_theme ? 1 : 0,
+            allow_participant_audio_stop: game.allow_participant_audio_stop ? 1 : 0
           }
         : null,
     [game]
@@ -107,7 +111,8 @@ export function GameDetailPage() {
         description,
         game_type_id: gameTypeId,
         subtype: subtype.trim() || null,
-        show_theme: showTheme
+        show_theme: showTheme,
+        allow_participant_audio_stop: allowParticipantAudioStop
       });
       if (res.ok) {
         setGame(res.data);
@@ -119,7 +124,7 @@ export function GameDetailPage() {
       }
     }, 600);
     return () => window.clearTimeout(timeout);
-  }, [gameId, game, gameDirty, name, gameCode, description, gameTypeId, subtype, showTheme]);
+  }, [gameId, game, gameDirty, name, gameCode, description, gameTypeId, subtype, showTheme, allowParticipantAudioStop]);
 
   useEffect(() => {
     if (saveState !== 'saved') return;
@@ -239,6 +244,16 @@ export function GameDetailPage() {
               />
               Show theme when presenting
             </label>
+            {isMusicType && (
+              <label className="flex items-center gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+                <input
+                  type="checkbox"
+                  checked={allowParticipantAudioStop}
+                  onChange={(event) => setAllowParticipantAudioStop(event.target.checked)}
+                />
+                Allow participants to stop audio
+              </label>
+            )}
             {updateError && (
               <div className="border border-danger bg-panel2 px-3 py-2 text-xs text-danger-ink">
                 {updateError}

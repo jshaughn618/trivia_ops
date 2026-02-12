@@ -47,6 +47,7 @@ export type Game = {
   subtype: string | null;
   default_settings_json: string | null;
   show_theme: number | null;
+  allow_participant_audio_stop: number | null;
   created_at: string;
 };
 

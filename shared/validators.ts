@@ -22,7 +22,8 @@ export const gameCreateSchema = z.object({
   description: z.string().nullable().optional(),
   subtype: z.string().nullable().optional(),
   default_settings_json: z.string().nullable().optional(),
-  show_theme: z.boolean().optional()
+  show_theme: z.boolean().optional(),
+  allow_participant_audio_stop: z.boolean().optional()
 });
 
 export const gameUpdateSchema = z.object({
@@ -32,7 +33,8 @@ export const gameUpdateSchema = z.object({
   description: z.string().nullable().optional(),
   subtype: z.string().nullable().optional(),
   default_settings_json: z.string().nullable().optional(),
-  show_theme: z.boolean().optional()
+  show_theme: z.boolean().optional(),
+  allow_participant_audio_stop: z.boolean().optional()
 });
 
 const editionStatusSchema = z.enum(['draft', 'published', 'archived']);
@@ -263,6 +265,11 @@ export const publicJoinSchema = z.object({
 export const publicTeamNameSchema = z.object({
   team_id: idSchema,
   team_name: z.string().min(1),
+  session_token: z.string().min(1)
+});
+
+export const publicAudioStopSchema = z.object({
+  team_id: idSchema,
   session_token: z.string().min(1)
 });
 

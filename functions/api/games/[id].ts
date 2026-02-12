@@ -45,9 +45,25 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
     return jsonError({ code: 'conflict', message: 'Game name already exists.' }, 409);
   }
   const showThemeValue = merged.show_theme === undefined || merged.show_theme === null ? 1 : merged.show_theme ? 1 : 0;
+  const gameType = await queryFirst<{ code: string }>(
+    env,
+    'SELECT code FROM game_types WHERE id = ? AND COALESCE(deleted, 0) = 0',
+    [merged.game_type_id]
+  );
+  if (!gameType) {
+    return jsonError({ code: 'validation_error', message: 'Invalid game type.' }, 400);
+  }
+  const allowParticipantAudioStopValue =
+    gameType.code !== 'music' || merged.allow_participant_audio_stop === undefined || merged.allow_participant_audio_stop === null
+      ? 0
+      : merged.allow_participant_audio_stop
+      ? 1
+      : 0;
   await execute(
     env,
-    `UPDATE games SET name = ?, game_code = ?, game_type_id = ?, description = ?, subtype = ?, default_settings_json = ?, show_theme = ? WHERE id = ?`,
+    `UPDATE games
+     SET name = ?, game_code = ?, game_type_id = ?, description = ?, subtype = ?, default_settings_json = ?, show_theme = ?, allow_participant_audio_stop = ?
+     WHERE id = ?`,
     [
       name,
       gameCode,
@@ -56,6 +72,7 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
       merged.subtype ?? null,
       merged.default_settings_json ?? null,
       showThemeValue,
+      allowParticipantAudioStopValue,
       params.id
     ]
   );

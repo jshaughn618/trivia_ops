@@ -72,6 +72,7 @@ type PublicEventResponse = {
     status: string;
     timer_seconds?: number | null;
     is_speed_round?: boolean;
+    allow_participant_audio_stop?: boolean;
     round_audio_key?: string | null;
     round_audio_name?: string | null;
   }[];
@@ -146,6 +147,8 @@ export function PlayEventPage() {
   const [joinError, setJoinError] = useState<string | null>(null);
   const [joinLoading, setJoinLoading] = useState(false);
   const [mediaError, setMediaError] = useState<string | null>(null);
+  const [stopAudioLoading, setStopAudioLoading] = useState(false);
+  const [stopAudioError, setStopAudioError] = useState<string | null>(null);
   const [visualIndex, setVisualIndex] = useState(0);
   const [selectedChoiceIndex, setSelectedChoiceIndex] = useState<number | null>(null);
   const [submittedChoiceIndex, setSubmittedChoiceIndex] = useState<number | null>(null);
@@ -560,6 +563,30 @@ export function PlayEventPage() {
     }
   };
 
+  const handleStopAudio = async () => {
+    if (!data?.event?.public_code || !teamId) return;
+    if (!teamSession) {
+      handleSessionExpired('Your team session expired. Re-enter the team code to continue.');
+      return;
+    }
+    setStopAudioLoading(true);
+    setStopAudioError(null);
+    const res = await api.publicStopAudio(data.event.public_code, {
+      team_id: teamId,
+      session_token: teamSession
+    });
+    setStopAudioLoading(false);
+    if (!res.ok) {
+      if (res.error?.code === 'team_session_invalid' || res.error?.code === 'team_session_required') {
+        handleSessionExpired(res.error.message ?? 'Your team session expired. Re-enter the team code to continue.');
+        return;
+      }
+      setStopAudioError(formatApiError(res, 'Unable to stop audio.'));
+      return;
+    }
+    setStopAudioError(null);
+  };
+
   useEffect(() => {
     if (!timerExpired) return;
     if (submittedChoiceIndex !== null) return;
@@ -635,6 +662,13 @@ export function PlayEventPage() {
         ? 'Play the clip and collect answers before reveal.'
       : '';
   const showAudioClue = speedRoundMode || displayItem?.media_type === 'audio';
+  const canRequestAudioStop = Boolean(
+    showAudioClue &&
+    data?.live?.audio_playing &&
+    activeRound?.allow_participant_audio_stop &&
+    teamId &&
+    teamSession
+  );
   const choiceOptions =
     displayItem?.question_type === 'multiple_choice' ? parseChoices(displayItem.choices_json) : [];
   const awaitingResponseSync = Boolean(responseSync);
@@ -645,6 +679,12 @@ export function PlayEventPage() {
   const timerDurationSeconds = data.live?.timer_duration_seconds ?? activeRound?.timer_seconds ?? 15;
   const timerActive = !suppressItemTimer && Boolean(data.live?.timer_started_at && data.live?.timer_duration_seconds);
   const timerBlocked = !suppressItemTimer && (!timerActive || timerExpired);
+
+  useEffect(() => {
+    if (canRequestAudioStop) return;
+    setStopAudioError(null);
+  }, [canRequestAudioStop, activeRound?.id, displayItem?.id]);
+
   const timerLabel = (() => {
     const totalSeconds = timerRemainingSeconds ?? timerDurationSeconds;
     const minutes = Math.floor(totalSeconds / 60);
@@ -1049,6 +1089,19 @@ export function PlayEventPage() {
                         </div>
                       </div>
                       <AudioVisualizer active={Boolean(data.live?.audio_playing)} />
+                      {canRequestAudioStop && (
+                        <div className="flex flex-col items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={handleStopAudio}
+                            disabled={stopAudioLoading}
+                            className="play-touch w-full max-w-sm rounded-md border border-danger bg-danger px-4 py-3 text-base font-semibold text-bg hover:bg-danger/90 disabled:opacity-60"
+                          >
+                            {stopAudioLoading ? 'Stopping…' : 'STOP'}
+                          </button>
+                          {stopAudioError && <PlayFooterHint className="text-danger">{stopAudioError}</PlayFooterHint>}
+                        </div>
+                      )}
                     </div>
                   )}
                 </>

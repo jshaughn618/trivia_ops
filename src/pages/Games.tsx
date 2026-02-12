@@ -49,6 +49,7 @@ export function GamesPage() {
   const [subtype, setSubtype] = useState('');
   const [description, setDescription] = useState('');
   const [showTheme, setShowTheme] = useState(true);
+  const [allowParticipantAudioStop, setAllowParticipantAudioStop] = useState(false);
   const [loading, setLoading] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const params = useMemo(() => new URLSearchParams(location.search), [location.search]);
@@ -148,7 +149,8 @@ export function GamesPage() {
       description,
       game_type_id: gameTypeId,
       subtype: subtype.trim() || null,
-      show_theme: showTheme
+      show_theme: showTheme,
+      allow_participant_audio_stop: allowParticipantAudioStop
     });
     setLoading(false);
     if (res.ok) {
@@ -158,6 +160,7 @@ export function GamesPage() {
       setGameTypeId('');
       setSubtype('');
       setShowTheme(true);
+      setAllowParticipantAudioStop(false);
       setCreateError(null);
       updateCreateParam(false);
       load();
@@ -535,6 +538,16 @@ export function GamesPage() {
                     />
                     Show theme when presenting
                   </label>
+                  {isMusicType && (
+                    <label className="flex items-center gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+                      <input
+                        type="checkbox"
+                        checked={allowParticipantAudioStop}
+                        onChange={(event) => setAllowParticipantAudioStop(event.target.checked)}
+                      />
+                      Allow participants to stop audio
+                    </label>
+                  )}
                   {createError && (
                     <div className="border border-danger bg-panel2 px-3 py-2 text-xs text-danger-ink">
                       {createError}
@@ -552,6 +565,7 @@ export function GamesPage() {
                         setGameTypeId('');
                         setSubtype('');
                         setShowTheme(true);
+                        setAllowParticipantAudioStop(false);
                       }}
                     >
                       Clear
