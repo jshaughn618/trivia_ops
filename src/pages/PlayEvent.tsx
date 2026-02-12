@@ -90,6 +90,8 @@ type PublicEventResponse = {
     show_full_leaderboard: boolean;
     timer_started_at: string | null;
     timer_duration_seconds: number | null;
+    participant_audio_stopped_by_team_name?: string | null;
+    participant_audio_stopped_at?: string | null;
   } | null;
   visual_round?: boolean;
   visual_items?: {
@@ -1081,6 +1083,11 @@ export function PlayEventPage() {
                                 : 'Host audio is playing now.'
                               : 'Audio playback is controlled by the host.'}
                           </div>
+                          {!data.live?.audio_playing && data.live?.participant_audio_stopped_by_team_name && (
+                            <div className="text-sm text-accent-ink">
+                              Stopped by {data.live.participant_audio_stopped_by_team_name}.
+                            </div>
+                          )}
                         </div>
                       </div>
                       <AudioVisualizer active={Boolean(data.live?.audio_playing)} />

@@ -42,6 +42,8 @@ export type PublicEventPayload = {
     show_full_leaderboard: boolean;
     timer_started_at: string | null;
     timer_duration_seconds: number | null;
+    participant_audio_stopped_by_team_name: string | null;
+    participant_audio_stopped_at: string | null;
     updated_at: string;
   } | null;
   current_item: PublicItem | null;
@@ -147,11 +149,14 @@ export async function getPublicEventPayload(env: Env, rawCode: string, view?: Pu
     show_full_leaderboard: number;
     timer_started_at: string | null;
     timer_duration_seconds: number | null;
+    participant_audio_stopped_by_team_name: string | null;
+    participant_audio_stopped_at: string | null;
     updated_at: string;
   }>(
     env,
     `SELECT id, event_id, active_round_id, current_item_ordinal, audio_playing, reveal_answer, reveal_fun_fact,
-            waiting_message, waiting_show_leaderboard, waiting_show_next_round, show_full_leaderboard, timer_started_at, timer_duration_seconds, updated_at
+            waiting_message, waiting_show_leaderboard, waiting_show_next_round, show_full_leaderboard, timer_started_at, timer_duration_seconds,
+            participant_audio_stopped_by_team_name, participant_audio_stopped_at, updated_at
      FROM event_live_state WHERE event_id = ? AND COALESCE(deleted, 0) = 0`,
     [event.id]
   );
@@ -167,7 +172,9 @@ export async function getPublicEventPayload(env: Env, rawCode: string, view?: Pu
         waiting_show_next_round: Boolean(live.waiting_show_next_round),
         show_full_leaderboard: Boolean(live.show_full_leaderboard),
         timer_started_at: live.timer_started_at ?? null,
-        timer_duration_seconds: live.timer_duration_seconds ?? null
+        timer_duration_seconds: live.timer_duration_seconds ?? null,
+        participant_audio_stopped_by_team_name: live.participant_audio_stopped_by_team_name ?? null,
+        participant_audio_stopped_at: live.participant_audio_stopped_at ?? null
       }
     : null;
 

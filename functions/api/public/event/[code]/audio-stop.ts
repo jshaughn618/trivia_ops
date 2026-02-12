@@ -111,7 +111,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request }
   }
 
   const stoppedAt = nowIso();
-  await execute(
+  const updateResult = await execute(
     env,
     `UPDATE event_live_state
      SET audio_playing = 0,
@@ -119,9 +119,13 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request }
          participant_audio_stopped_by_team_name = ?,
          participant_audio_stopped_at = ?,
          updated_at = ?
-     WHERE event_id = ?`,
+     WHERE event_id = ? AND audio_playing = 1`,
     [team.id, team.name, stoppedAt, stoppedAt, event.id]
   );
+
+  if ((updateResult.meta?.changes ?? 0) === 0) {
+    return jsonOk({ ok: true, stopped: false });
+  }
 
   return jsonOk({ ok: true, stopped: true });
 };
