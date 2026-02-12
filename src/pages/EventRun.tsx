@@ -61,6 +61,7 @@ export function EventRunPage() {
   const [audioRequestId, setAudioRequestId] = useState<string | null>(null);
   const [audioRetryToken, setAudioRetryToken] = useState(0);
   const [localAudioPlaying, setLocalAudioPlaying] = useState(false);
+  const remoteAudioPlayingSeenRef = useRef(false);
   const [waitingMessage, setWaitingMessage] = useState('');
   const [waitingShowLeaderboard, setWaitingShowLeaderboard] = useState(false);
   const [waitingShowNextRound, setWaitingShowNextRound] = useState(true);
@@ -264,6 +265,7 @@ export function EventRunPage() {
   useEffect(() => {
     setAudioError(null);
     setAudioRequestId(null);
+    remoteAudioPlayingSeenRef.current = false;
     if (!isAudioItem || !effectiveAudioKey) {
       setAudioLoading(false);
       setAudioUrl(null);
@@ -292,9 +294,15 @@ export function EventRunPage() {
     const poll = async () => {
       const res = await api.getLiveState(eventId);
       if (closed || !res.ok || !res.data) return;
-      if (!res.data.audio_playing) {
+      if (res.data.audio_playing) {
+        remoteAudioPlayingSeenRef.current = true;
+        return;
+      }
+      // Only treat a remote false as a stop request after we've observed true at least once.
+      if (remoteAudioPlayingSeenRef.current && !res.data.audio_playing) {
         audioRef.current?.pause();
         setLocalAudioPlaying(false);
+        remoteAudioPlayingSeenRef.current = false;
       }
     };
     void poll();
@@ -306,6 +314,12 @@ export function EventRunPage() {
       window.clearInterval(timer);
     };
   }, [eventId, localAudioPlaying]);
+
+  useEffect(() => {
+    if (localAudioPlaying) return;
+    // Ensure no stale remote-stop state carries into the next play session.
+    remoteAudioPlayingSeenRef.current = false;
+  }, [localAudioPlaying]);
 
   const handleAudioEvent = (event: string) => {
     const error = audioRef.current?.error;
@@ -786,16 +800,19 @@ export function EventRunPage() {
                         onCanPlay={() => handleAudioReady('canplay')}
                         onPlay={() => {
                           handleAudioEvent('audio_play_click');
+                          remoteAudioPlayingSeenRef.current = false;
                           setLocalAudioPlaying(true);
                           syncAudioPlaying(true);
                         }}
                         onPause={() => {
                           handleAudioEvent('pause');
+                          remoteAudioPlayingSeenRef.current = false;
                           setLocalAudioPlaying(false);
                           syncAudioPlaying(false);
                         }}
                         onEnded={() => {
                           handleAudioEvent('ended');
+                          remoteAudioPlayingSeenRef.current = false;
                           setLocalAudioPlaying(false);
                           syncAudioPlaying(false);
                         }}
