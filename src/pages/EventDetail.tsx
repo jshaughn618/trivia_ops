@@ -1277,6 +1277,11 @@ export function EventDetailPage() {
     return map;
   }, [teams]);
 
+  const sortedTeams = useMemo(
+    () => [...teams].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })),
+    [teams]
+  );
+
   const lastCompletedRoundId = useMemo(() => {
     const completed = [...rounds]
       .filter((round) => round.status === 'completed')
@@ -2148,13 +2153,14 @@ export function EventDetailPage() {
               {teams.length === 0 && <div className="text-sm text-muted">Add teams to score.</div>}
               {teams.length > 0 && (
                 <List>
-                  {teams.map((team) => (
+                  {sortedTeams.map((team) => (
                     <ListRow key={team.id} className="items-center">
                       <div className="text-sm">{team.name}</div>
                       <input
                         type="number"
-                        className="h-9 w-20 px-2 text-right"
+                        className="h-9 w-20 px-2 text-right [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                         value={scoreMap[team.id] ?? 0}
+                        onFocus={(event) => event.currentTarget.select()}
                         onChange={(event) =>
                           setScoreMap((prev) => ({ ...prev, [team.id]: Number(event.target.value) }))
                         }
@@ -2175,7 +2181,7 @@ export function EventDetailPage() {
             </div>
           </Section>
           {scoreScanOpen && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-bg p-4">
               <div
                 role="dialog"
                 aria-modal="true"
@@ -2265,8 +2271,11 @@ export function EventDetailPage() {
                         <span>Score</span>
                         <input
                           type="number"
-                          className="h-10 w-28 px-3 text-right"
+                          className="h-10 w-28 px-3 text-right [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                           value={scoreScanScore}
+                          onFocus={() => {
+                            if (scoreScanScore === '0') setScoreScanScore('');
+                          }}
                           onChange={(event) => setScoreScanScore(event.target.value)}
                         />
                       </label>
@@ -2502,7 +2511,7 @@ export function EventDetailPage() {
       {teams.length === 0 && <div className="text-sm text-muted">No teams yet.</div>}
       {teams.length > 0 && (
         <List>
-          {teams.map((team) => (
+          {sortedTeams.map((team) => (
             <ListRow key={team.id} className="items-center">
               {editingTeamId === team.id ? (
                 <>
@@ -2676,13 +2685,14 @@ export function EventDetailPage() {
       {teams.length === 0 && <div className="text-sm text-muted">Add teams to score.</div>}
       {teams.length > 0 && (
         <List>
-          {teams.map((team) => (
+          {sortedTeams.map((team) => (
             <ListRow key={team.id} className="items-center">
               <div className="text-sm">{team.name}</div>
               <input
                 type="number"
-                className="h-9 w-20 px-2 text-right"
+                className="h-9 w-20 px-2 text-right [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                 value={scoreMap[team.id] ?? 0}
+                onFocus={(event) => event.currentTarget.select()}
                 onChange={(event) =>
                   setScoreMap((prev) => ({ ...prev, [team.id]: Number(event.target.value) }))
                 }
@@ -3103,7 +3113,7 @@ export function EventDetailPage() {
         </div>
 
         {scoreScanOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-bg p-4">
             <div
               role="dialog"
               aria-modal="true"
@@ -3193,8 +3203,11 @@ export function EventDetailPage() {
                       <span>Score</span>
                       <input
                         type="number"
-                        className="h-10 w-28 px-3 text-right"
+                        className="h-10 w-28 px-3 text-right [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                         value={scoreScanScore}
+                        onFocus={() => {
+                          if (scoreScanScore === '0') setScoreScanScore('');
+                        }}
                         onChange={(event) => setScoreScanScore(event.target.value)}
                       />
                     </label>

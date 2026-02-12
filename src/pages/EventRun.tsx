@@ -200,6 +200,10 @@ export function EventRunPage() {
   };
 
   const activeRound = useMemo(() => rounds.find((round) => round.id === roundId) ?? null, [rounds, roundId]);
+  const sortedTeams = useMemo(
+    () => [...teams].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })),
+    [teams]
+  );
   const activeEdition = activeRound ? editionById[activeRound.edition_id] : null;
   const activeGame = activeEdition ? gameById[activeEdition.game_id] : null;
   const isSpeedRoundMode = activeGame?.subtype === 'speed_round';
@@ -1044,7 +1048,7 @@ export function EventRunPage() {
         </div>
       </div>
       {scoresOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-bg p-4">
           <div className="w-full max-w-xl border-2 border-border bg-panel p-6">
             <div className="flex items-center justify-between">
               <div className="text-sm font-display uppercase tracking-[0.25em]">Enter Scores</div>
@@ -1060,15 +1064,20 @@ export function EventRunPage() {
               {teams.length === 0 && (
                 <div className="text-xs uppercase tracking-[0.2em] text-muted">No teams yet.</div>
               )}
-              {teams.map((team) => (
+              {sortedTeams.map((team) => (
                 <div key={team.id} className="flex items-center justify-between gap-3 border border-border bg-panel2 px-3 py-2">
                   <div className="text-sm font-display uppercase tracking-[0.2em]">{team.name}</div>
                   <input
                     type="number"
                     step="0.1"
                     inputMode="decimal"
-                    className="h-9 w-28 px-2 text-right"
+                    className="h-9 w-28 px-2 text-right [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                     value={scoreDrafts[team.id] ?? ''}
+                    onFocus={() => {
+                      if ((scoreDrafts[team.id] ?? '') === '0') {
+                        setScoreDrafts((prev) => ({ ...prev, [team.id]: '' }));
+                      }
+                    }}
                     onChange={(event) =>
                       setScoreDrafts((prev) => ({
                         ...prev,
