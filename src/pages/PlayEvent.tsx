@@ -680,11 +680,6 @@ export function PlayEventPage() {
   const timerActive = !suppressItemTimer && Boolean(data.live?.timer_started_at && data.live?.timer_duration_seconds);
   const timerBlocked = !suppressItemTimer && (!timerActive || timerExpired);
 
-  useEffect(() => {
-    if (canRequestAudioStop) return;
-    setStopAudioError(null);
-  }, [canRequestAudioStop, activeRound?.id, displayItem?.id]);
-
   const timerLabel = (() => {
     const totalSeconds = timerRemainingSeconds ?? timerDurationSeconds;
     const minutes = Math.floor(totalSeconds / 60);
