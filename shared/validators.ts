@@ -122,7 +122,7 @@ export const editionItemCreateSchema = editionItemBaseSchema
     }
     return hasAnswerParts || Boolean(data.answer) || (Boolean(data.answer_a) && Boolean(data.answer_b));
   }, {
-    message: 'Provide an answer or both answer_a and answer_b',
+    message: 'Provide an answer, answer parts, or both answer_a and answer_b',
     path: ['answer']
   })
   .refine((data) => {
