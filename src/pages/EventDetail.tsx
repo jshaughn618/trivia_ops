@@ -783,7 +783,7 @@ const renderUpcomingBlock = (
       size: upcomingTitleSize,
       font: fonts.bold
     });
-    cursorY -= upcomingTitleSize + 8;
+    cursorY -= upcomingTitleSize + 14;
     upcoming.forEach((line) => {
       if (!line.trim()) {
         cursorY -= upcomingTextSize + 8;

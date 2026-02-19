@@ -98,6 +98,11 @@ export function HeaderBar() {
                     </NavLink>
                   )}
                   {isAdmin && (
+                    <NavLink to="/documents" className={menuNavLinkClass} onClick={() => setOpen(false)}>
+                      Documents
+                    </NavLink>
+                  )}
+                  {isAdmin && (
                     <NavLink to="/settings" className={menuNavLinkClass} onClick={() => setOpen(false)}>
                       Settings
                     </NavLink>

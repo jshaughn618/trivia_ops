@@ -19,6 +19,7 @@ const PlayLeaderboardPage = lazy(() =>
   import('./pages/PlayLeaderboard').then((mod) => ({ default: mod.PlayLeaderboardPage }))
 );
 const LocationsPage = lazy(() => import('./pages/Locations').then((mod) => ({ default: mod.LocationsPage })));
+const DocumentsPage = lazy(() => import('./pages/Documents').then((mod) => ({ default: mod.DocumentsPage })));
 const LocationDetailPage = lazy(() =>
   import('./pages/LocationDetail').then((mod) => ({ default: mod.LocationDetailPage }))
 );
@@ -144,6 +145,14 @@ export function App() {
           element={
             <RequireAdmin>
               <LocationsPage />
+            </RequireAdmin>
+          }
+        />
+        <Route
+          path="/documents"
+          element={
+            <RequireAdmin>
+              <DocumentsPage />
             </RequireAdmin>
           }
         />
