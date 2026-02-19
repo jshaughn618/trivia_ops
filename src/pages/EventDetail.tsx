@@ -441,11 +441,13 @@ const renderRoundBlock = (
   bundle: RoundBundle,
   cell: { x: number; y: number; width: number; height: number },
   fonts: { regular: any; bold: any },
-  mode: 'scoresheet' | 'answersheet'
+  mode: 'scoresheet' | 'answersheet',
+  options?: { showPointsColumn?: boolean }
 ) => {
   const titleSize = 11;
   const numberSize = 9;
   const textSize = mode === 'scoresheet' ? 9 : 8.5;
+  const showPointsColumn = options?.showPointsColumn ?? true;
   const items = bundle.items;
   const answerColumns = resolveScoresheetAnswerColumns(items);
   const hasSplitAnswerColumns = answerColumns.length > 0;
@@ -463,8 +465,8 @@ const renderRoundBlock = (
   const contentX = cell.x + CELL_PADDING;
   const textStartX = contentX + numberWidth + 6;
   const availableWidth = cell.width - CELL_PADDING * 2 - numberWidth - 6;
-  const pointsColWidth = Math.min(56, Math.max(44, availableWidth * 0.24));
-  const pointsGap = 10;
+  const pointsColWidth = showPointsColumn ? Math.min(56, Math.max(44, availableWidth * 0.24)) : 0;
+  const pointsGap = showPointsColumn ? 10 : 0;
   const responseWidth = Math.max(60, availableWidth - pointsColWidth - pointsGap);
   const responseEndX = textStartX + responseWidth;
   const pointsX = responseEndX + pointsGap;
@@ -486,12 +488,14 @@ const renderRoundBlock = (
       });
     });
   }
-  page.drawText('Points', {
-    x: pointsX,
-    y: labelY,
-    size: labelSize,
-    font: fonts.regular
-  });
+  if (showPointsColumn) {
+    page.drawText('Points', {
+      x: pointsX,
+      y: labelY,
+      size: labelSize,
+      font: fonts.regular
+    });
+  }
   const labelGap = 8;
   contentTop = labelY - labelGap;
 
@@ -537,12 +541,14 @@ const renderRoundBlock = (
           thickness: 0.8,
           color: rgb(0, 0, 0)
         });
-        page.drawLine({
-          start: { x: pointsX, y: lineY },
-          end: { x: pointsX + pointsLineWidth, y: lineY },
-          thickness: 0.8,
-          color: rgb(0, 0, 0)
-        });
+        if (showPointsColumn) {
+          page.drawLine({
+            start: { x: pointsX, y: lineY },
+            end: { x: pointsX + pointsLineWidth, y: lineY },
+            thickness: 0.8,
+            color: rgb(0, 0, 0)
+          });
+        }
       } else if (hasSplitAnswerColumns) {
         numberedRow += 1;
         page.drawText(`${numberedRow}.`, {
@@ -565,12 +571,14 @@ const renderRoundBlock = (
             color: rgb(0, 0, 0)
           });
         });
-        page.drawLine({
-          start: { x: pointsX, y: lineY },
-          end: { x: pointsX + pointsLineWidth, y: lineY },
-          thickness: 0.8,
-          color: rgb(0, 0, 0)
-        });
+        if (showPointsColumn) {
+          page.drawLine({
+            start: { x: pointsX, y: lineY },
+            end: { x: pointsX + pointsLineWidth, y: lineY },
+            thickness: 0.8,
+            color: rgb(0, 0, 0)
+          });
+        }
       } else {
         numberedRow += 1;
         page.drawText(`${numberedRow}.`, {
@@ -586,12 +594,14 @@ const renderRoundBlock = (
           thickness: 0.8,
           color: rgb(0, 0, 0)
         });
-        page.drawLine({
-          start: { x: pointsX, y: lineY },
-          end: { x: pointsX + pointsLineWidth, y: lineY },
-          thickness: 0.8,
-          color: rgb(0, 0, 0)
-        });
+        if (showPointsColumn) {
+          page.drawLine({
+            start: { x: pointsX, y: lineY },
+            end: { x: pointsX + pointsLineWidth, y: lineY },
+            thickness: 0.8,
+            color: rgb(0, 0, 0)
+          });
+        }
       }
     } else {
       page.drawText(`${index + 1}.`, {
@@ -636,14 +646,16 @@ const renderRoundBlock = (
           font: fonts.regular
         });
       }
-      const pointsText = String(resolveTotalPossiblePoints(item));
-      const pointsWidth = fonts.bold.widthOfTextAtSize(pointsText, textSize);
-      page.drawText(pointsText, {
-        x: pointsX + Math.max(0, (pointsLineWidth - pointsWidth) / 2),
-        y: rowY,
-        size: textSize,
-        font: fonts.bold
-      });
+      if (showPointsColumn) {
+        const pointsText = String(resolveTotalPossiblePoints(item));
+        const pointsWidth = fonts.bold.widthOfTextAtSize(pointsText, textSize);
+        page.drawText(pointsText, {
+          x: pointsX + Math.max(0, (pointsLineWidth - pointsWidth) / 2),
+          y: rowY,
+          size: textSize,
+          font: fonts.bold
+        });
+      }
     }
   }
 };
@@ -674,69 +686,77 @@ const renderTeamBlock = (
 ) => {
   const padding = CELL_PADDING;
   const textSize = 11;
-  const topY = cell.y + cell.height - padding;
-  const leftX = cell.x + padding;
-  const contentWidth = cell.width - padding * 2;
-  const leftColumnWidth = Math.min(220, Math.max(160, contentWidth * 0.55));
-  const rightX = leftX + leftColumnWidth + 12;
-  const rightWidth = Math.max(60, cell.x + cell.width - padding - rightX);
+  let cursorY = cell.y + cell.height - padding;
 
-  let logoWidth = 0;
-  let logoHeight = 0;
+  const teamName = extras.teamName?.trim() ?? '';
+  if (teamName && !extras.teamPlaceholder) {
+    page.drawText(`Team: ${teamName}`, {
+      x: cell.x + padding,
+      y: cursorY - textSize,
+      size: textSize,
+      font: fonts.bold
+    });
+    cursorY -= textSize + 36;
+  } else {
+    const label = 'Team Name:';
+    const labelWidth = fonts.bold.widthOfTextAtSize(label, textSize);
+    const baseY = cursorY - textSize;
+    const lineStartX = cell.x + padding + labelWidth + 6;
+    const lineEndX = cell.x + cell.width - padding;
+    page.drawText(label, {
+      x: cell.x + padding,
+      y: baseY,
+      size: textSize,
+      font: fonts.bold
+    });
+    page.drawLine({
+      start: { x: lineStartX, y: baseY - 2 },
+      end: { x: lineEndX, y: baseY - 2 },
+      thickness: 1,
+      color: rgb(0, 0, 0)
+    });
+    cursorY -= textSize + 36;
+  }
+
   if (extras.logoImage) {
-    const maxLogoWidth = Math.min(120, leftColumnWidth - 96);
-    const maxLogoHeight = 42;
+    const maxLogoWidth = 150;
+    const maxLogoHeight = 44;
     const scale = Math.min(
       maxLogoWidth / extras.logoImage.width,
       maxLogoHeight / extras.logoImage.height,
       1
     );
-    logoWidth = extras.logoImage.width * scale;
-    logoHeight = extras.logoImage.height * scale;
+    const logoWidth = extras.logoImage.width * scale;
+    const logoHeight = extras.logoImage.height * scale;
     page.drawImage(extras.logoImage, {
-      x: leftX,
-      y: topY - logoHeight,
+      x: cell.x + padding,
+      y: cursorY - logoHeight,
       width: logoWidth,
       height: logoHeight
     });
+    cursorY -= logoHeight + 4;
   }
 
-  const qrSize = extras.qrImage ? 86 : 0;
+  cursorY -= textSize * 0.5;
+
+  const teamCodeText = extras.teamCode ? `Team Code: ${extras.teamCode}` : 'Team Code: —';
+  page.drawText(teamCodeText, {
+    x: cell.x + padding,
+    y: cursorY - textSize,
+    size: textSize,
+    font: fonts.bold
+  });
+  cursorY -= textSize + 8;
+
+  const qrSize = 96;
   if (extras.qrImage) {
-    const qrX = leftX + (logoWidth > 0 ? logoWidth + 8 : 0);
     page.drawImage(extras.qrImage, {
-      x: qrX,
-      y: topY - qrSize,
+      x: cell.x + padding,
+      y: cursorY - qrSize,
       width: qrSize,
       height: qrSize
     });
   }
-
-  const nameLabel = 'Team Name:';
-  const lineBaseY = topY - textSize;
-  const nameLabelWidth = fonts.bold.widthOfTextAtSize(nameLabel, textSize);
-  const lineStartX = rightX + nameLabelWidth + 6;
-  const lineEndX = rightX + rightWidth;
-  page.drawText(nameLabel, {
-    x: rightX,
-    y: lineBaseY,
-    size: textSize,
-    font: fonts.bold
-  });
-  page.drawLine({
-    start: { x: Math.min(lineStartX, lineEndX - 12), y: lineBaseY - 2 },
-    end: { x: lineEndX, y: lineBaseY - 2 },
-    thickness: 1,
-    color: rgb(0, 0, 0)
-  });
-
-  const teamCodeText = extras.teamCode ? `Team Code: ${extras.teamCode}` : 'Team Code: —';
-  page.drawText(teamCodeText, {
-    x: rightX,
-    y: lineBaseY - 28,
-    size: textSize,
-    font: fonts.bold
-  });
 };
 
 const renderUpcomingBlock = (
@@ -884,7 +904,7 @@ const buildPdf = async (
       }
       const cellIndex = positionIndex;
       positionIndex += 1;
-      renderRoundBlock(page, rounds[index], getTwoUpCell(cellIndex), fonts, mode);
+      renderRoundBlock(page, rounds[index], getTwoUpCell(cellIndex), fonts, mode, { showPointsColumn: true });
     }
   } else if (mode === 'scoresheet') {
     let pageIndex = -1;
@@ -907,7 +927,7 @@ const buildPdf = async (
       }
       const cellIndex = positions[positionIndex];
       positionIndex += 1;
-      renderRoundBlock(page, rounds[index], getCell(cellIndex), fonts, mode);
+      renderRoundBlock(page, rounds[index], getCell(cellIndex), fonts, mode, { showPointsColumn: false });
     }
 
     const firstPage = pdfDoc.getPages()[0] ?? createPage(true);
@@ -937,7 +957,7 @@ const buildPdf = async (
       }
       const page = pdfDoc.getPages()[pdfDoc.getPages().length - 1];
       const cellIndex = index % 4;
-      renderRoundBlock(page, rounds[index], getCell(cellIndex), fonts, mode);
+      renderRoundBlock(page, rounds[index], getCell(cellIndex), fonts, mode, { showPointsColumn: true });
     }
   }
 
