@@ -680,15 +680,12 @@ const renderTeamBlock = (
   const leftColumnWidth = Math.min(220, Math.max(160, contentWidth * 0.55));
   const rightX = leftX + leftColumnWidth + 12;
   const rightWidth = Math.max(60, cell.x + cell.width - padding - rightX);
-  const qrImageSize = extras.qrImage ? 78 : 0;
-  const qrPadding = extras.qrImage ? 4 : 0;
-  const qrFrameSize = qrImageSize > 0 ? qrImageSize + qrPadding * 2 : 0;
 
   let logoWidth = 0;
   let logoHeight = 0;
   if (extras.logoImage) {
-    const maxLogoWidth = Math.min(112, Math.max(56, leftColumnWidth - qrFrameSize - 14));
-    const maxLogoHeight = 34;
+    const maxLogoWidth = Math.min(120, leftColumnWidth - 96);
+    const maxLogoHeight = 42;
     const scale = Math.min(
       maxLogoWidth / extras.logoImage.width,
       maxLogoHeight / extras.logoImage.height,
@@ -696,39 +693,22 @@ const renderTeamBlock = (
     );
     logoWidth = extras.logoImage.width * scale;
     logoHeight = extras.logoImage.height * scale;
-  }
-
-  const clusterGap = logoWidth > 0 && qrFrameSize > 0 ? 10 : 0;
-  const clusterHeight = Math.max(logoHeight, qrFrameSize);
-  if (extras.logoImage && logoWidth > 0 && logoHeight > 0) {
-    const logoY = topY - (clusterHeight - logoHeight) / 2 - logoHeight;
     page.drawImage(extras.logoImage, {
       x: leftX,
-      y: logoY,
+      y: topY - logoHeight,
       width: logoWidth,
       height: logoHeight
     });
   }
 
-  if (extras.qrImage && qrFrameSize > 0) {
-    const qrFrameX = leftX + (logoWidth > 0 ? logoWidth + clusterGap : 0);
-    const qrFrameY = topY - (clusterHeight - qrFrameSize) / 2 - qrFrameSize;
-    page.drawRectangle({
-      x: qrFrameX,
-      y: qrFrameY,
-      width: qrFrameSize,
-      height: qrFrameSize,
-      color: rgb(1, 1, 1),
-      borderColor: rgb(0.78, 0.78, 0.78),
-      borderWidth: 0.8
-    });
-    const qrX = qrFrameX + qrPadding;
-    const qrY = qrFrameY + qrPadding;
+  const qrSize = extras.qrImage ? 86 : 0;
+  if (extras.qrImage) {
+    const qrX = leftX + (logoWidth > 0 ? logoWidth + 8 : 0);
     page.drawImage(extras.qrImage, {
       x: qrX,
-      y: qrY,
-      width: qrImageSize,
-      height: qrImageSize
+      y: topY - qrSize,
+      width: qrSize,
+      height: qrSize
     });
   }
 
