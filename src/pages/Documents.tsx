@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Download, FileText } from 'lucide-react';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { api, formatApiError } from '../api';
-import logoDark from '../assets/trivia_ops_logo_dark.png';
+import logoLight from '../assets/trivia_ops_logo_light.png';
 import { AppShell } from '../components/AppShell';
 import { PrimaryButton } from '../components/Buttons';
 import { Panel } from '../components/Panel';
@@ -10,9 +10,10 @@ import type { Location } from '../types';
 
 type PdfFonts = { regular: any; bold: any };
 
-const LETTER_LANDSCAPE_WIDTH = 11 * 72;
-const LETTER_LANDSCAPE_HEIGHT = 8.5 * 72;
-const HALF_SHEET_WIDTH = LETTER_LANDSCAPE_WIDTH / 2;
+const LETTER_PORTRAIT_WIDTH = 8.5 * 72;
+const LETTER_PORTRAIT_HEIGHT = 11 * 72;
+const QUARTER_SHEET_WIDTH = LETTER_PORTRAIT_WIDTH / 2;
+const QUARTER_SHEET_HEIGHT = LETTER_PORTRAIT_HEIGHT / 2;
 
 const wrapText = (font: any, text: string, maxWidth: number, size: number) => {
   const words = text.trim().split(/\s+/).filter(Boolean);
@@ -54,55 +55,67 @@ const drawCenteredText = (
 const drawWelcomeHalfSheet = (
   page: any,
   panelX: number,
+  panelY: number,
   panelWidth: number,
   panelHeight: number,
   fonts: PdfFonts,
   locationName: string,
   logoImage?: any
 ) => {
-  const sidePadding = 30;
-  const topPadding = 34;
+  const sidePadding = 20;
+  const topPadding = 16;
   const contentX = panelX + sidePadding;
   const contentWidth = panelWidth - sidePadding * 2;
-  let cursorY = panelHeight - topPadding;
+  let cursorY = panelY + panelHeight - topPadding;
 
   const titleText = `Welcome to Pub Trivia @ ${locationName}`;
-  const titleSize = 21;
+  const titleSize = 14.5;
   const titleLines = wrapText(fonts.bold, titleText, panelWidth - 44, titleSize);
   titleLines.forEach((line, lineIndex) => {
-    drawCenteredText(page, line, fonts.bold, titleSize, panelX, panelWidth, cursorY - titleSize - lineIndex * 24);
+    drawCenteredText(page, line, fonts.bold, titleSize, panelX, panelWidth, cursorY - titleSize - lineIndex * 17.5);
   });
-  cursorY -= 30 + titleLines.length * 24;
+  cursorY -= 10 + titleLines.length * 17.5;
 
-  drawCenteredText(page, 'Powered by', fonts.regular, 12, panelX, panelWidth, cursorY - 12);
-  cursorY -= 24;
-
-  if (logoImage) {
-    const maxLogoWidth = 165;
-    const maxLogoHeight = 46;
+  if (logoImage && logoImage.width > 0 && logoImage.height > 0) {
+    const label = 'Powered by';
+    const labelSize = 9.5;
+    const labelWidth = fonts.regular.widthOfTextAtSize(label, labelSize);
+    const maxLogoWidth = 74;
+    const maxLogoHeight = 21;
     const scale = Math.min(maxLogoWidth / logoImage.width, maxLogoHeight / logoImage.height, 1);
     const logoWidth = logoImage.width * scale;
     const logoHeight = logoImage.height * scale;
-    const logoX = panelX + (panelWidth - logoWidth) / 2;
+    const rowGap = 7;
+    const groupWidth = labelWidth + rowGap + logoWidth;
+    const groupX = panelX + (panelWidth - groupWidth) / 2;
+    const rowHeight = Math.max(logoHeight, labelSize + 2);
+    const rowBottomY = cursorY - rowHeight;
+
+    page.drawText(label, {
+      x: groupX,
+      y: rowBottomY + (rowHeight - labelSize) / 2,
+      size: labelSize,
+      font: fonts.regular
+    });
     page.drawImage(logoImage, {
-      x: logoX,
-      y: cursorY - logoHeight,
+      x: groupX + labelWidth + rowGap,
+      y: rowBottomY + (rowHeight - logoHeight) / 2,
       width: logoWidth,
       height: logoHeight
     });
-    cursorY -= logoHeight + 24;
+    cursorY -= rowHeight + 14;
   } else {
-    drawCenteredText(page, 'Trivia Ops', fonts.bold, 19, panelX, panelWidth, cursorY - 19);
-    cursorY -= 42;
+    drawCenteredText(page, 'Powered by Trivia Ops', fonts.regular, 9.5, panelX, panelWidth, cursorY - 9.5);
+    cursorY -= 24;
   }
 
   page.drawText('How to Join Your Team', {
     x: contentX,
-    y: cursorY - 14,
-    size: 14,
+    y: cursorY - 10.5,
+    size: 10.5,
     font: fonts.bold
   });
-  cursorY -= 34;
+  cursorY -= 23;
 
   const steps = [
     'Scan the QR code on your scoresheet with your mobile device.',
@@ -110,9 +123,9 @@ const drawWelcomeHalfSheet = (
     'Only one phone can be logged in to your team site at a time.',
     'Sit back, keep your scoresheet at your table, and wait for the host to start the game.'
   ];
-  const stepTextSize = 10.5;
-  const stepLineHeight = 13;
-  const stepIndent = 16;
+  const stepTextSize = 8.3;
+  const stepLineHeight = 10.3;
+  const stepIndent = 13;
 
   steps.forEach((step, index) => {
     const numberY = cursorY - stepTextSize;
@@ -133,11 +146,11 @@ const drawWelcomeHalfSheet = (
       });
     });
 
-    cursorY -= lines.length * stepLineHeight + 10;
+    cursorY -= lines.length * stepLineHeight + 6;
   });
 
   const note = 'Have fun and good luck!';
-  drawCenteredText(page, note, fonts.bold, 11.5, panelX, panelWidth, 24);
+  drawCenteredText(page, note, fonts.bold, 9.5, panelX, panelWidth, panelY + 14);
 };
 
 const buildWelcomeSheetPdf = async (locationName: string) => {
@@ -146,39 +159,46 @@ const buildWelcomeSheetPdf = async (locationName: string) => {
     regular: await pdfDoc.embedFont(StandardFonts.Helvetica),
     bold: await pdfDoc.embedFont(StandardFonts.HelveticaBold)
   };
-  const page = pdfDoc.addPage([LETTER_LANDSCAPE_WIDTH, LETTER_LANDSCAPE_HEIGHT]);
+  const page = pdfDoc.addPage([LETTER_PORTRAIT_WIDTH, LETTER_PORTRAIT_HEIGHT]);
 
   let logoImage: any | null = null;
   try {
-    const response = await fetch(logoDark);
+    const response = await fetch(logoLight);
     const bytes = await response.arrayBuffer();
     logoImage = await pdfDoc.embedPng(bytes);
   } catch {
     logoImage = null;
   }
 
-  drawWelcomeHalfSheet(
-    page,
-    0,
-    HALF_SHEET_WIDTH,
-    LETTER_LANDSCAPE_HEIGHT,
-    fonts,
-    locationName,
-    logoImage ?? undefined
-  );
-  drawWelcomeHalfSheet(
-    page,
-    HALF_SHEET_WIDTH,
-    HALF_SHEET_WIDTH,
-    LETTER_LANDSCAPE_HEIGHT,
-    fonts,
-    locationName,
-    logoImage ?? undefined
-  );
+  const panels = [
+    { x: 0, y: QUARTER_SHEET_HEIGHT },
+    { x: QUARTER_SHEET_WIDTH, y: QUARTER_SHEET_HEIGHT },
+    { x: 0, y: 0 },
+    { x: QUARTER_SHEET_WIDTH, y: 0 }
+  ];
+
+  panels.forEach((panel) => {
+    drawWelcomeHalfSheet(
+      page,
+      panel.x,
+      panel.y,
+      QUARTER_SHEET_WIDTH,
+      QUARTER_SHEET_HEIGHT,
+      fonts,
+      locationName,
+      logoImage ?? undefined
+    );
+  });
 
   page.drawLine({
-    start: { x: HALF_SHEET_WIDTH, y: 16 },
-    end: { x: HALF_SHEET_WIDTH, y: LETTER_LANDSCAPE_HEIGHT - 16 },
+    start: { x: QUARTER_SHEET_WIDTH, y: 16 },
+    end: { x: QUARTER_SHEET_WIDTH, y: LETTER_PORTRAIT_HEIGHT - 16 },
+    thickness: 0.8,
+    color: rgb(0.75, 0.75, 0.75)
+  });
+  page.drawLine({
+    start: { x: 16, y: QUARTER_SHEET_HEIGHT },
+    end: { x: LETTER_PORTRAIT_WIDTH - 16, y: QUARTER_SHEET_HEIGHT },
     thickness: 0.8,
     color: rgb(0.75, 0.75, 0.75)
   });
@@ -264,8 +284,8 @@ export function DocumentsPage() {
                     Welcome Sheet
                   </div>
                   <p className="max-w-2xl text-sm text-muted">
-                    Half-sheet handout designed for 2-up printing on letter paper (vertical orientation per cut
-                    piece). Select a location, then generate a sheet that reads "Welcome to Pub Trivia @ {'{location}'}".
+                    Quarter-sheet handout designed for 4-up printing on letter paper in vertical orientation. Select a
+                    location, then generate a sheet that reads "Welcome to Pub Trivia @ {'{location}'}".
                   </p>
                 </div>
                 <div className="flex w-full flex-col gap-2 sm:w-[280px]">
