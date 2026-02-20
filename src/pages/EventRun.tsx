@@ -339,6 +339,32 @@ export function EventRunPage() {
     setAudioMarkingItemId(null);
   };
 
+  const resetAudioSubmission = async (editionItemId: string) => {
+    if (!activeRound?.id) return;
+    const confirmed = window.confirm(
+      'Reset this item? This will clear the stopped-by team and any submitted answers for this item.'
+    );
+    if (!confirmed) return;
+    setAudioMarkingItemId(editionItemId);
+    setAudioSubmissionsError(null);
+    const res = await api.resetRoundAudioSubmission(activeRound.id, {
+      edition_item_id: editionItemId
+    });
+    if (res.ok) {
+      setAudioStoppedByTeamNotice(null);
+      setShowAnswer(false);
+      setShowFact(false);
+      setTimerStartedAt(null);
+      setTimerRemainingSeconds(null);
+      setAudioSubmissions((prev) =>
+        prev.map((entry) => (entry.edition_item_id === editionItemId ? res.data : entry))
+      );
+    } else {
+      setAudioSubmissionsError(formatApiError(res, 'Failed to reset item.'));
+    }
+    setAudioMarkingItemId(null);
+  };
+
   const speedRoundAnswerLines = useMemo(() => {
     if (!isSpeedRoundMode) return [];
     const byOrdinal = [...items].sort((a, b) => a.ordinal - b.ordinal);
@@ -1010,6 +1036,15 @@ export function EventRunPage() {
                       </div>
                     </>
                   )}
+                  <div className="mt-3">
+                    <SecondaryButton
+                      className="h-10"
+                      onClick={() => resetAudioSubmission(item.id)}
+                      disabled={audioMarkingItemId === item.id}
+                    >
+                      Reset Item
+                    </SecondaryButton>
+                  </div>
                   {audioSubmissionsError && (
                     <div className="mt-3 rounded-lg border border-danger bg-panel px-3 py-2 text-sm text-danger-ink">
                       {audioSubmissionsError}

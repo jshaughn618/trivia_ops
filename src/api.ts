@@ -299,6 +299,11 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify(payload)
     }),
+  resetRoundAudioSubmission: (roundId: string, payload: { edition_item_id: string }) =>
+    apiFetch<EventRoundAudioSubmission>(`/api/event-rounds/${roundId}/audio-submissions`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    }),
 
   listTeams: (eventId: string) => apiFetch<Team[]>(`/api/events/${eventId}/teams`),
   createTeam: (eventId: string, payload: Partial<Team>) =>

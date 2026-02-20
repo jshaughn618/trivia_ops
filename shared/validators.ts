@@ -294,6 +294,10 @@ export const eventRoundAudioSubmissionMarkSchema = z.object({
   is_correct: z.boolean().nullable()
 });
 
+export const eventRoundAudioSubmissionResetSchema = z.object({
+  edition_item_id: idSchema
+});
+
 export const liveStateUpdateSchema = z.object({
   active_round_id: idSchema.nullable().optional(),
   current_item_ordinal: z.number().int().min(1).nullable().optional(),
