@@ -1197,14 +1197,20 @@ export function PlayEventPage() {
                             ))}
                           </div>
                           <div className="mt-3 flex flex-col items-start gap-2">
-                            {audioAnswerStatus !== 'submitted' && (
-                              <PrimaryCTA
-                                onClick={handleSubmitAudioAnswer}
-                                disabled={audioAnswerStatus === 'submitting' || missingAudioAnswerLabels.length > 0}
-                              >
-                                {audioAnswerStatus === 'submitting' ? 'Submitting…' : 'Submit to host'}
-                              </PrimaryCTA>
-                            )}
+                            <PrimaryCTA
+                              onClick={handleSubmitAudioAnswer}
+                              disabled={
+                                audioAnswerStatus === 'submitting' ||
+                                audioAnswerStatus === 'submitted' ||
+                                missingAudioAnswerLabels.length > 0
+                              }
+                            >
+                              {audioAnswerStatus === 'submitting'
+                                ? 'Submitting…'
+                                : audioAnswerStatus === 'submitted'
+                                  ? 'Submitted'
+                                  : 'Submit to host'}
+                            </PrimaryCTA>
                             {audioAnswerStatus === 'submitted' && !audioAnswerError && (
                               <PlayFooterHint>Submitted to host. One submission only.</PlayFooterHint>
                             )}

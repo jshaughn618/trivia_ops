@@ -224,9 +224,9 @@ export function EventRunPage() {
 
   const submissionOutcomeClass = (submission: EventRoundAudioSubmission | null) => {
     if (!submission?.team_id || !submission.response_parts_json) return 'border-border text-muted';
-    if (submission.is_correct === true) return 'border-accent-ink bg-accent text-accent-fg';
+    if (submission.is_correct === true) return 'border-[#2d9a59] bg-[#2d9a59]/20 text-[#8ce7ad]';
     if (submission.is_correct === false) return 'border-danger bg-danger text-danger-fg';
-    return 'border-accent-ink text-accent-ink';
+    return 'border-border text-muted';
   };
 
   const activeRound = useMemo(() => rounds.find((round) => round.id === roundId) ?? null, [rounds, roundId]);
@@ -320,6 +320,27 @@ export function EventRunPage() {
         })),
     [items, audioSubmissionByItemId]
   );
+  const audioSummaryByTeam = useMemo(() => {
+    const grouped = new Map<string, { teamId: string; teamName: string; rows: typeof audioSummaryRows }>();
+    for (const row of audioSummaryRows) {
+      const submission = row.submission;
+      if (!submission?.team_id || !submission.response_parts_json) continue;
+      const teamId = submission.team_id;
+      const teamName = submission.team_name?.trim() || 'Unknown team';
+      const existing = grouped.get(teamId);
+      if (existing) {
+        existing.rows.push(row);
+      } else {
+        grouped.set(teamId, { teamId, teamName, rows: [row] });
+      }
+    }
+    return [...grouped.values()]
+      .map((group) => ({
+        ...group,
+        rows: [...group.rows].sort((a, b) => a.item.ordinal - b.item.ordinal)
+      }))
+      .sort((a, b) => a.teamName.localeCompare(b.teamName, undefined, { sensitivity: 'base' }));
+  }, [audioSummaryRows]);
 
   const markAudioSubmission = async (editionItemId: string, isCorrect: boolean | null) => {
     if (!activeRound?.id) return;
@@ -1207,41 +1228,55 @@ export function EventRunPage() {
               )}
               {hasAudioSubmissionWorkflow &&
                 (activeRound?.status === 'completed' || activeRound?.status === 'locked') &&
-                audioSummaryRows.length > 0 && (
+                audioSummaryByTeam.length > 0 && (
                 <div className="surface-inset p-5">
                   <div className="ui-label">Round Submission Summary</div>
                   <div className="mt-3 flex flex-col gap-2">
-                    {audioSummaryRows.map(({ item: summaryItem, submission }) => {
-                      const submittedParts = parseAnswerParts(submission?.response_parts_json);
-                      return (
-                        <div key={`audio-summary-${summaryItem.id}`} className="rounded-md border border-border bg-panel px-3 py-3">
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <div className="text-sm font-semibold text-text">
-                              Item {summaryItem.ordinal}
-                            </div>
-                            <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold tracking-[0.04em] ${submissionOutcomeClass(submission)}`}>
-                              {submissionOutcome(submission)}
-                            </span>
+                    {audioSummaryByTeam.map((teamGroup) => (
+                      <div key={`audio-summary-team-${teamGroup.teamId}`} className="rounded-md border border-border bg-panel px-3 py-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="text-sm font-semibold text-text">{teamGroup.teamName}</div>
+                          <div className="text-xs text-muted">
+                            {teamGroup.rows.length} submission{teamGroup.rows.length === 1 ? '' : 's'}
                           </div>
-                          <div className="mt-1 text-xs text-muted">{summaryItem.prompt?.trim() || 'Prompt not set.'}</div>
-                          <div className="mt-2 text-sm">
-                            <span className="text-muted">Team:</span>{' '}
-                            <span className="font-medium text-text">{submission?.team_name ?? 'No team answer'}</span>
-                          </div>
-                          {submittedParts.length > 0 && (
-                            <div className="mt-2 flex flex-wrap gap-2">
-                              {submittedParts.map((part) => (
-                                <span key={`audio-summary-part-${summaryItem.id}-${part.label}`} className="rounded-md border border-border bg-panel2 px-2 py-1 text-xs">
-                                  <span className="text-muted">{part.label}:</span>{' '}
-                                  <span className="text-text">{part.answer}</span>
-                                </span>
-                              ))}
-                            </div>
-                          )}
                         </div>
-                      );
-                    })}
+                        <div className="mt-3 flex flex-col gap-2">
+                          {teamGroup.rows.map(({ item: summaryItem, submission }) => {
+                            const submittedParts = parseAnswerParts(submission?.response_parts_json);
+                            return (
+                              <div key={`audio-summary-item-${summaryItem.id}`} className="rounded-md border border-border bg-panel2 px-3 py-2">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <div className="text-sm font-semibold text-text">Item {summaryItem.ordinal}</div>
+                                  <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold tracking-[0.04em] ${submissionOutcomeClass(submission)}`}>
+                                    {submissionOutcome(submission)}
+                                  </span>
+                                </div>
+                                <div className="mt-1 text-xs text-muted">{summaryItem.prompt?.trim() || 'Prompt not set.'}</div>
+                                {submittedParts.length > 0 && (
+                                  <div className="mt-2 flex flex-wrap gap-2">
+                                    {submittedParts.map((part) => (
+                                      <span key={`audio-summary-part-${summaryItem.id}-${part.label}`} className="rounded-md border border-border bg-panel px-2 py-1 text-xs">
+                                        <span className="text-muted">{part.label}:</span>{' '}
+                                        <span className="text-text">{part.answer}</span>
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
                   </div>
+                </div>
+              )}
+              {hasAudioSubmissionWorkflow &&
+                (activeRound?.status === 'completed' || activeRound?.status === 'locked') &&
+                audioSummaryByTeam.length === 0 && (
+                <div className="surface-inset p-5">
+                  <div className="ui-label">Round Submission Summary</div>
+                  <div className="mt-2 text-sm text-muted">No team submissions were recorded for this round.</div>
                 </div>
               )}
             </div>
