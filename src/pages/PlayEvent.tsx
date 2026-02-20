@@ -1171,6 +1171,12 @@ export function PlayEventPage() {
                                 <input
                                   className="play-touch h-11 rounded-md px-3"
                                   value={audioAnswerDrafts[label] ?? ''}
+                                  autoComplete="off"
+                                  autoCorrect="off"
+                                  autoCapitalize="off"
+                                  spellCheck={false}
+                                  data-lpignore="true"
+                                  data-1p-ignore="true"
                                   onChange={(event) => {
                                     setAudioAnswerDrafts((prev) => ({ ...prev, [label]: event.target.value }));
                                     if (audioAnswerStatus !== 'submitting') {
