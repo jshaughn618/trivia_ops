@@ -601,6 +601,7 @@ export function PlayEventPage() {
   const handleSubmitAudioAnswer = async () => {
     if (!data?.event?.public_code || !teamId || !teamSession || !displayItem?.id) return;
     if (!canSubmitStoppedAudioAnswer) return;
+    if (audioAnswerStatus === 'submitted') return;
     if (missingAudioAnswerLabels.length > 0) {
       setAudioAnswerStatus('error');
       setAudioAnswerError(`Complete all answer parts: ${missingAudioAnswerLabels.join(', ')}`);
@@ -622,6 +623,11 @@ export function PlayEventPage() {
     });
 
     if (res.ok) {
+      setAudioAnswerStatus('submitted');
+      setAudioAnswerError(null);
+      return;
+    }
+    if (res.error?.code === 'already_submitted') {
       setAudioAnswerStatus('submitted');
       setAudioAnswerError(null);
       return;
@@ -1177,6 +1183,7 @@ export function PlayEventPage() {
                                   spellCheck={false}
                                   data-lpignore="true"
                                   data-1p-ignore="true"
+                                  disabled={audioAnswerStatus === 'submitted' || audioAnswerStatus === 'submitting'}
                                   onChange={(event) => {
                                     setAudioAnswerDrafts((prev) => ({ ...prev, [label]: event.target.value }));
                                     if (audioAnswerStatus !== 'submitting') {
@@ -1190,18 +1197,16 @@ export function PlayEventPage() {
                             ))}
                           </div>
                           <div className="mt-3 flex flex-col items-start gap-2">
-                            <PrimaryCTA
-                              onClick={handleSubmitAudioAnswer}
-                              disabled={audioAnswerStatus === 'submitting' || missingAudioAnswerLabels.length > 0}
-                            >
-                              {audioAnswerStatus === 'submitting'
-                                ? 'Submitting…'
-                                : audioAnswerStatus === 'submitted'
-                                  ? 'Update submission'
-                                  : 'Submit to host'}
-                            </PrimaryCTA>
+                            {audioAnswerStatus !== 'submitted' && (
+                              <PrimaryCTA
+                                onClick={handleSubmitAudioAnswer}
+                                disabled={audioAnswerStatus === 'submitting' || missingAudioAnswerLabels.length > 0}
+                              >
+                                {audioAnswerStatus === 'submitting' ? 'Submitting…' : 'Submit to host'}
+                              </PrimaryCTA>
+                            )}
                             {audioAnswerStatus === 'submitted' && !audioAnswerError && (
-                              <PlayFooterHint>Submitted to host.</PlayFooterHint>
+                              <PlayFooterHint>Submitted to host. One submission only.</PlayFooterHint>
                             )}
                             {audioAnswerError && <PlayFooterHint className="text-danger">{audioAnswerError}</PlayFooterHint>}
                           </div>

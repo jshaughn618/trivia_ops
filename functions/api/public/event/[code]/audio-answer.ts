@@ -217,12 +217,15 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request }
      LIMIT 1`,
     [event.id, event.active_round_id, parsed.data.item_id]
   );
-  if (existingForItem && existingForItem.team_id !== team.id) {
+  if (existingForItem) {
     await recordFailure();
+    if (existingForItem.team_id === team.id) {
+      return jsonError({ code: 'already_submitted', message: 'Your team has already submitted for this item.' }, 409);
+    }
     return jsonError({ code: 'forbidden', message: 'Another team has already submitted for this item.' }, 403);
   }
 
-  let targetResponseId = existingForItem?.id ?? null;
+  let targetResponseId: string | null = null;
   if (!targetResponseId) {
     const existingByTeam = await queryFirst<{ id: string }>(
       env,

@@ -102,6 +102,7 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
   }
 
   const now = nowIso();
+  const markerUserId = (data.user as { id?: string } | null | undefined)?.id ?? null;
   await execute(
     env,
     `UPDATE event_item_responses
