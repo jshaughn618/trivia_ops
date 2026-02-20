@@ -166,6 +166,19 @@ export type EventRoundScore = {
   score: number;
 };
 
+export type EventRoundAudioSubmission = {
+  event_round_id: Id;
+  edition_item_id: Id;
+  ordinal: number;
+  prompt: string;
+  team_id: Id | null;
+  team_name: string | null;
+  response_parts_json: string | null;
+  submitted_at: string | null;
+  is_correct: boolean | null;
+  marked_at: string | null;
+};
+
 export type Team = {
   id: Id;
   event_id: Id;

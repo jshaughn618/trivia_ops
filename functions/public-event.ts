@@ -42,6 +42,7 @@ export type PublicEventPayload = {
     show_full_leaderboard: boolean;
     timer_started_at: string | null;
     timer_duration_seconds: number | null;
+    participant_audio_stopped_by_team_id: string | null;
     participant_audio_stopped_by_team_name: string | null;
     participant_audio_stopped_at: string | null;
     updated_at: string;
@@ -62,6 +63,7 @@ export type PublicItem = {
   media_key: string | null;
   media_caption?: string | null;
   ordinal: number;
+  answer_part_labels?: string[];
   answer?: string;
   answer_a?: string | null;
   answer_b?: string | null;
@@ -135,6 +137,39 @@ export async function getPublicEventPayload(env: Env, rawCode: string, view?: Pu
     round_audio_name: round.round_audio_name ?? null
   }));
 
+  const extractResponseLabels = (item: {
+    answer_parts_json: string | null;
+    answer_a_label: string | null;
+    answer_b_label: string | null;
+    answer_a: string | null;
+    answer_b: string | null;
+  }) => {
+    const labels: string[] = [];
+    if (item.answer_parts_json) {
+      try {
+        const parsed = JSON.parse(item.answer_parts_json) as Array<{ label?: unknown }>;
+        if (Array.isArray(parsed)) {
+          parsed.forEach((part) => {
+            const label = typeof part?.label === 'string' ? part.label.trim() : '';
+            if (!label) return;
+            if (!labels.includes(label)) labels.push(label);
+          });
+        }
+      } catch {
+        // Ignore malformed answer-parts payload.
+      }
+    }
+    if (labels.length === 0) {
+      if (item.answer_a?.trim()) {
+        labels.push(item.answer_a_label?.trim() || 'Part A');
+      }
+      if (item.answer_b?.trim()) {
+        labels.push(item.answer_b_label?.trim() || 'Part B');
+      }
+    }
+    return labels;
+  };
+
   const live = await queryFirst<{
     id: string;
     event_id: string;
@@ -149,6 +184,7 @@ export async function getPublicEventPayload(env: Env, rawCode: string, view?: Pu
     show_full_leaderboard: number;
     timer_started_at: string | null;
     timer_duration_seconds: number | null;
+    participant_audio_stopped_by_team_id: string | null;
     participant_audio_stopped_by_team_name: string | null;
     participant_audio_stopped_at: string | null;
     updated_at: string;
@@ -156,7 +192,7 @@ export async function getPublicEventPayload(env: Env, rawCode: string, view?: Pu
     env,
     `SELECT id, event_id, active_round_id, current_item_ordinal, audio_playing, reveal_answer, reveal_fun_fact,
             waiting_message, waiting_show_leaderboard, waiting_show_next_round, show_full_leaderboard, timer_started_at, timer_duration_seconds,
-            participant_audio_stopped_by_team_name, participant_audio_stopped_at, updated_at
+            participant_audio_stopped_by_team_id, participant_audio_stopped_by_team_name, participant_audio_stopped_at, updated_at
      FROM event_live_state WHERE event_id = ? AND COALESCE(deleted, 0) = 0`,
     [event.id]
   );
@@ -173,6 +209,7 @@ export async function getPublicEventPayload(env: Env, rawCode: string, view?: Pu
         show_full_leaderboard: Boolean(live.show_full_leaderboard),
         timer_started_at: live.timer_started_at ?? null,
         timer_duration_seconds: live.timer_duration_seconds ?? null,
+        participant_audio_stopped_by_team_id: live.participant_audio_stopped_by_team_id ?? null,
         participant_audio_stopped_by_team_name: live.participant_audio_stopped_by_team_name ?? null,
         participant_audio_stopped_at: live.participant_audio_stopped_at ?? null
       }
@@ -207,7 +244,8 @@ export async function getPublicEventPayload(env: Env, rawCode: string, view?: Pu
       media_type: item.media_type,
       media_key: item.media_key,
       media_caption: item.media_caption ?? null,
-      ordinal: item.ordinal
+      ordinal: item.ordinal,
+      answer_part_labels: extractResponseLabels(item)
     };
 
     if (canRevealAnswer) {

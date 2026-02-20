@@ -90,6 +90,7 @@ type PublicEventResponse = {
     show_full_leaderboard: boolean;
     timer_started_at: string | null;
     timer_duration_seconds: number | null;
+    participant_audio_stopped_by_team_id?: string | null;
     participant_audio_stopped_by_team_name?: string | null;
     participant_audio_stopped_at?: string | null;
   } | null;
@@ -105,6 +106,7 @@ type PublicEventResponse = {
     answer_a_label: string | null;
     answer_b_label: string | null;
     answer_parts_json: string | null;
+    answer_part_labels?: string[];
     fun_fact: string | null;
     media_type: string | null;
     media_key: string | null;
@@ -122,6 +124,7 @@ type PublicEventResponse = {
     answer_a_label: string | null;
     answer_b_label: string | null;
     answer_parts_json: string | null;
+    answer_part_labels?: string[];
     fun_fact: string | null;
     media_type: string | null;
     media_key: string | null;
@@ -151,6 +154,9 @@ export function PlayEventPage() {
   const [mediaError, setMediaError] = useState<string | null>(null);
   const [stopAudioLoading, setStopAudioLoading] = useState(false);
   const [stopAudioError, setStopAudioError] = useState<string | null>(null);
+  const [audioAnswerDrafts, setAudioAnswerDrafts] = useState<Record<string, string>>({});
+  const [audioAnswerStatus, setAudioAnswerStatus] = useState<'idle' | 'submitting' | 'submitted' | 'error'>('idle');
+  const [audioAnswerError, setAudioAnswerError] = useState<string | null>(null);
   const [visualIndex, setVisualIndex] = useState(0);
   const [selectedChoiceIndex, setSelectedChoiceIndex] = useState<number | null>(null);
   const [submittedChoiceIndex, setSubmittedChoiceIndex] = useState<number | null>(null);
@@ -298,6 +304,9 @@ export function PlayEventPage() {
     setSubmittedChoiceIndex(null);
     setSubmitStatus('idle');
     setSubmitError(null);
+    setAudioAnswerDrafts({});
+    setAudioAnswerStatus('idle');
+    setAudioAnswerError(null);
     setResponseSync(null);
     setGraphDelayUntil(null);
     graphDelayItemRef.current = null;
@@ -589,6 +598,42 @@ export function PlayEventPage() {
     setStopAudioError(null);
   };
 
+  const handleSubmitAudioAnswer = async () => {
+    if (!data?.event?.public_code || !teamId || !teamSession || !displayItem?.id) return;
+    if (!canSubmitStoppedAudioAnswer) return;
+    if (missingAudioAnswerLabels.length > 0) {
+      setAudioAnswerStatus('error');
+      setAudioAnswerError(`Complete all answer parts: ${missingAudioAnswerLabels.join(', ')}`);
+      return;
+    }
+
+    setAudioAnswerStatus('submitting');
+    setAudioAnswerError(null);
+    const answers = answerPartLabels.map((label) => ({
+      label,
+      answer: (audioAnswerDrafts[label] ?? '').trim()
+    }));
+
+    const res = await api.publicSubmitAudioAnswer(data.event.public_code, {
+      team_id: teamId,
+      item_id: displayItem.id,
+      session_token: teamSession,
+      answers
+    });
+
+    if (res.ok) {
+      setAudioAnswerStatus('submitted');
+      setAudioAnswerError(null);
+      return;
+    }
+    if (res.error?.code === 'team_session_invalid' || res.error?.code === 'team_session_required') {
+      handleSessionExpired(res.error.message ?? 'Your team session expired. Re-enter the team code to continue.');
+      return;
+    }
+    setAudioAnswerStatus('error');
+    setAudioAnswerError(formatApiError(res, 'Failed to submit answers.'));
+  };
+
   useEffect(() => {
     if (!timerExpired) return;
     if (submittedChoiceIndex !== null) return;
@@ -671,6 +716,17 @@ export function PlayEventPage() {
     teamId &&
     teamSession
   );
+  const answerPartLabels = displayItem?.answer_part_labels ?? [];
+  const canSubmitStoppedAudioAnswer = Boolean(
+    showAudioClue &&
+    !data?.live?.audio_playing &&
+    data?.live?.participant_audio_stopped_by_team_id === teamId &&
+    teamId &&
+    teamSession &&
+    displayItem?.id &&
+    answerPartLabels.length > 0
+  );
+  const missingAudioAnswerLabels = answerPartLabels.filter((label) => !(audioAnswerDrafts[label] ?? '').trim());
   const choiceOptions =
     displayItem?.question_type === 'multiple_choice' ? parseChoices(displayItem.choices_json) : [];
   const awaitingResponseSync = Boolean(responseSync);
@@ -1102,6 +1158,47 @@ export function PlayEventPage() {
                             {stopAudioLoading ? 'Stopping…' : 'STOP'}
                           </button>
                           {stopAudioError && <PlayFooterHint className="text-danger">{stopAudioError}</PlayFooterHint>}
+                        </div>
+                      )}
+                      {canSubmitStoppedAudioAnswer && (
+                        <div className="play-panel rounded-md px-4 py-4 text-left">
+                          <div className="text-sm font-semibold text-text">Your Team Stopped Playback</div>
+                          <div className="mt-1 text-xs text-muted">Enter each answer part and submit it to the host.</div>
+                          <div className="mt-3 grid gap-2.5">
+                            {answerPartLabels.map((label) => (
+                              <label key={`audio-answer-${displayItem?.id}-${label}`} className="flex flex-col gap-1.5">
+                                <span className="text-xs font-medium text-muted">{label}</span>
+                                <input
+                                  className="play-touch h-11 rounded-md px-3"
+                                  value={audioAnswerDrafts[label] ?? ''}
+                                  onChange={(event) => {
+                                    setAudioAnswerDrafts((prev) => ({ ...prev, [label]: event.target.value }));
+                                    if (audioAnswerStatus !== 'submitting') {
+                                      setAudioAnswerStatus('idle');
+                                      setAudioAnswerError(null);
+                                    }
+                                  }}
+                                  placeholder={`Enter ${label}`}
+                                />
+                              </label>
+                            ))}
+                          </div>
+                          <div className="mt-3 flex flex-col items-start gap-2">
+                            <PrimaryCTA
+                              onClick={handleSubmitAudioAnswer}
+                              disabled={audioAnswerStatus === 'submitting' || missingAudioAnswerLabels.length > 0}
+                            >
+                              {audioAnswerStatus === 'submitting'
+                                ? 'Submitting…'
+                                : audioAnswerStatus === 'submitted'
+                                  ? 'Update submission'
+                                  : 'Submit to host'}
+                            </PrimaryCTA>
+                            {audioAnswerStatus === 'submitted' && !audioAnswerError && (
+                              <PlayFooterHint>Submitted to host.</PlayFooterHint>
+                            )}
+                            {audioAnswerError && <PlayFooterHint className="text-danger">{audioAnswerError}</PlayFooterHint>}
+                          </div>
                         </div>
                       )}
                     </div>

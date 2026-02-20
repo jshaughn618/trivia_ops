@@ -273,6 +273,13 @@ export const publicAudioStopSchema = z.object({
   session_token: z.string().min(1)
 });
 
+export const publicAudioAnswerSchema = z.object({
+  team_id: idSchema,
+  item_id: idSchema,
+  session_token: z.string().min(1),
+  answers: z.array(z.object({ label: z.string().min(1), answer: z.string().min(1) })).min(1)
+});
+
 export const roundScoreSchema = z.object({
   team_id: idSchema,
   score: z.number()
@@ -280,6 +287,11 @@ export const roundScoreSchema = z.object({
 
 export const roundScoresUpdateSchema = z.object({
   scores: z.array(roundScoreSchema).min(1)
+});
+
+export const eventRoundAudioSubmissionMarkSchema = z.object({
+  edition_item_id: idSchema,
+  is_correct: z.boolean().nullable()
 });
 
 export const liveStateUpdateSchema = z.object({

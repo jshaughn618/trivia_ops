@@ -5,6 +5,7 @@ import type {
   EventBootstrap,
   EventLiveState,
   EventRound,
+  EventRoundAudioSubmission,
   EventRoundScore,
   Game,
   GameEdition,
@@ -291,6 +292,13 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify({ scores })
     }),
+  listRoundAudioSubmissions: (roundId: string) =>
+    apiFetch<EventRoundAudioSubmission[]>(`/api/event-rounds/${roundId}/audio-submissions`),
+  markRoundAudioSubmission: (roundId: string, payload: { edition_item_id: string; is_correct: boolean | null }) =>
+    apiFetch<EventRoundAudioSubmission>(`/api/event-rounds/${roundId}/audio-submissions`, {
+      method: 'PUT',
+      body: JSON.stringify(payload)
+    }),
 
   listTeams: (eventId: string) => apiFetch<Team[]>(`/api/events/${eventId}/teams`),
   createTeam: (eventId: string, payload: Partial<Team>) =>
@@ -324,6 +332,14 @@ export const api = {
     }),
   publicStopAudio: (code: string, payload: { team_id: string; session_token: string }) =>
     apiFetch<{ ok: true; stopped: boolean }>(`/api/public/event/${code}/audio-stop`, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    }),
+  publicSubmitAudioAnswer: (
+    code: string,
+    payload: { team_id: string; item_id: string; session_token: string; answers: Array<{ label: string; answer: string }> }
+  ) =>
+    apiFetch<{ ok: true; answers: Array<{ label: string; answer: string }> }>(`/api/public/event/${code}/audio-answer`, {
       method: 'POST',
       body: JSON.stringify(payload)
     }),

@@ -8,7 +8,7 @@ import { AccordionSection } from '../components/AccordionSection';
 import { ButtonLink, PrimaryButton, SecondaryButton } from '../components/Buttons';
 import { StampBadge } from '../components/StampBadge';
 import { createRequestId, logError, logInfo } from '../lib/log';
-import type { EditionItem, Event, EventRound, Game, GameEdition, Team, EventRoundScore } from '../types';
+import type { EditionItem, Event, EventRound, Game, GameEdition, Team, EventRoundAudioSubmission, EventRoundScore } from '../types';
 
 function useQuery() {
   return new URLSearchParams(useLocation().search);
@@ -81,6 +81,10 @@ export function EventRunPage() {
   const [scoreDrafts, setScoreDrafts] = useState<Record<string, string>>({});
   const [scoreDraftBaseline, setScoreDraftBaseline] = useState<Record<string, string>>({});
   const [scoreDraftRoundId, setScoreDraftRoundId] = useState<string | null>(null);
+  const [audioSubmissions, setAudioSubmissions] = useState<EventRoundAudioSubmission[]>([]);
+  const [audioSubmissionsLoading, setAudioSubmissionsLoading] = useState(false);
+  const [audioSubmissionsError, setAudioSubmissionsError] = useState<string | null>(null);
+  const [audioMarkingItemId, setAudioMarkingItemId] = useState<string | null>(null);
   const preselectRef = useRef(false);
   const auth = useAuth();
   const isAdmin = auth.user?.user_type === 'admin';
@@ -211,6 +215,20 @@ export function EventRunPage() {
     return 'Planned';
   };
 
+  const submissionOutcome = (submission: EventRoundAudioSubmission | null) => {
+    if (!submission?.team_id || !submission.response_parts_json) return 'No Team Answer';
+    if (submission.is_correct === true) return 'Correct';
+    if (submission.is_correct === false) return 'Incorrect';
+    return 'Pending';
+  };
+
+  const submissionOutcomeClass = (submission: EventRoundAudioSubmission | null) => {
+    if (!submission?.team_id || !submission.response_parts_json) return 'border-border text-muted';
+    if (submission.is_correct === true) return 'border-accent-ink bg-accent text-accent-fg';
+    if (submission.is_correct === false) return 'border-danger bg-danger text-danger-fg';
+    return 'border-accent-ink text-accent-ink';
+  };
+
   const activeRound = useMemo(() => rounds.find((round) => round.id === roundId) ?? null, [rounds, roundId]);
   const sortedTeams = useMemo(
     () => [...teams].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })),
@@ -236,6 +254,90 @@ export function EventRunPage() {
       : isSpeedRoundMode
         ? speedRoundPrompt
         : item?.prompt ?? '';
+
+  const loadAudioSubmissions = useCallback(
+    async (selectedRoundId: string, silent = false) => {
+      if (!selectedRoundId) {
+        setAudioSubmissions([]);
+        return;
+      }
+      if (!silent) setAudioSubmissionsLoading(true);
+      const res = await api.listRoundAudioSubmissions(selectedRoundId);
+      if (res.ok) {
+        setAudioSubmissions(res.data);
+        if (!silent) setAudioSubmissionsError(null);
+      } else if (!silent) {
+        setAudioSubmissionsError(formatApiError(res, 'Failed to load participant submissions.'));
+      }
+      if (!silent) setAudioSubmissionsLoading(false);
+    },
+    []
+  );
+
+  useEffect(() => {
+    if (!activeRound?.id) {
+      setAudioSubmissions([]);
+      setAudioSubmissionsLoading(false);
+      setAudioSubmissionsError(null);
+      return;
+    }
+    void loadAudioSubmissions(activeRound.id);
+  }, [activeRound?.id, activeRound?.status, loadAudioSubmissions]);
+
+  useEffect(() => {
+    if (!activeRound?.id || activeRound.status !== 'live') return;
+    let closed = false;
+    const tick = async () => {
+      if (closed) return;
+      await loadAudioSubmissions(activeRound.id, true);
+    };
+    const timer = window.setInterval(() => {
+      void tick();
+    }, 2000);
+    return () => {
+      closed = true;
+      window.clearInterval(timer);
+    };
+  }, [activeRound?.id, activeRound?.status, loadAudioSubmissions]);
+
+  const audioSubmissionByItemId = useMemo(
+    () => new Map(audioSubmissions.map((submission) => [submission.edition_item_id, submission])),
+    [audioSubmissions]
+  );
+  const currentAudioSubmission = item ? audioSubmissionByItemId.get(item.id) ?? null : null;
+  const currentSubmittedParts = useMemo(
+    () => parseAnswerParts(currentAudioSubmission?.response_parts_json),
+    [currentAudioSubmission?.response_parts_json]
+  );
+  const hasAudioSubmissionWorkflow = Boolean(isSpeedRoundMode || isAudioItem);
+  const audioSummaryRows = useMemo(
+    () =>
+      [...items]
+        .sort((a, b) => a.ordinal - b.ordinal)
+        .map((entry) => ({
+          item: entry,
+          submission: audioSubmissionByItemId.get(entry.id) ?? null
+        })),
+    [items, audioSubmissionByItemId]
+  );
+
+  const markAudioSubmission = async (editionItemId: string, isCorrect: boolean | null) => {
+    if (!activeRound?.id) return;
+    setAudioMarkingItemId(editionItemId);
+    setAudioSubmissionsError(null);
+    const res = await api.markRoundAudioSubmission(activeRound.id, {
+      edition_item_id: editionItemId,
+      is_correct: isCorrect
+    });
+    if (res.ok) {
+      setAudioSubmissions((prev) =>
+        prev.map((entry) => (entry.edition_item_id === editionItemId ? res.data : entry))
+      );
+    } else {
+      setAudioSubmissionsError(formatApiError(res, 'Failed to mark submission.'));
+    }
+    setAudioMarkingItemId(null);
+  };
 
   const speedRoundAnswerLines = useMemo(() => {
     if (!isSpeedRoundMode) return [];
@@ -856,6 +958,65 @@ export function EventRunPage() {
               ) : (
                 <div className="text-sm text-muted">No items in this round.</div>
               )}
+              {item && hasAudioSubmissionWorkflow && (
+                <div className="surface-inset p-5">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="ui-label">Participant Submission</div>
+                    <span className={`inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-semibold tracking-[0.04em] ${submissionOutcomeClass(currentAudioSubmission)}`}>
+                      {submissionOutcome(currentAudioSubmission)}
+                    </span>
+                  </div>
+                  {audioSubmissionsLoading && !currentAudioSubmission && (
+                    <div className="mt-2 text-sm text-muted">Loading submission…</div>
+                  )}
+                  {!currentAudioSubmission?.team_id || !currentAudioSubmission.response_parts_json ? (
+                    <div className="mt-2 text-sm text-muted">No team has submitted for this item yet.</div>
+                  ) : (
+                    <>
+                      <div className="mt-2 text-sm">
+                        <span className="text-muted">Team:</span>{' '}
+                        <span className="font-semibold text-text">{currentAudioSubmission.team_name ?? 'Unknown team'}</span>
+                      </div>
+                      <div className="mt-3 grid gap-2">
+                        {currentSubmittedParts.map((part) => (
+                          <div key={`submission-${item.id}-${part.label}`} className="rounded-md border border-border bg-panel px-3 py-2 text-sm">
+                            <span className="text-muted">{part.label}:</span>{' '}
+                            <span className="font-medium text-text">{part.answer}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <SecondaryButton
+                          className="h-10"
+                          onClick={() => markAudioSubmission(item.id, true)}
+                          disabled={audioMarkingItemId === item.id}
+                        >
+                          Mark Correct
+                        </SecondaryButton>
+                        <SecondaryButton
+                          className="h-10"
+                          onClick={() => markAudioSubmission(item.id, false)}
+                          disabled={audioMarkingItemId === item.id}
+                        >
+                          Mark Incorrect
+                        </SecondaryButton>
+                        <SecondaryButton
+                          className="h-10"
+                          onClick={() => markAudioSubmission(item.id, null)}
+                          disabled={audioMarkingItemId === item.id}
+                        >
+                          Clear Mark
+                        </SecondaryButton>
+                      </div>
+                    </>
+                  )}
+                  {audioSubmissionsError && (
+                    <div className="mt-3 rounded-lg border border-danger bg-panel px-3 py-2 text-sm text-danger-ink">
+                      {audioSubmissionsError}
+                    </div>
+                  )}
+                </div>
+              )}
               {item && (showAnswer || showFact) && (
                 <div className="grid gap-4 lg:grid-cols-2">
                   {showAnswer && (
@@ -1007,6 +1168,45 @@ export function EventRunPage() {
                   className={`text-sm ${clearResponsesStatus === 'error' ? 'text-danger-ink' : 'text-muted'}`}
                 >
                   {clearResponsesMessage}
+                </div>
+              )}
+              {hasAudioSubmissionWorkflow &&
+                (activeRound?.status === 'completed' || activeRound?.status === 'locked') &&
+                audioSummaryRows.length > 0 && (
+                <div className="surface-inset p-5">
+                  <div className="ui-label">Round Submission Summary</div>
+                  <div className="mt-3 flex flex-col gap-2">
+                    {audioSummaryRows.map(({ item: summaryItem, submission }) => {
+                      const submittedParts = parseAnswerParts(submission?.response_parts_json);
+                      return (
+                        <div key={`audio-summary-${summaryItem.id}`} className="rounded-md border border-border bg-panel px-3 py-3">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="text-sm font-semibold text-text">
+                              Item {summaryItem.ordinal}
+                            </div>
+                            <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold tracking-[0.04em] ${submissionOutcomeClass(submission)}`}>
+                              {submissionOutcome(submission)}
+                            </span>
+                          </div>
+                          <div className="mt-1 text-xs text-muted">{summaryItem.prompt?.trim() || 'Prompt not set.'}</div>
+                          <div className="mt-2 text-sm">
+                            <span className="text-muted">Team:</span>{' '}
+                            <span className="font-medium text-text">{submission?.team_name ?? 'No team answer'}</span>
+                          </div>
+                          {submittedParts.length > 0 && (
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {submittedParts.map((part) => (
+                                <span key={`audio-summary-part-${summaryItem.id}-${part.label}`} className="rounded-md border border-border bg-panel2 px-2 py-1 text-xs">
+                                  <span className="text-muted">{part.label}:</span>{' '}
+                                  <span className="text-text">{part.answer}</span>
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </div>
