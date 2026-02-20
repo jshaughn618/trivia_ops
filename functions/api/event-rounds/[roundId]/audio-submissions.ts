@@ -102,7 +102,6 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
   }
 
   const now = nowIso();
-  const markerUserId = (data.user as { id?: string } | null | undefined)?.id ?? null;
   await execute(
     env,
     `UPDATE event_item_responses
@@ -183,13 +182,12 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request, 
          reveal_fun_fact = 0,
          timer_started_at = NULL,
          timer_duration_seconds = NULL,
-         updated_at = ?,
-         updated_by = ?
+         updated_at = ?
      WHERE event_id = ?
        AND active_round_id = ?
        AND current_item_ordinal = ?
        AND COALESCE(deleted, 0) = 0`,
-    [now, markerUserId, roundItem.event_id, params.roundId, roundItem.ordinal]
+    [now, roundItem.event_id, params.roundId, roundItem.ordinal]
   );
 
   const rows = await listSubmissions(env, params.roundId as string);
