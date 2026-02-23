@@ -22,6 +22,16 @@ export type ZeptoDiagnosticResult = {
   attempts: ZeptoAttempt[];
 };
 
+function normalizeZeptoApiKey(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  const prefixMatch = trimmed.match(/^Zoho-enczapikey\s+(.+)$/i);
+  if (prefixMatch && prefixMatch[1]) {
+    return prefixMatch[1].trim();
+  }
+  return trimmed;
+}
+
 function buildPayload(to: string, inviteUrl: string, includeHtml: boolean) {
   const textbody = `You have been invited to host for Trivia Ops.\n\nCreate your account:\n${inviteUrl}\n\nThis invite expires in 30 days.\n\nJacob\nFounder, triviaops.com`;
   const payload: Record<string, unknown> = {
@@ -64,11 +74,12 @@ function extractErrorMessage(text: string, fallback: string) {
 }
 
 async function postEmail(env: Env, payload: Record<string, unknown>) {
+  const token = normalizeZeptoApiKey(env.ZEPTO_API_KEY ?? '');
   const res = await fetch(env.ZEPTO_API_URL ?? DEFAULT_ZEPTO_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Zoho-enczapikey ${env.ZEPTO_API_KEY}`
+      Authorization: `Zoho-enczapikey ${token}`
     },
     body: JSON.stringify({
       from: {
