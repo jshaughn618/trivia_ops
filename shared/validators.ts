@@ -232,6 +232,10 @@ export const inviteCreateSchema = z.object({
   role: userTypeSchema.optional()
 });
 
+export const inviteDiagnosticSchema = z.object({
+  email: emailSchema
+});
+
 export const inviteAcceptSchema = z.object({
   password: passwordSchema,
   username: z.string().min(1).optional(),

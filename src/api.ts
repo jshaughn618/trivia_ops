@@ -125,6 +125,22 @@ export const api = {
       '/api/invites',
       { method: 'POST', body: JSON.stringify(payload) }
     ),
+  testInviteDelivery: (payload: { email: string }) =>
+    apiFetch<{
+      recipient: string;
+      ok: boolean;
+      error: string | null;
+      attempts: Array<{
+        name: 'primary' | 'fallback';
+        status: number | null;
+        statusText: string;
+        headers: Record<string, string>;
+        bodySnippet: string;
+      }>;
+    }>('/api/invites/test', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    }),
   getPublicInvite: (token: string) =>
     apiFetch<{ email: string; role: 'admin' | 'host' | 'player'; expires_at: string }>(
       `/api/public/invite/${token}`

@@ -25,6 +25,10 @@ export function UsersPage() {
   const [inviteResult, setInviteResult] = useState<string | null>(null);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteFailures, setInviteFailures] = useState<string[]>([]);
+  const [diagnosticEmail, setDiagnosticEmail] = useState('');
+  const [diagnosticRunning, setDiagnosticRunning] = useState(false);
+  const [diagnosticError, setDiagnosticError] = useState<string | null>(null);
+  const [diagnosticResult, setDiagnosticResult] = useState<string | null>(null);
 
   const load = async () => {
     const res = await api.listUsers();
@@ -95,6 +99,21 @@ export function UsersPage() {
       );
     }
     setInviteText('');
+  };
+
+  const handleRunDiagnostic = async () => {
+    const email = diagnosticEmail.trim().toLowerCase();
+    if (!email) return;
+    setDiagnosticRunning(true);
+    setDiagnosticError(null);
+    setDiagnosticResult(null);
+    const res = await api.testInviteDelivery({ email });
+    setDiagnosticRunning(false);
+    if (!res.ok) {
+      setDiagnosticError(formatApiError(res, 'Failed to run invite diagnostic.'));
+      return;
+    }
+    setDiagnosticResult(JSON.stringify(res.data, null, 2));
   };
 
   if (auth.user?.user_type !== 'admin') {
@@ -240,6 +259,34 @@ export function UsersPage() {
                 ))}
               </div>
             )}
+
+            <div className="mt-2 border-t border-border pt-3">
+              <div className="mb-2 text-xs uppercase tracking-[0.2em] text-muted">Zepto diagnostic</div>
+              <label className="flex flex-col gap-2 text-xs uppercase tracking-[0.2em] text-muted">
+                Diagnostic Email
+                <input
+                  className="h-10 px-3 normal-case tracking-normal"
+                  value={diagnosticEmail}
+                  onChange={(event) => setDiagnosticEmail(event.target.value)}
+                  placeholder="email@example.com"
+                />
+              </label>
+              <div className="mt-2">
+                <SecondaryButton onClick={handleRunDiagnostic} disabled={diagnosticRunning || !diagnosticEmail.trim()}>
+                  {diagnosticRunning ? 'Running…' : 'Run Zepto Diagnostic'}
+                </SecondaryButton>
+              </div>
+              {diagnosticError && (
+                <div className="mt-2 border-2 border-danger bg-panel2 px-3 py-2 text-xs uppercase tracking-[0.2em] text-danger">
+                  {diagnosticError}
+                </div>
+              )}
+              {diagnosticResult && (
+                <pre className="mt-2 overflow-x-auto border border-border bg-panel2 p-3 text-[11px] text-text">
+                  {diagnosticResult}
+                </pre>
+              )}
+            </div>
           </div>
         </Panel>
       </div>
