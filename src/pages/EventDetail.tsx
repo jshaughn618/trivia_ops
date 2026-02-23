@@ -770,7 +770,7 @@ const renderUpcomingBlock = (
 ) => {
   const padding = CELL_PADDING;
   const upcomingTitleSize = 10.5;
-  const upcomingTextSize = 11;
+  const upcomingTextSize = 13;
   let cursorY = cell.y + cell.height - padding;
   const upcoming = extras.upcomingLines ?? [];
   if (upcoming.length > 0) {
@@ -783,7 +783,7 @@ const renderUpcomingBlock = (
       size: upcomingTitleSize,
       font: fonts.bold
     });
-    cursorY -= upcomingTitleSize + 14;
+    cursorY -= upcomingTitleSize + 20;
     upcoming.forEach((line) => {
       if (!line.trim()) {
         cursorY -= upcomingTextSize + 8;
@@ -793,7 +793,7 @@ const renderUpcomingBlock = (
         x: cell.x + padding,
         y: cursorY - upcomingTextSize,
         size: upcomingTextSize,
-        font: fonts.regular
+        font: fonts.bold
       });
       cursorY -= upcomingTextSize + 6;
     });
