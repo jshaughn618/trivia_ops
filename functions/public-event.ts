@@ -3,7 +3,7 @@ import type { ApiError } from '../shared/types';
 import { normalizeCode } from './public';
 import { queryAll, queryFirst } from './db';
 
-export type PublicEventView = 'play' | 'leaderboard';
+export type PublicEventView = 'play' | 'leaderboard' | 'display';
 
 export type PublicEventPayload = {
   event: {

@@ -316,9 +316,26 @@ export const api = {
   updateTeam: (teamId: string, payload: Partial<Team>) =>
     apiFetch<Team>(`/api/teams/${teamId}`, { method: 'PUT', body: JSON.stringify(payload) }),
   deleteTeam: (teamId: string) => apiFetch<{ ok: true }>(`/api/teams/${teamId}`, { method: 'DELETE' }),
+  createParticipantDisplayLink: (eventId: string) =>
+    apiFetch<{ url: string; token: string; public_code: string; expires_at: string }>(
+      `/api/events/${eventId}/participant-display-link`,
+      { method: 'POST' }
+    ),
   publicEvent: (code: string, view?: 'play' | 'leaderboard') => {
     const query = view ? `?view=${encodeURIComponent(view)}` : '';
     return apiFetch<any>(`/api/public/event/${code}${query}`, { cache: 'no-store' });
+  },
+  publicDisplayEvent: (code: string, token: string) => {
+    const search = new URLSearchParams();
+    search.set('view', 'display');
+    search.set('token', token);
+    return apiFetch<any>(`/api/public/event/${code}?${search.toString()}`, { cache: 'no-store' });
+  },
+  publicDisplayStreamUrl: (code: string, token: string) => {
+    const search = new URLSearchParams();
+    search.set('view', 'display');
+    search.set('token', token);
+    return `/api/public/event/${encodeURIComponent(code)}/stream?${search.toString()}`;
   },
   publicJoin: (code: string, payload: { team_code: string; team_name?: string }) =>
     apiFetch<{ team: { id: string; name: string }; session_token: string }>(`/api/public/event/${code}/join`, {

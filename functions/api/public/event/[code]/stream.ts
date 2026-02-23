@@ -2,6 +2,7 @@ import type { Env } from '../../../../types';
 import { jsonError } from '../../../../responses';
 import { checkRateLimit } from '../../../../rate-limit';
 import { getPublicEventPayload } from '../../../../public-event';
+import { verifyParticipantDisplayToken } from '../../../../participant-display';
 
 const STREAM_POLL_MS = 2000;
 const DEFAULT_PUBLIC_STREAM_RATE_LIMIT = {
@@ -49,7 +50,17 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params, request })
   }
 
   const url = new URL(request.url);
-  const viewParam = url.searchParams.get('view') as 'play' | 'leaderboard' | null;
+  const viewParam = url.searchParams.get('view') as 'play' | 'leaderboard' | 'display' | null;
+  if (viewParam === 'display') {
+    const rawToken = url.searchParams.get('token') ?? '';
+    const tokenCheck = await verifyParticipantDisplayToken(env, rawToken, params.code as string);
+    if (!tokenCheck.ok) {
+      const message = tokenCheck.reason === 'token_expired'
+        ? 'Display link expired'
+        : 'Display link is invalid';
+      return jsonError({ code: tokenCheck.reason, message }, 401);
+    }
+  }
 
   let closed = false;
 

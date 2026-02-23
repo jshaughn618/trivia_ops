@@ -1016,6 +1016,11 @@ export function EventDetailPage() {
   const [qrUrl, setQrUrl] = useState<string | null>(null);
   const [qrLoading, setQrLoading] = useState(false);
   const [qrError, setQrError] = useState<string | null>(null);
+  const [participantDisplayLink, setParticipantDisplayLink] = useState<string | null>(null);
+  const [participantDisplayExpiresAt, setParticipantDisplayExpiresAt] = useState<string | null>(null);
+  const [participantDisplayLoading, setParticipantDisplayLoading] = useState(false);
+  const [participantDisplayError, setParticipantDisplayError] = useState<string | null>(null);
+  const [participantDisplayCopied, setParticipantDisplayCopied] = useState(false);
   const [roundMenuId, setRoundMenuId] = useState<string | null>(null);
   const [expandedRoundId, setExpandedRoundId] = useState<string | null>(null);
   const [draggedRoundId, setDraggedRoundId] = useState<string | null>(null);
@@ -1298,6 +1303,38 @@ export function EventDetailPage() {
       window.setTimeout(() => setCodeCopied(false), 1600);
     } catch (error) {
       logError('event_code_copy_failed', { error });
+    }
+  };
+
+  const generateParticipantDisplayLink = async () => {
+    if (!eventId) return null;
+    setParticipantDisplayLoading(true);
+    setParticipantDisplayError(null);
+    const res = await api.createParticipantDisplayLink(eventId);
+    setParticipantDisplayLoading(false);
+    if (!res.ok) {
+      setParticipantDisplayError(formatApiError(res, 'Failed to create participant display link.'));
+      return null;
+    }
+    setParticipantDisplayLink(res.data.url);
+    setParticipantDisplayExpiresAt(res.data.expires_at);
+    return res.data.url;
+  };
+
+  const copyParticipantDisplayLink = async () => {
+    const url = participantDisplayLink ?? (await generateParticipantDisplayLink());
+    if (!url) return;
+    if (!navigator.clipboard) {
+      setParticipantDisplayError('Clipboard unavailable. Use the link below to open display view.');
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      setParticipantDisplayCopied(true);
+      window.setTimeout(() => setParticipantDisplayCopied(false), 1800);
+    } catch (error) {
+      setParticipantDisplayError('Could not copy display link.');
+      logError('participant_display_link_copy_failed', { error });
     }
   };
 
@@ -2871,9 +2908,34 @@ export function EventDetailPage() {
         <div className="border-t border-border pt-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="text-sm font-medium text-muted">Share event</div>
-            <SecondaryButton className="px-3 py-2 text-xs" onClick={() => setShowQr((prev) => !prev)}>
-              {showQr ? 'Hide QR' : 'Show QR'}
-            </SecondaryButton>
+            <div className="flex flex-wrap items-center gap-2">
+              <SecondaryButton
+                className="px-3 py-2 text-xs"
+                onClick={copyParticipantDisplayLink}
+                disabled={participantDisplayLoading}
+              >
+                {participantDisplayLoading ? 'Creating link…' : 'Copy participant display URL'}
+              </SecondaryButton>
+              <SecondaryButton className="px-3 py-2 text-xs" onClick={() => setShowQr((prev) => !prev)}>
+                {showQr ? 'Hide QR' : 'Show QR'}
+              </SecondaryButton>
+            </div>
+          </div>
+          <div className="mt-3 space-y-1 text-xs" aria-live="polite">
+            {participantDisplayCopied && <div className="text-accent-ink">Participant display URL copied.</div>}
+            {participantDisplayError && <div className="text-danger-ink">{participantDisplayError}</div>}
+            {participantDisplayLink && (
+              <div className="flex flex-wrap items-center gap-3">
+                <TextLink href={participantDisplayLink} target="_blank" rel="noreferrer">
+                  Open participant display
+                </TextLink>
+                {participantDisplayExpiresAt && (
+                  <span className="text-muted">
+                    Expires {new Date(participantDisplayExpiresAt).toLocaleString()}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
           {showQr && (
             <div className="mt-3 space-y-2">

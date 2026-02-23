@@ -2,6 +2,7 @@ import type { Env } from '../../../types';
 import { jsonError, jsonOk } from '../../../responses';
 import { getPublicEventPayload } from '../../../public-event';
 import { checkRateLimit, recordRateLimitHit } from '../../../rate-limit';
+import { verifyParticipantDisplayToken } from '../../../participant-display';
 
 const DEFAULT_PUBLIC_EVENT_RATE_LIMIT = {
   maxAttempts: 300,
@@ -37,7 +38,17 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params, request })
     );
   }
   const url = new URL(request.url);
-  const viewParam = url.searchParams.get('view') as 'play' | 'leaderboard' | null;
+  const viewParam = url.searchParams.get('view') as 'play' | 'leaderboard' | 'display' | null;
+  if (viewParam === 'display') {
+    const rawToken = url.searchParams.get('token') ?? '';
+    const tokenCheck = await verifyParticipantDisplayToken(env, rawToken, params.code as string);
+    if (!tokenCheck.ok) {
+      const message = tokenCheck.reason === 'token_expired'
+        ? 'Display link expired'
+        : 'Display link is invalid';
+      return jsonError({ code: tokenCheck.reason, message }, 401);
+    }
+  }
   const result = await getPublicEventPayload(env, params.code as string, viewParam ?? undefined);
   if (!result.ok) {
     await recordRateLimitHit(env, limitKey, getPublicEventRateLimit(env));

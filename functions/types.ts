@@ -3,6 +3,8 @@ export type Env = {
   BUCKET: R2Bucket;
   SESSION_SECRET: string;
   SESSION_TTL_HOURS: string;
+  PARTICIPANT_DISPLAY_SECRET?: string;
+  PARTICIPANT_DISPLAY_LINK_TTL_MINUTES?: string;
   OPENAI_API_KEY: string;
   AI_DEFAULT_MODEL?: string;
   LOGIN_RATE_MAX?: string;

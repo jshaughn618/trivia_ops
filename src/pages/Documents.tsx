@@ -68,14 +68,28 @@ const drawWelcomeHalfSheet = (
   const contentWidth = panelWidth - sidePadding * 2;
   let cursorY = panelY + panelHeight - topPadding;
 
-  const titleLineOne = 'Welcome to Pub Trivia';
+  const titleLineOne = 'Pub Trivia';
   const titleLineTwo = `@ ${locationName}`;
-  const titleSize = 14.5;
-  const titleLines = [titleLineOne, ...wrapText(fonts.bold, titleLineTwo, panelWidth - 44, titleSize)];
+  const titleSize = 26;
+  const subtitleSize = 16;
+  const titleLines = [titleLineOne];
+  const subtitleLines = wrapText(fonts.bold, titleLineTwo, panelWidth - 44, subtitleSize);
   titleLines.forEach((line, lineIndex) => {
-    drawCenteredText(page, line, fonts.bold, titleSize, panelX, panelWidth, cursorY - titleSize - lineIndex * 17.5);
+    drawCenteredText(page, line, fonts.bold, titleSize, panelX, panelWidth, cursorY - titleSize - lineIndex * 30);
   });
-  cursorY -= 10 + titleLines.length * 17.5;
+  cursorY -= 8 + titleLines.length * 30;
+  subtitleLines.forEach((line, lineIndex) => {
+    drawCenteredText(
+      page,
+      line,
+      fonts.bold,
+      subtitleSize,
+      panelX,
+      panelWidth,
+      cursorY - subtitleSize - lineIndex * 20
+    );
+  });
+  cursorY -= 8 + subtitleLines.length * 20;
 
   if (logoImage && logoImage.width > 0 && logoImage.height > 0) {
     const label = 'Powered by';
@@ -110,22 +124,22 @@ const drawWelcomeHalfSheet = (
     cursorY -= 24;
   }
 
-  page.drawText('How to Join Your Team', {
+  page.drawText('Start Here', {
     x: contentX,
-    y: cursorY - 10.5,
-    size: 10.5,
+    y: cursorY - 14,
+    size: 14,
     font: fonts.bold
   });
-  cursorY -= 23;
+  cursorY -= 27;
 
   const steps = [
     'Scan the QR code on your scoresheet with your mobile device.',
-    'Enter a team name when prompted and continue into your team site.',
-    'Only one phone can be logged in to your team site at a time.',
+    'Enter a team name when prompted and continue to your team site.',
+    'Only one phone can be logged into your team site at a time (you may switch phones if needed).',
     'Write your team name on the scoresheet, then sit back and wait for the host to start the game.'
   ];
-  const stepTextSize = 8.3;
-  const stepLineHeight = 10.3;
+  const stepTextSize = 11;
+  const stepLineHeight = 13.4;
   const stepIndent = 13;
 
   steps.forEach((step, index) => {
@@ -150,8 +164,39 @@ const drawWelcomeHalfSheet = (
     cursorY -= lines.length * stepLineHeight + 6;
   });
 
+  const rules = [
+    'Teams up to 6 players.',
+    'No Googling or outside help.',
+    'One team device out. All other phones away.'
+  ];
+  const ruleTextSize = 10.5;
+  const ruleLineHeight = 12.5;
+  const ruleIndent = 10;
+
+  page.drawText('Rules', {
+    x: contentX,
+    y: cursorY - 12,
+    size: 12,
+    font: fonts.bold
+  });
+  cursorY -= 20;
+
+  rules.forEach((rule) => {
+    const lines = wrapText(fonts.regular, rule, contentWidth - ruleIndent, ruleTextSize);
+    lines.forEach((line, lineIndex) => {
+      const bullet = lineIndex === 0 ? '- ' : '  ';
+      page.drawText(`${bullet}${line}`, {
+        x: contentX,
+        y: cursorY - ruleTextSize - lineIndex * ruleLineHeight,
+        size: ruleTextSize,
+        font: fonts.regular
+      });
+    });
+    cursorY -= lines.length * ruleLineHeight + 4;
+  });
+
   const note = 'Have fun and good luck!';
-  drawCenteredText(page, note, fonts.bold, 9.5, panelX, panelWidth, panelY + 14);
+  drawCenteredText(page, note, fonts.bold, 16, panelX, panelWidth, panelY + 16);
 };
 
 const buildWelcomeSheetPdf = async (locationName: string) => {
