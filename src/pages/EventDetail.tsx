@@ -783,7 +783,7 @@ const renderUpcomingBlock = (
       size: upcomingTitleSize,
       font: fonts.bold
     });
-    cursorY -= upcomingTitleSize + 20;
+    cursorY -= upcomingTitleSize + 28;
     upcoming.forEach((line) => {
       if (!line.trim()) {
         cursorY -= upcomingTextSize + 8;
@@ -1981,12 +1981,12 @@ export function EventDetailPage() {
                 new Date(candidate.starts_at).getTime() > now
             )
             .sort((a, b) => a.starts_at.localeCompare(b.starts_at))
-            .slice(0, 2)
-            .flatMap((candidate, index) => {
+            .slice(0, 4)
+            .flatMap((candidate, index, allCandidates) => {
               const start = new Date(candidate.starts_at);
               const lines = formatUpcoming(start);
               const block = [candidate.event_type, `${lines.dateLine} ${lines.timeLine}`];
-              return index === 0 ? block.concat(['']) : block;
+              return index < allCandidates.length - 1 ? block.concat(['']) : block;
             });
         }
       }

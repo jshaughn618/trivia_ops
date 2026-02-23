@@ -68,9 +68,10 @@ const drawWelcomeHalfSheet = (
   const contentWidth = panelWidth - sidePadding * 2;
   let cursorY = panelY + panelHeight - topPadding;
 
-  const titleText = `Welcome to Pub Trivia @ ${locationName}`;
+  const titleLineOne = 'Welcome to Pub Trivia';
+  const titleLineTwo = `@ ${locationName}`;
   const titleSize = 14.5;
-  const titleLines = wrapText(fonts.bold, titleText, panelWidth - 44, titleSize);
+  const titleLines = [titleLineOne, ...wrapText(fonts.bold, titleLineTwo, panelWidth - 44, titleSize)];
   titleLines.forEach((line, lineIndex) => {
     drawCenteredText(page, line, fonts.bold, titleSize, panelX, panelWidth, cursorY - titleSize - lineIndex * 17.5);
   });
@@ -121,7 +122,7 @@ const drawWelcomeHalfSheet = (
     'Scan the QR code on your scoresheet with your mobile device.',
     'Enter a team name when prompted and continue into your team site.',
     'Only one phone can be logged in to your team site at a time.',
-    'Sit back, keep your scoresheet at your table, and wait for the host to start the game.'
+    'Write your team name on the scoresheet, then sit back and wait for the host to start the game.'
   ];
   const stepTextSize = 8.3;
   const stepLineHeight = 10.3;
@@ -285,7 +286,7 @@ export function DocumentsPage() {
                   </div>
                   <p className="max-w-2xl text-sm text-muted">
                     Quarter-sheet handout designed for 4-up printing on letter paper in vertical orientation. Select a
-                    location, then generate a sheet that reads "Welcome to Pub Trivia @ {'{location}'}".
+                    location, then generate a sheet that reads "Welcome to Pub Trivia" and "@ {'{location}'}".
                   </p>
                 </div>
                 <div className="flex w-full flex-col gap-2 sm:w-[280px]">
