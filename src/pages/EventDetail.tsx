@@ -5,6 +5,7 @@ import jsQR from 'jsqr';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { api, formatApiError } from '../api';
 import logoLight from '../assets/trivia_ops_logo_light.png';
+import calIcon from '../assets/cal_icon.png';
 import { AppShell } from '../components/AppShell';
 import { PrimaryButton, SecondaryButton, DangerButton, ButtonLink, TextLink } from '../components/Buttons';
 import { Section } from '../components/Section';
@@ -988,6 +989,7 @@ const renderUpcomingBlock = (
   extras: {
     upcomingLines?: string[];
     locationName?: string;
+    calendarImage?: any;
   }
 ) => {
   const padding = CELL_PADDING;
@@ -997,53 +999,21 @@ const renderUpcomingBlock = (
   let cursorY = cell.y + cell.height - padding;
   const upcoming = extras.upcomingLines ?? [];
   if (upcoming.length > 0) {
-    const iconSize = 18;
+    const iconWidth = 24;
+    const iconHeight = 20;
     const iconX = cell.x + padding;
-    const iconY = cursorY - iconSize;
-    const iconStroke = rgb(0, 0, 0);
+    const iconY = cursorY - iconHeight + 1;
+    if (extras.calendarImage) {
+      page.drawImage(extras.calendarImage, {
+        x: iconX,
+        y: iconY,
+        width: iconWidth,
+        height: iconHeight
+      });
+    }
 
-    page.drawRectangle({
-      x: iconX,
-      y: iconY,
-      width: iconSize,
-      height: iconSize,
-      borderColor: iconStroke,
-      borderWidth: 1
-    });
-    page.drawRectangle({
-      x: iconX,
-      y: iconY + iconSize - 5,
-      width: iconSize,
-      height: 5,
-      color: rgb(0.88, 0.88, 0.88)
-    });
-    page.drawLine({
-      start: { x: iconX + 4, y: iconY + iconSize + 1 },
-      end: { x: iconX + 4, y: iconY + iconSize - 3 },
-      thickness: 1.4,
-      color: iconStroke
-    });
-    page.drawLine({
-      start: { x: iconX + iconSize - 4, y: iconY + iconSize + 1 },
-      end: { x: iconX + iconSize - 4, y: iconY + iconSize - 3 },
-      thickness: 1.4,
-      color: iconStroke
-    });
-    page.drawLine({
-      start: { x: iconX + iconSize - 2, y: iconY + 2 },
-      end: { x: iconX + iconSize + 9, y: iconY - 4 },
-      thickness: 1.6,
-      color: iconStroke
-    });
-    page.drawLine({
-      start: { x: iconX + iconSize + 8.2, y: iconY - 3.2 },
-      end: { x: iconX + iconSize + 9.6, y: iconY - 1.8 },
-      thickness: 1.2,
-      color: iconStroke
-    });
-
-    const headingX = iconX + iconSize + 8;
-    const headingMaxWidth = cell.width - padding * 2 - iconSize - 8;
+    const headingX = iconX + iconWidth + 8;
+    const headingMaxWidth = cell.width - padding * 2 - iconWidth - 8;
     const headingText = truncateText(fonts.bold, 'Mark Your Calendars!', headingMaxWidth, headlineSize);
     page.drawText(headingText, {
       x: headingX,
@@ -1058,11 +1028,11 @@ const renderUpcomingBlock = (
     const subtitleText = truncateText(fonts.bold, locationLabel, cell.width - padding * 2, upcomingTitleSize);
     page.drawText(subtitleText, {
       x: cell.x + padding,
-      y: cursorY - headlineSize - upcomingTitleSize - 4,
+      y: cursorY - headlineSize - upcomingTitleSize - 14,
       size: upcomingTitleSize,
       font: fonts.bold
     });
-    cursorY -= headlineSize + upcomingTitleSize + 24;
+    cursorY -= headlineSize + upcomingTitleSize + 34;
     upcoming.forEach((line) => {
       if (!line.trim()) {
         cursorY -= upcomingTextSize + 8;
@@ -1102,6 +1072,7 @@ const buildPdf = async (
   };
   let qrImage: any | null = null;
   let logoImage: any | null = null;
+  let calendarImage: any | null = null;
   if (mode === 'scoresheet' && extras?.qrDataUrl) {
     const qrBytes = dataUrlToBytes(extras.qrDataUrl);
     if (qrBytes.length > 0) {
@@ -1117,6 +1088,14 @@ const buildPdf = async (
       logoImage = await pdfDoc.embedPng(extras.logoBytes);
     } catch {
       logoImage = null;
+    }
+  }
+  if (mode === 'scoresheet') {
+    try {
+      const iconBytes = new Uint8Array(await (await fetch(calIcon)).arrayBuffer());
+      calendarImage = await pdfDoc.embedPng(iconBytes);
+    } catch {
+      calendarImage = null;
     }
   }
   const gridTop = PAGE_HEIGHT - PAGE_MARGIN - HEADER_HEIGHT;
@@ -1224,11 +1203,12 @@ const buildPdf = async (
         createPage(false);
       }
       const upcomingPage = pdfDoc.getPages()[1];
-      renderUpcomingBlock(upcomingPage, getCell(3), fonts, {
-        upcomingLines: extras?.upcomingLines,
-        locationName: extras?.locationName
-      });
-    }
+    renderUpcomingBlock(upcomingPage, getCell(3), fonts, {
+      upcomingLines: extras?.upcomingLines,
+      locationName: extras?.locationName,
+      calendarImage: calendarImage ?? undefined
+    });
+  }
   } else {
     for (let index = 0; index < rounds.length; index += 1) {
       if (index % 4 === 0) {
