@@ -56,6 +56,35 @@ const chunkArray = <T,>(items: T[], size: number) => {
   return chunks;
 };
 
+const blobToPngArrayBuffer = async (blob: Blob) => {
+  const bitmap = await createImageBitmap(blob);
+  const canvas = document.createElement('canvas');
+  canvas.width = bitmap.width;
+  canvas.height = bitmap.height;
+  const context = canvas.getContext('2d');
+  if (!context) {
+    bitmap.close();
+    throw new Error('Canvas unavailable for image conversion.');
+  }
+  context.drawImage(bitmap, 0, 0);
+  bitmap.close();
+
+  const pngBlob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (result) => {
+        if (!result) {
+          reject(new Error('Failed to convert image to PNG.'));
+          return;
+        }
+        resolve(result);
+      },
+      'image/png',
+      1
+    );
+  });
+  return pngBlob.arrayBuffer();
+};
+
 const drawImageSheetHalf = (
   page: any,
   fonts: { regular: any; bold: any },
@@ -138,6 +167,7 @@ const buildImageSheetsPdf = async (
     bold: await pdfDoc.embedFont(StandardFonts.HelveticaBold)
   };
   const embeddedImageCache = new Map<string, any>();
+  let pageCount = 0;
 
   for (const bundle of roundBundles) {
     const embeddedItems: EmbeddedImageItem[] = [];
@@ -188,6 +218,7 @@ const buildImageSheetsPdf = async (
     const chunks = chunkArray(embeddedItems, IMAGE_SHEET_ITEMS_PER_SET);
     chunks.forEach((chunk, chunkIndex) => {
       const page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
+      pageCount += 1;
       const suffix = chunks.length > 1 ? ` (Set ${chunkIndex + 1})` : '';
       const titleText = `Round ${bundle.round.round_number}: ${bundle.round.label}${suffix}`;
       drawImageSheetHalf(page, fonts, IMAGE_SHEET_HALF_HEIGHT, titleText, chunk);
@@ -206,6 +237,10 @@ const buildImageSheetsPdf = async (
         color: rgb(0.35, 0.35, 0.35)
       });
     });
+  }
+
+  if (pageCount === 0) {
+    throw new Error('No embeddable images were found for image sheets.');
   }
 
   return pdfDoc.save();
@@ -2324,9 +2359,12 @@ export function EventDetailPage() {
       const imageSheetBytes = await buildImageSheetsPdf(event, imageBundles, async (mediaKey) => {
         const response = await fetch(api.mediaUrl(mediaKey), { credentials: 'include' });
         if (!response.ok) return null;
+        const blob = await response.blob();
+        if (!blob || blob.size === 0) return null;
+        const pngBytes = await blobToPngArrayBuffer(blob);
         return {
-          bytes: await response.arrayBuffer(),
-          contentType: response.headers.get('content-type') || ''
+          bytes: pngBytes,
+          contentType: 'image/png'
         };
       });
 
