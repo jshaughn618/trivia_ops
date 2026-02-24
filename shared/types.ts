@@ -111,6 +111,8 @@ export type Event = {
   scoresheet_name: string | null;
   answersheet_key: string | null;
   answersheet_name: string | null;
+  imagesheet_key: string | null;
+  imagesheet_name: string | null;
   created_at: string;
 };
 

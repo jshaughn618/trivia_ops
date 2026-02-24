@@ -21,12 +21,23 @@ const PAGE_HEIGHT = 792;
 const PAGE_MARGIN = 36;
 const HEADER_HEIGHT = 60;
 const CELL_PADDING = 12;
+const IMAGE_SHEET_HALF_HEIGHT = PAGE_HEIGHT / 2;
+const IMAGE_SHEET_ITEMS_PER_SET = 8;
+const IMAGE_SHEET_ROW_COUNT = 2;
 
 type RoundBundle = {
   round: EventRound;
   items: EditionItem[];
 };
 type ParsedAnswerPart = { label: string; answer: string; points: number };
+type ImageRoundBundle = {
+  round: EventRound;
+  items: Array<{ ordinal: number; media_key: string }>;
+};
+type EmbeddedImageItem = {
+  ordinal: number;
+  image: any;
+};
 
 const safeFileName = (value: string, fallback: string) => {
   const trimmed = value.trim().toLowerCase();
@@ -35,6 +46,169 @@ const safeFileName = (value: string, fallback: string) => {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+/, '')
     .replace(/-+$/, '') || fallback;
+};
+
+const chunkArray = <T,>(items: T[], size: number) => {
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
+};
+
+const drawImageSheetHalf = (
+  page: any,
+  fonts: { regular: any; bold: any },
+  halfY: number,
+  roundTitleText: string,
+  items: EmbeddedImageItem[]
+) => {
+  const halfTop = halfY + IMAGE_SHEET_HALF_HEIGHT;
+  const contentX = PAGE_MARGIN;
+  const contentWidth = PAGE_WIDTH - PAGE_MARGIN * 2;
+  const titleY = halfTop - 24;
+
+  page.drawText(roundTitleText, {
+    x: contentX,
+    y: titleY,
+    size: 12,
+    font: fonts.bold,
+    color: rgb(0, 0, 0)
+  });
+
+  const columns = Math.max(1, Math.ceil(items.length / IMAGE_SHEET_ROW_COUNT));
+  const columnGap = 12;
+  const rowGap = 18;
+  const labelHeight = 20;
+  const cardWidth = (contentWidth - (columns - 1) * columnGap) / columns;
+  const maxImageHeightByRow =
+    (IMAGE_SHEET_HALF_HEIGHT - 68 - rowGap - IMAGE_SHEET_ROW_COUNT * labelHeight) / IMAGE_SHEET_ROW_COUNT;
+  const imageHeight = Math.max(60, Math.min(120, cardWidth * 0.62, maxImageHeightByRow));
+  const firstRowImageY = halfTop - 56 - imageHeight;
+  const secondRowImageY = firstRowImageY - rowGap - labelHeight - imageHeight;
+
+  items.forEach((item, index) => {
+    const rowIndex = Math.floor(index / columns);
+    const columnIndex = index % columns;
+    const x = contentX + columnIndex * (cardWidth + columnGap);
+    const imageY = rowIndex === 0 ? firstRowImageY : secondRowImageY;
+    const labelY = imageY - 12;
+
+    const widthScale = cardWidth / item.image.width;
+    const heightScale = imageHeight / item.image.height;
+    const scale = Math.min(widthScale, heightScale);
+    const drawWidth = item.image.width * scale;
+    const drawHeight = item.image.height * scale;
+    const drawX = x + (cardWidth - drawWidth) / 2;
+    const drawY = imageY + (imageHeight - drawHeight) / 2;
+
+    page.drawImage(item.image, {
+      x: drawX,
+      y: drawY,
+      width: drawWidth,
+      height: drawHeight
+    });
+
+    const numberText = `${item.ordinal}.`;
+    page.drawText(numberText, {
+      x,
+      y: labelY,
+      size: 10,
+      font: fonts.bold,
+      color: rgb(0, 0, 0)
+    });
+    const numberWidth = fonts.bold.widthOfTextAtSize(numberText, 10);
+    page.drawLine({
+      start: { x: x + numberWidth + 6, y: labelY + 2 },
+      end: { x: x + cardWidth, y: labelY + 2 },
+      thickness: 0.8,
+      color: rgb(0.35, 0.35, 0.35)
+    });
+  });
+};
+
+const buildImageSheetsPdf = async (
+  event: Event,
+  roundBundles: ImageRoundBundle[],
+  fetchImageBytes: (key: string) => Promise<{ bytes: ArrayBuffer; contentType: string } | null>
+) => {
+  const pdfDoc = await PDFDocument.create();
+  const fonts = {
+    regular: await pdfDoc.embedFont(StandardFonts.Helvetica),
+    bold: await pdfDoc.embedFont(StandardFonts.HelveticaBold)
+  };
+  const embeddedImageCache = new Map<string, any>();
+
+  for (const bundle of roundBundles) {
+    const embeddedItems: EmbeddedImageItem[] = [];
+    for (const item of bundle.items) {
+      let embeddedImage = embeddedImageCache.get(item.media_key);
+      if (!embeddedImage) {
+        const imageFile = await fetchImageBytes(item.media_key);
+        if (!imageFile) continue;
+        const lowerContentType = imageFile.contentType.toLowerCase();
+        const lowerKey = item.media_key.toLowerCase();
+        if (lowerContentType.includes('png') || lowerKey.endsWith('.png')) {
+          try {
+            embeddedImage = await pdfDoc.embedPng(imageFile.bytes);
+          } catch {
+            embeddedImage = null;
+          }
+        } else if (
+          lowerContentType.includes('jpeg') ||
+          lowerContentType.includes('jpg') ||
+          lowerKey.endsWith('.jpg') ||
+          lowerKey.endsWith('.jpeg')
+        ) {
+          try {
+            embeddedImage = await pdfDoc.embedJpg(imageFile.bytes);
+          } catch {
+            embeddedImage = null;
+          }
+        } else {
+          try {
+            embeddedImage = await pdfDoc.embedPng(imageFile.bytes);
+          } catch {
+            try {
+              embeddedImage = await pdfDoc.embedJpg(imageFile.bytes);
+            } catch {
+              embeddedImage = null;
+            }
+          }
+        }
+        if (embeddedImage) {
+          embeddedImageCache.set(item.media_key, embeddedImage);
+        }
+      }
+      if (!embeddedImage) continue;
+      embeddedItems.push({ ordinal: item.ordinal, image: embeddedImage });
+    }
+    if (embeddedItems.length === 0) continue;
+
+    const chunks = chunkArray(embeddedItems, IMAGE_SHEET_ITEMS_PER_SET);
+    chunks.forEach((chunk, chunkIndex) => {
+      const page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
+      const suffix = chunks.length > 1 ? ` (Set ${chunkIndex + 1})` : '';
+      const titleText = `Round ${bundle.round.round_number}: ${bundle.round.label}${suffix}`;
+      drawImageSheetHalf(page, fonts, IMAGE_SHEET_HALF_HEIGHT, titleText, chunk);
+      drawImageSheetHalf(page, fonts, 0, titleText, chunk);
+      page.drawLine({
+        start: { x: PAGE_MARGIN, y: IMAGE_SHEET_HALF_HEIGHT },
+        end: { x: PAGE_WIDTH - PAGE_MARGIN, y: IMAGE_SHEET_HALF_HEIGHT },
+        thickness: 0.8,
+        color: rgb(0.75, 0.75, 0.75)
+      });
+      page.drawText(event.title, {
+        x: PAGE_MARGIN,
+        y: PAGE_HEIGHT - 16,
+        size: 8,
+        font: fonts.regular,
+        color: rgb(0.35, 0.35, 0.35)
+      });
+    });
+  }
+
+  return pdfDoc.save();
 };
 
 const formatEditionCode = (gameCode?: string | null, editionNumber?: number | null) => {
@@ -1035,9 +1209,13 @@ export function EventDetailPage() {
   const [scoresheetError, setScoresheetError] = useState<string | null>(null);
   const [answersheetUploading, setAnswersheetUploading] = useState(false);
   const [answersheetError, setAnswersheetError] = useState<string | null>(null);
+  const [imagesheetUploading, setImagesheetUploading] = useState(false);
+  const [imagesheetError, setImagesheetError] = useState<string | null>(null);
   const [scoresheetGenerating, setScoresheetGenerating] = useState(false);
   const [scoresheetGenerateError, setScoresheetGenerateError] = useState<string | null>(null);
-  const [openDocumentMenu, setOpenDocumentMenu] = useState<'scoresheet' | 'answersheet' | null>(null);
+  const [imagesheetGenerating, setImagesheetGenerating] = useState(false);
+  const [imagesheetGenerateError, setImagesheetGenerateError] = useState<string | null>(null);
+  const [openDocumentMenu, setOpenDocumentMenu] = useState<'scoresheet' | 'answersheet' | 'imagesheet' | null>(null);
   const [showQr, setShowQr] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
   const [editingTitle, setEditingTitle] = useState(false);
@@ -1051,6 +1229,7 @@ export function EventDetailPage() {
   const [settingsSaveError, setSettingsSaveError] = useState<string | null>(null);
   const scoresheetInputId = useId();
   const answersheetInputId = useId();
+  const imagesheetInputId = useId();
   const documentMenuRef = useRef<HTMLDivElement | null>(null);
   const scoreScanVideoRef = useRef<HTMLVideoElement | null>(null);
   const scoreScanStreamRef = useRef<MediaStream | null>(null);
@@ -1944,10 +2123,16 @@ export function EventDetailPage() {
     return teams.find((team) => team.id === scoreScanTeamId) ?? null;
   }, [teams, scoreScanTeamId]);
 
-  const uploadDocument = async (type: 'scoresheet' | 'answersheet', file: File) => {
+  const uploadDocument = async (type: 'scoresheet' | 'answersheet' | 'imagesheet', file: File) => {
     if (!eventId) return;
-    const setUploading = type === 'scoresheet' ? setScoresheetUploading : setAnswersheetUploading;
-    const setError = type === 'scoresheet' ? setScoresheetError : setAnswersheetError;
+    const setUploading =
+      type === 'scoresheet'
+        ? setScoresheetUploading
+        : type === 'answersheet'
+          ? setAnswersheetUploading
+          : setImagesheetUploading;
+    const setError =
+      type === 'scoresheet' ? setScoresheetError : type === 'answersheet' ? setAnswersheetError : setImagesheetError;
     setUploading(true);
     setError(null);
 
@@ -1966,10 +2151,16 @@ export function EventDetailPage() {
     setUploading(false);
   };
 
-  const removeDocument = async (type: 'scoresheet' | 'answersheet') => {
+  const removeDocument = async (type: 'scoresheet' | 'answersheet' | 'imagesheet') => {
     if (!eventId) return;
-    const setUploading = type === 'scoresheet' ? setScoresheetUploading : setAnswersheetUploading;
-    const setError = type === 'scoresheet' ? setScoresheetError : setAnswersheetError;
+    const setUploading =
+      type === 'scoresheet'
+        ? setScoresheetUploading
+        : type === 'answersheet'
+          ? setAnswersheetUploading
+          : setImagesheetUploading;
+    const setError =
+      type === 'scoresheet' ? setScoresheetError : type === 'answersheet' ? setAnswersheetError : setImagesheetError;
     setUploading(true);
     setError(null);
     const res = await api.deleteEventDocument(eventId, type);
@@ -2102,6 +2293,58 @@ export function EventDetailPage() {
       setScoresheetGenerateError(message);
     } finally {
       setScoresheetGenerating(false);
+    }
+  };
+
+  const generateImageSheets = async () => {
+    if (!eventId || !event) return;
+    setImagesheetGenerating(true);
+    setImagesheetGenerateError(null);
+    try {
+      const itemResponses = await Promise.all(rounds.map((round) => api.listEventRoundItems(round.id)));
+      const imageBundles: ImageRoundBundle[] = [];
+      for (let index = 0; index < rounds.length; index += 1) {
+        const response = itemResponses[index];
+        if (!response.ok) {
+          throw new Error(response.error.message ?? `Failed to load items for round ${rounds[index].round_number}.`);
+        }
+        const imageItems = response.data
+          .filter((item) => item.media_type === 'image' && Boolean(item.media_key))
+          .sort((a, b) => a.ordinal - b.ordinal)
+          .map((item) => ({ ordinal: item.ordinal, media_key: item.media_key as string }));
+        if (imageItems.length > 0) {
+          imageBundles.push({ round: rounds[index], items: imageItems });
+        }
+      }
+
+      if (imageBundles.length === 0) {
+        throw new Error('No image rounds found for this event.');
+      }
+
+      const imageSheetBytes = await buildImageSheetsPdf(event, imageBundles, async (mediaKey) => {
+        const response = await fetch(api.mediaUrl(mediaKey), { credentials: 'include' });
+        if (!response.ok) return null;
+        return {
+          bytes: await response.arrayBuffer(),
+          contentType: response.headers.get('content-type') || ''
+        };
+      });
+
+      const baseName = safeFileName(event.title, `event-${event.id.slice(0, 8)}`);
+      const imagesheetFile = new File([imageSheetBytes], `${baseName}-imagesheet.pdf`, {
+        type: 'application/pdf'
+      });
+
+      const imagesheetRes = await api.uploadEventDocument(eventId, 'imagesheet', imagesheetFile);
+      if (!imagesheetRes.ok) {
+        throw new Error(imagesheetRes.error.message ?? 'Failed to upload image sheet.');
+      }
+      setEvent(imagesheetRes.data);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to generate image sheets.';
+      setImagesheetGenerateError(message);
+    } finally {
+      setImagesheetGenerating(false);
     }
   };
 
@@ -2759,7 +3002,11 @@ export function EventDetailPage() {
         <SecondaryButton onClick={generateScoresheets} disabled={scoresheetGenerating}>
           {scoresheetGenerating ? 'Generating…' : 'Generate scoresheets'}
         </SecondaryButton>
+        <SecondaryButton onClick={generateImageSheets} disabled={imagesheetGenerating}>
+          {imagesheetGenerating ? 'Generating…' : 'Generate image sheets'}
+        </SecondaryButton>
         {scoresheetGenerateError && <div className="text-xs text-danger-ink">{scoresheetGenerateError}</div>}
+        {imagesheetGenerateError && <div className="text-xs text-danger-ink">{imagesheetGenerateError}</div>}
       </div>
       <List>
         <ListRow className="flex-col items-start gap-3 sm:flex-row sm:items-center">
@@ -2908,6 +3155,79 @@ export function EventDetailPage() {
           </div>
         </ListRow>
         {answersheetError && <div className="px-4 py-2 text-xs text-danger-ink">{answersheetError}</div>}
+        <ListRow className="flex-col items-start gap-3 sm:flex-row sm:items-center">
+          <div className="flex-1">
+            <div className="text-sm font-display tracking-[0.12em]">Image sheet</div>
+            <div className="mt-1 text-xs text-muted">
+              {event.imagesheet_key ? event.imagesheet_name ?? 'imagesheet.pdf' : 'Not generated yet'}
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              id={imagesheetInputId}
+              type="file"
+              accept="application/pdf"
+              className="sr-only"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                event.target.value = '';
+                if (file) uploadDocument('imagesheet', file);
+              }}
+              disabled={imagesheetUploading}
+            />
+            <div className="relative">
+              <button
+                type="button"
+                className={documentMenuButtonClass}
+                aria-haspopup="menu"
+                aria-expanded={openDocumentMenu === 'imagesheet'}
+                onClick={() =>
+                  setOpenDocumentMenu((current) => (current === 'imagesheet' ? null : 'imagesheet'))
+                }
+              >
+                Actions
+                <span aria-hidden>▾</span>
+              </button>
+              {openDocumentMenu === 'imagesheet' && (
+                <div className="surface-card absolute right-0 z-10 mt-2 w-40 p-1" role="menu">
+                  {event.imagesheet_key && (
+                    <a
+                      href={api.mediaUrl(event.imagesheet_key)}
+                      download={event.imagesheet_name ?? 'imagesheet.pdf'}
+                      className={documentMenuItemClass}
+                      role="menuitem"
+                      onClick={() => setOpenDocumentMenu(null)}
+                    >
+                      Download
+                    </a>
+                  )}
+                  <label
+                    htmlFor={imagesheetInputId}
+                    className={`${documentMenuItemClass} cursor-pointer`}
+                    role="menuitem"
+                    onClick={() => setOpenDocumentMenu(null)}
+                  >
+                    Replace
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOpenDocumentMenu(null);
+                      removeDocument('imagesheet');
+                    }}
+                    className={`${documentMenuItemClass} text-danger-ink`}
+                    disabled={!event.imagesheet_key || imagesheetUploading}
+                    role="menuitem"
+                  >
+                    Remove
+                  </button>
+                </div>
+              )}
+            </div>
+            {imagesheetUploading && <span className="text-xs text-muted">Uploading…</span>}
+          </div>
+        </ListRow>
+        {imagesheetError && <div className="px-4 py-2 text-xs text-danger-ink">{imagesheetError}</div>}
       </List>
       {event.public_code && (
         <div className="border-t border-border pt-4">

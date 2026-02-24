@@ -51,7 +51,9 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
          scoresheet_key = ?,
          scoresheet_name = ?,
          answersheet_key = ?,
-         answersheet_name = ?
+         answersheet_name = ?,
+         imagesheet_key = ?,
+         imagesheet_name = ?
      WHERE id = ?`,
     [
       merged.title,
@@ -66,6 +68,8 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
       merged.scoresheet_name ?? null,
       merged.answersheet_key ?? null,
       merged.answersheet_name ?? null,
+      merged.imagesheet_key ?? null,
+      merged.imagesheet_name ?? null,
       params.id
     ]
   );

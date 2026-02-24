@@ -290,7 +290,7 @@ export const api = {
   updateEvent: (id: string, payload: EventMutationPayload) =>
     apiFetch<Event>(`/api/events/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
   deleteEvent: (id: string) => apiFetch<{ ok: true }>(`/api/events/${id}`, { method: 'DELETE' }),
-  uploadEventDocument: async (eventId: string, type: 'scoresheet' | 'answersheet', file: File) => {
+  uploadEventDocument: async (eventId: string, type: 'scoresheet' | 'answersheet' | 'imagesheet', file: File) => {
     const requestId = createRequestId();
     const start = performance.now();
     const csrfToken = getCsrfToken();
@@ -322,7 +322,7 @@ export const api = {
     }
     return json as ApiEnvelope<Event>;
   },
-  deleteEventDocument: (eventId: string, type: 'scoresheet' | 'answersheet') =>
+  deleteEventDocument: (eventId: string, type: 'scoresheet' | 'answersheet' | 'imagesheet') =>
     apiFetch<Event>(`/api/events/${eventId}/documents?type=${type}`, { method: 'DELETE' }),
 
   getEventBootstrap: (eventId: string) => apiFetch<EventBootstrap>(`/api/events/${eventId}/bootstrap`),

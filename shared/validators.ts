@@ -179,7 +179,9 @@ export const eventUpdateSchema = z.object({
   scoresheet_key: z.string().nullable().optional(),
   scoresheet_name: z.string().nullable().optional(),
   answersheet_key: z.string().nullable().optional(),
-  answersheet_name: z.string().nullable().optional()
+  answersheet_name: z.string().nullable().optional(),
+  imagesheet_key: z.string().nullable().optional(),
+  imagesheet_name: z.string().nullable().optional()
 });
 
 export const eventRoundCreateSchema = z.object({

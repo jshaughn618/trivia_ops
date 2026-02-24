@@ -5,16 +5,16 @@ import { logInfo, logWarn } from '../../../_lib/log';
 import { MAX_PDF_BYTES, sniffPdf } from '../../../documents';
 import { requireAdmin } from '../../../access';
 
-const DOC_TYPES = new Set(['scoresheet', 'answersheet']);
+const DOC_TYPES = new Set(['scoresheet', 'answersheet', 'imagesheet']);
 
-type DocType = 'scoresheet' | 'answersheet';
+type DocType = 'scoresheet' | 'answersheet' | 'imagesheet';
 
 function getDocType(request: Request): DocType | null {
   const url = new URL(request.url);
   const fromQuery = url.searchParams.get('type');
   const fromHeader = request.headers.get('x-doc-type');
   const raw = (fromHeader || fromQuery || '').toLowerCase();
-  if (raw === 'scoresheet' || raw === 'answersheet') return raw;
+  if (raw === 'scoresheet' || raw === 'answersheet' || raw === 'imagesheet') return raw;
   return null;
 }
 
@@ -30,7 +30,10 @@ function columnFor(type: DocType) {
   if (type === 'scoresheet') {
     return { keyColumn: 'scoresheet_key', nameColumn: 'scoresheet_name' };
   }
-  return { keyColumn: 'answersheet_key', nameColumn: 'answersheet_name' };
+  if (type === 'answersheet') {
+    return { keyColumn: 'answersheet_key', nameColumn: 'answersheet_name' };
+  }
+  return { keyColumn: 'imagesheet_key', nameColumn: 'imagesheet_name' };
 }
 
 export const onRequestPost: PagesFunction<Env> = async ({ env, params, request, data }) => {
