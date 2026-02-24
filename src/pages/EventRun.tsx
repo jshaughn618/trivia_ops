@@ -66,9 +66,11 @@ export function EventRunPage() {
   const [audioError, setAudioError] = useState<string | null>(null);
   const [audioRequestId, setAudioRequestId] = useState<string | null>(null);
   const [audioRetryToken, setAudioRetryToken] = useState(0);
+  const [audioRetryAttempt, setAudioRetryAttempt] = useState(0);
   const [localAudioPlaying, setLocalAudioPlaying] = useState(false);
   const [audioStoppedByTeamNotice, setAudioStoppedByTeamNotice] = useState<string | null>(null);
   const remoteAudioPlayingSeenRef = useRef(false);
+  const lastAudioKeyRef = useRef<string | null>(null);
   const [waitingMessage, setWaitingMessage] = useState('');
   const [waitingShowLeaderboard, setWaitingShowLeaderboard] = useState(false);
   const [waitingShowNextRound, setWaitingShowNextRound] = useState(true);
@@ -492,6 +494,11 @@ export function EventRunPage() {
   }, [activeRound?.id, activeRound?.timer_seconds]);
 
   useEffect(() => {
+    const nextAudioKey = isAudioItem && effectiveAudioKey ? effectiveAudioKey : null;
+    if (lastAudioKeyRef.current !== nextAudioKey) {
+      lastAudioKeyRef.current = nextAudioKey;
+      setAudioRetryAttempt(0);
+    }
     setAudioError(null);
     setAudioRequestId(null);
     remoteAudioPlayingSeenRef.current = false;
@@ -572,6 +579,16 @@ export function EventRunPage() {
 
   const handleAudioError = () => {
     const error = audioRef.current?.error;
+    if (error?.code === MediaError.MEDIA_ERR_ABORTED) {
+      logInfo('audio_error_ignored', {
+        reason: 'aborted',
+        itemId: item?.id ?? null,
+        roundId: activeRound?.id ?? null,
+        mediaKey: effectiveAudioKey ?? null,
+        requestId: audioRequestId
+      });
+      return;
+    }
     logError('audio_error', {
       itemId: item?.id ?? null,
       roundId: activeRound?.id ?? null,
@@ -581,6 +598,13 @@ export function EventRunPage() {
       errorCode: error?.code ?? null,
       errorMessage: error?.message ?? null
     });
+    if (effectiveAudioKey && audioRetryAttempt < 1) {
+      setAudioRetryAttempt((prev) => prev + 1);
+      setAudioError(null);
+      setAudioLoading(true);
+      setAudioRetryToken((prev) => prev + 1);
+      return;
+    }
     setAudioLoading(false);
     setAudioError('Audio unavailable.');
     setLocalAudioPlaying(false);
@@ -589,6 +613,8 @@ export function EventRunPage() {
 
   const handleAudioReady = (event: string) => {
     setAudioLoading(false);
+    setAudioError(null);
+    setAudioRetryAttempt(0);
     handleAudioEvent(event);
   };
 

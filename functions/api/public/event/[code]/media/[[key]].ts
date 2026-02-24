@@ -5,7 +5,8 @@ import { queryFirst } from '../../../../../db';
 import { logError, logInfo, logWarn } from '../../../../../_lib/log';
 
 export const onRequestGet: PagesFunction<Env> = async ({ env, params, request, data }) => {
-  const requestId = data.requestId ?? request.headers.get('x-request-id') ?? 'unknown';
+  const requestUrl = new URL(request.url);
+  const requestId = requestUrl.searchParams.get('request_id') ?? data.requestId ?? request.headers.get('x-request-id') ?? 'unknown';
   const raw = params.key;
   const key = Array.isArray(raw) ? raw.join('/') : raw;
   if (!key) {
@@ -139,48 +140,41 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params, request, d
     headers.set('Cache-Control', 'private, max-age=60');
 
     if (rangeHeader) {
-      const match = /^bytes=(\d*)-(\d*)$/i.exec(rangeHeader);
-      if (!match) {
-        return jsonError({ code: 'invalid_request', message: 'Invalid range header' }, 416);
-      }
-      const startRaw = match[1];
-      const endRaw = match[2];
-      let start = startRaw ? Number(startRaw) : NaN;
-      let end = endRaw ? Number(endRaw) : NaN;
-
-      if (Number.isNaN(start) && !Number.isNaN(end)) {
-        const suffixLength = end;
-        start = Math.max(totalSize - suffixLength, 0);
-        end = totalSize - 1;
-      } else if (!Number.isNaN(start) && Number.isNaN(end)) {
-        end = totalSize - 1;
-      }
-
-      if (Number.isNaN(start) || Number.isNaN(end) || start > end || start >= totalSize) {
+      const parsedRange = parseByteRange(rangeHeader, totalSize);
+      if (parsedRange.kind === 'invalid') {
+        logWarn(env, 'public_media_invalid_range_header', {
+          requestId,
+          key,
+          range: rangeHeader.slice(0, 128)
+        });
+      } else if (parsedRange.kind === 'unsatisfiable') {
         headers.set('Content-Range', `bytes */${totalSize}`);
         return new Response(null, { status: 416, headers });
+      } else {
+        const { start, end } = parsedRange;
+        const length = end - start + 1;
+        const getStart = performance.now();
+        const object = await env.BUCKET.get(key, { range: { offset: start, length } });
+        const getDurationMs = Math.round(performance.now() - getStart);
+        if (!object) {
+          logWarn(env, 'public_media_not_found', { requestId, key, durationMs: getDurationMs });
+          return jsonError({ code: 'not_found', message: 'Media not found' }, 404);
+        }
+        logInfo(env, 'public_r2_get', {
+          requestId,
+          key,
+          offset: start,
+          length,
+          durationMs: getDurationMs
+        });
+        status = 206;
+        headers.set('Content-Length', String(length));
+        headers.set('Content-Range', `bytes ${start}-${end}/${totalSize}`);
+        body = object.body;
       }
+    }
 
-      const length = end - start + 1;
-      const getStart = performance.now();
-      const object = await env.BUCKET.get(key, { range: { offset: start, length } });
-      const getDurationMs = Math.round(performance.now() - getStart);
-      if (!object) {
-        logWarn(env, 'public_media_not_found', { requestId, key, durationMs: getDurationMs });
-        return jsonError({ code: 'not_found', message: 'Media not found' }, 404);
-      }
-      logInfo(env, 'public_r2_get', {
-        requestId,
-        key,
-        offset: start,
-        length,
-        durationMs: getDurationMs
-      });
-      status = 206;
-      headers.set('Content-Length', String(length));
-      headers.set('Content-Range', `bytes ${start}-${end}/${totalSize}`);
-      body = object.body;
-    } else {
+    if (!body) {
       const getStart = performance.now();
       const object = await env.BUCKET.get(key);
       const getDurationMs = Math.round(performance.now() - getStart);
@@ -211,3 +205,36 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params, request, d
     return jsonError({ code: 'server_error', message: 'Media fetch failed' }, 500);
   }
 };
+
+type ParsedByteRange =
+  | { kind: 'ok'; start: number; end: number }
+  | { kind: 'invalid' }
+  | { kind: 'unsatisfiable' };
+
+function parseByteRange(rangeHeader: string, totalSize: number): ParsedByteRange {
+  if (totalSize <= 0) return { kind: 'unsatisfiable' };
+  const normalized = rangeHeader.trim();
+  if (!normalized.toLowerCase().startsWith('bytes=')) return { kind: 'invalid' };
+  const firstRange = normalized.slice(6).split(',')[0]?.trim() ?? '';
+  const match = /^(\d*)-(\d*)$/.exec(firstRange);
+  if (!match) return { kind: 'invalid' };
+  const startRaw = match[1];
+  const endRaw = match[2];
+  if (!startRaw && !endRaw) return { kind: 'invalid' };
+
+  let start = startRaw ? Number(startRaw) : NaN;
+  let end = endRaw ? Number(endRaw) : NaN;
+
+  if (Number.isNaN(start) && !Number.isNaN(end)) {
+    if (end <= 0) return { kind: 'invalid' };
+    const suffixLength = end;
+    start = Math.max(totalSize - suffixLength, 0);
+    end = totalSize - 1;
+  } else if (!Number.isNaN(start) && Number.isNaN(end)) {
+    end = totalSize - 1;
+  }
+
+  if (Number.isNaN(start) || Number.isNaN(end)) return { kind: 'invalid' };
+  if (start > end || start < 0 || end < 0 || start >= totalSize) return { kind: 'unsatisfiable' };
+  return { kind: 'ok', start, end };
+}

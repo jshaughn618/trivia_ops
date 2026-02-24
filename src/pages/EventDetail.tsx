@@ -365,8 +365,11 @@ const resolveScoresheetAnswerColumns = (items: EditionItem[]) => {
 const resolveInlineResponseLabel = (item: EditionItem) => {
   if (item.media_type === 'audio') return null;
   const labels = deriveAnswerTypeLabels(item);
-  if (labels.length === 1) return `${labels[0].label} (${formatPointsLabel(labels[0].points)})`;
-  return null;
+  if (labels.length !== 1) return null;
+  const label = labels[0].label.trim();
+  if (!label) return null;
+  if (/^answer(?:\s+[ab])?$/i.test(label)) return null;
+  return `${label} (${formatPointsLabel(labels[0].points)})`;
 };
 
 const formatAnswer = (item: EditionItem) => {
@@ -737,6 +740,13 @@ const renderRoundBlock = (
     const inlineLabel = mode === 'scoresheet' ? resolveInlineResponseLabel(item) : null;
     if (mode === 'scoresheet') {
       if (inlineLabel) {
+        numberedRow += 1;
+        page.drawText(`${numberedRow}.`, {
+          x: contentX,
+          y: rowY,
+          size: numberSize,
+          font: fonts.regular
+        });
         const labelText = `${inlineLabel}:`;
         page.drawText(labelText, {
           x: textStartX,
