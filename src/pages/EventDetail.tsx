@@ -979,6 +979,7 @@ export function EventDetailPage() {
   const [hosts, setHosts] = useState<User[]>([]);
   const [status, setStatus] = useState('planned');
   const [eventType, setEventType] = useState<'Pub Trivia' | 'Music Trivia'>('Pub Trivia');
+  const [allowParticipantWebSubmissions, setAllowParticipantWebSubmissions] = useState(false);
   const [notes, setNotes] = useState('');
   const [locationId, setLocationId] = useState('');
   const [hostUserId, setHostUserId] = useState('');
@@ -1067,6 +1068,7 @@ export function EventDetailPage() {
       setEvent(eventRes.data);
       setStatus(eventRes.data.status);
       setEventType(eventRes.data.event_type ?? 'Pub Trivia');
+      setAllowParticipantWebSubmissions(Boolean(eventRes.data.allow_participant_web_submissions ?? 0));
       setNotes(eventRes.data.notes ?? '');
       setLocationId(eventRes.data.location_id ?? '');
       setHostUserId(eventRes.data.host_user_id ?? '');
@@ -1083,6 +1085,7 @@ export function EventDetailPage() {
     setEvent(res.data.event);
     setStatus(res.data.event.status);
     setEventType(res.data.event.event_type ?? 'Pub Trivia');
+    setAllowParticipantWebSubmissions(Boolean(res.data.event.allow_participant_web_submissions ?? 0));
     setNotes(res.data.event.notes ?? '');
     setLocationId(res.data.event.location_id ?? '');
     setHostUserId(res.data.event.host_user_id ?? '');
@@ -1172,12 +1175,13 @@ export function EventDetailPage() {
     () => ({
       status,
       event_type: eventType,
+      allow_participant_web_submissions: allowParticipantWebSubmissions,
       notes,
       starts_at: parsedStartsAt.iso || event?.starts_at || '',
       location_id: locationId || null,
       host_user_id: hostUserId || null
     }),
-    [status, eventType, notes, parsedStartsAt.iso, locationId, hostUserId, event?.starts_at]
+    [status, eventType, allowParticipantWebSubmissions, notes, parsedStartsAt.iso, locationId, hostUserId, event?.starts_at]
   );
 
   const eventSettingsSaved = useMemo(
@@ -1186,6 +1190,7 @@ export function EventDetailPage() {
         ? {
             status: event.status,
             event_type: event.event_type ?? 'Pub Trivia',
+            allow_participant_web_submissions: Boolean(event.allow_participant_web_submissions ?? 0),
             notes: event.notes ?? '',
             starts_at: event.starts_at,
             location_id: event.location_id ?? null,
@@ -3017,6 +3022,14 @@ export function EventDetailPage() {
             <option value="Music Trivia">Music Trivia</option>
           </select>
         </label>
+        <label className="flex items-center gap-2 text-sm text-muted">
+          <input
+            type="checkbox"
+            checked={allowParticipantWebSubmissions}
+            onChange={(event) => setAllowParticipantWebSubmissions(event.target.checked)}
+          />
+          Allow submissions via web app
+        </label>
         <label className="flex min-w-0 flex-col gap-2 text-sm text-muted">
           <span>Notes</span>
           <textarea
@@ -3130,6 +3143,9 @@ export function EventDetailPage() {
               )}
             </div>
             <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-end">
+              <ButtonLink to={`/events/${event.id}/submissions`} variant="outline" className="w-full sm:w-auto">
+                Submissions
+              </ButtonLink>
               <ButtonLink to={`/events/${event.id}/leaderboard`} variant="outline" className="w-full sm:w-auto">
                 Leaderboard
               </ButtonLink>

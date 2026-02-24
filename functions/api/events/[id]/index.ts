@@ -31,6 +31,12 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
   }
 
   const merged = { ...existing, ...parsed.data };
+  const allowParticipantWebSubmissions =
+    parsed.data.allow_participant_web_submissions === undefined
+      ? Number(existing.allow_participant_web_submissions ?? 0)
+      : parsed.data.allow_participant_web_submissions
+        ? 1
+        : 0;
   await execute(
     env,
     `UPDATE events
@@ -38,6 +44,7 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
          starts_at = ?,
          location_id = ?,
          host_user_id = ?,
+         allow_participant_web_submissions = ?,
          status = ?,
          event_type = ?,
          notes = ?,
@@ -51,6 +58,7 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
       merged.starts_at,
       merged.location_id ?? null,
       merged.host_user_id ?? null,
+      allowParticipantWebSubmissions,
       merged.status,
       merged.event_type ?? 'Pub Trivia',
       merged.notes ?? null,

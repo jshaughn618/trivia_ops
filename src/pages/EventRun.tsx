@@ -15,6 +15,12 @@ function useQuery() {
 }
 
 type AnswerPart = { label: string; answer: string };
+type EventRoundResponseRow = {
+  team_id: string;
+  team_name: string;
+  submitted_at: string | null;
+  response_parts: Array<{ label: string; answer: string }> | null;
+};
 
 const parseAnswerParts = (value?: string | null): AnswerPart[] => {
   if (!value) return [];
@@ -85,6 +91,10 @@ export function EventRunPage() {
   const [audioSubmissionsLoading, setAudioSubmissionsLoading] = useState(false);
   const [audioSubmissionsError, setAudioSubmissionsError] = useState<string | null>(null);
   const [audioMarkingItemId, setAudioMarkingItemId] = useState<string | null>(null);
+  const [roundResponseLabels, setRoundResponseLabels] = useState<string[]>([]);
+  const [roundResponseRows, setRoundResponseRows] = useState<EventRoundResponseRow[]>([]);
+  const [roundResponsesLoading, setRoundResponsesLoading] = useState(false);
+  const [roundResponsesError, setRoundResponsesError] = useState<string | null>(null);
   const preselectRef = useRef(false);
   const auth = useAuth();
   const isAdmin = auth.user?.user_type === 'admin';
@@ -254,6 +264,66 @@ export function EventRunPage() {
       : isSpeedRoundMode
         ? speedRoundPrompt
         : item?.prompt ?? '';
+  const participantWebSubmissionsEnabled = Boolean(event?.allow_participant_web_submissions ?? 0);
+  const isDedicatedAudioStopFlowItem = Boolean(
+    activeGame?.allow_participant_audio_stop && (isSpeedRoundMode || isAudioItem)
+  );
+  const hasTextResponseWorkflow = Boolean(
+    participantWebSubmissionsEnabled &&
+    item &&
+    item.question_type !== 'multiple_choice' &&
+    !isDedicatedAudioStopFlowItem
+  );
+
+  const loadRoundResponses = useCallback(
+    async (selectedRoundId: string, selectedItemId: string, silent = false) => {
+      if (!selectedRoundId || !selectedItemId) {
+        setRoundResponseLabels([]);
+        setRoundResponseRows([]);
+        setRoundResponsesLoading(false);
+        setRoundResponsesError(null);
+        return;
+      }
+      if (!silent) setRoundResponsesLoading(true);
+      const res = await api.listEventRoundResponses(selectedRoundId, selectedItemId);
+      if (res.ok) {
+        setRoundResponseLabels(res.data.labels ?? []);
+        setRoundResponseRows(res.data.rows ?? []);
+        if (!silent) setRoundResponsesError(null);
+      } else if (!silent) {
+        setRoundResponsesError(formatApiError(res, 'Failed to load participant submissions.'));
+      }
+      if (!silent) setRoundResponsesLoading(false);
+    },
+    []
+  );
+
+  useEffect(() => {
+    if (!activeRound?.id || !item?.id || !hasTextResponseWorkflow) {
+      setRoundResponseLabels([]);
+      setRoundResponseRows([]);
+      setRoundResponsesLoading(false);
+      setRoundResponsesError(null);
+      return;
+    }
+    void loadRoundResponses(activeRound.id, item.id);
+  }, [activeRound?.id, item?.id, hasTextResponseWorkflow, loadRoundResponses]);
+
+  useEffect(() => {
+    if (!activeRound?.id || activeRound.status !== 'live' || !item?.id || !hasTextResponseWorkflow) return;
+    let closed = false;
+    const tick = async () => {
+      if (closed) return;
+      await loadRoundResponses(activeRound.id, item.id, true);
+    };
+    const timer = window.setInterval(() => {
+      void tick();
+    }, 2000);
+    return () => {
+      closed = true;
+      window.clearInterval(timer);
+    };
+  }, [activeRound?.id, activeRound?.status, item?.id, hasTextResponseWorkflow, loadRoundResponses]);
 
   const loadAudioSubmissions = useCallback(
     async (selectedRoundId: string, silent = false) => {
@@ -773,15 +843,19 @@ export function EventRunPage() {
   const timerExpired = Boolean(timerStartedAt) && timerRemainingSeconds === 0;
 
   const clearRoundResponses = async () => {
-    if (!activeRound) return;
-    const confirmed = window.confirm('Clear all multiple-choice responses for this round?');
+    if (!activeRound || !item) return;
+    const confirmed = window.confirm(
+      item.question_type === 'multiple_choice'
+        ? 'Clear all multiple-choice responses for this item?'
+        : 'Clear all participant web submissions for this item?'
+    );
     if (!confirmed) return;
     setClearResponsesStatus('clearing');
     setClearResponsesMessage(null);
-    const res = await api.clearRoundResponses(activeRound.id);
+    const res = await api.clearRoundResponses(activeRound.id, item.id);
     if (res.ok) {
       setClearResponsesStatus('done');
-      setClearResponsesMessage('Responses cleared.');
+      setClearResponsesMessage(item.question_type === 'multiple_choice' ? 'Responses cleared.' : 'Submissions cleared.');
     } else {
       setClearResponsesStatus('error');
       setClearResponsesMessage(formatApiError(res, 'Failed to clear responses.'));
@@ -862,7 +936,7 @@ export function EventRunPage() {
     if (isImageItem) return;
     const duration = activeRound.timer_seconds ?? timerDurationSeconds ?? 15;
     const startedAt = new Date().toISOString();
-    if (item?.question_type === 'multiple_choice') {
+    if (item?.question_type === 'multiple_choice' || hasTextResponseWorkflow) {
       await api.clearRoundResponses(activeRound.id, item.id);
     }
     setTimerStartedAt(startedAt);
@@ -1073,6 +1147,57 @@ export function EventRunPage() {
                   )}
                 </div>
               )}
+              {item && hasTextResponseWorkflow && (
+                <div className="surface-inset p-5">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="ui-label">Participant Submissions</div>
+                    {roundResponsesLoading && <div className="text-xs text-muted">Refreshing…</div>}
+                  </div>
+                  {roundResponseRows.length === 0 ? (
+                    <div className="mt-2 text-sm text-muted">No teams available for this event.</div>
+                  ) : (
+                    <div className="mt-3 overflow-x-auto">
+                      <table className="min-w-full divide-y divide-border text-sm">
+                        <thead>
+                          <tr className="text-left text-xs uppercase tracking-[0.08em] text-muted">
+                            <th className="px-2 py-2">Team</th>
+                            {roundResponseLabels.map((label) => (
+                              <th key={`submission-header-${item.id}-${label}`} className="px-2 py-2">
+                                {label}
+                              </th>
+                            ))}
+                            <th className="px-2 py-2">Submitted</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                          {roundResponseRows.map((row) => (
+                            <tr key={`submission-row-${item.id}-${row.team_id}`}>
+                              <td className="px-2 py-2 font-medium text-text">{row.team_name}</td>
+                              {roundResponseLabels.map((label) => {
+                                const part = row.response_parts?.find((entry) => entry.label === label);
+                                const answer = part?.answer ?? '';
+                                return (
+                                  <td key={`submission-row-${row.team_id}-${label}`} className="px-2 py-2 text-text">
+                                    {answer.trim() ? answer : '—'}
+                                  </td>
+                                );
+                              })}
+                              <td className="px-2 py-2 text-muted">
+                                {row.submitted_at ? new Date(row.submitted_at).toLocaleTimeString() : '—'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                  {roundResponsesError && (
+                    <div className="mt-3 rounded-lg border border-danger bg-panel px-3 py-2 text-sm text-danger-ink">
+                      {roundResponsesError}
+                    </div>
+                  )}
+                </div>
+              )}
               {item && (showAnswer || showFact) && (
                 <div className="grid gap-4 lg:grid-cols-2">
                   {showAnswer && (
@@ -1164,13 +1289,17 @@ export function EventRunPage() {
                     {timerButtonLabel}
                   </SecondaryButton>
                 )}
-                {item?.question_type === 'multiple_choice' && (
+                {(item?.question_type === 'multiple_choice' || hasTextResponseWorkflow) && (
                   <SecondaryButton
                     className="h-11"
                     onClick={clearRoundResponses}
                     disabled={!activeRound || clearResponsesStatus === 'clearing'}
                   >
-                    {clearResponsesStatus === 'clearing' ? 'Clearing…' : 'Clear Responses'}
+                    {clearResponsesStatus === 'clearing'
+                      ? 'Clearing…'
+                      : item?.question_type === 'multiple_choice'
+                        ? 'Clear Responses'
+                        : 'Clear Submissions'}
                   </SecondaryButton>
                 )}
                 <SecondaryButton
@@ -1375,6 +1504,9 @@ export function EventRunPage() {
               <div className="text-base font-semibold text-text">{event.title}</div>
               <ButtonLink to={`/events/${event.id}`} variant="secondary" className="h-11">
                 Back to Event
+              </ButtonLink>
+              <ButtonLink to={`/events/${event.id}/submissions`} variant="outline" className="h-11">
+                Review Submissions
               </ButtonLink>
               <div className="surface-inset p-3 text-sm text-muted">
                 {activeRound ? `Status: ${roundStatusLabel(activeRound.status)}` : 'Awaiting round selection'}

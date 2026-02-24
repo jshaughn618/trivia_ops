@@ -13,7 +13,7 @@ import type { Event } from '../types';
 
 export function EventsPage() {
   const [events, setEvents] = useState<Event[]>([]);
-  const [filter, setFilter] = useState('');
+  const [filter, setFilter] = useState('active');
   const [error, setError] = useState<string | null>(null);
   const location = useLocation();
   const auth = useAuth();
@@ -32,13 +32,26 @@ export function EventsPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-    const status = params.get('status') ?? '';
+    const status = params.get('status') ?? 'active';
     setFilter(status);
     load();
   }, [location.search]);
 
   const filtered = useMemo(() => {
-    return filter ? events.filter((event) => event.status === filter) : events;
+    const byStatus = filter === 'active'
+      ? events.filter((event) => event.status === 'planned' || event.status === 'live')
+      : filter
+        ? events.filter((event) => event.status === filter)
+        : events;
+
+    return [...byStatus].sort((a, b) => {
+      const aTime = new Date(a.starts_at).getTime();
+      const bTime = new Date(b.starts_at).getTime();
+      if (Number.isNaN(aTime) && Number.isNaN(bTime)) return 0;
+      if (Number.isNaN(aTime)) return 1;
+      if (Number.isNaN(bTime)) return -1;
+      return aTime - bTime;
+    });
   }, [events, filter]);
 
   return (
@@ -58,6 +71,7 @@ export function EventsPage() {
             <label className="flex w-full flex-col gap-2 text-xs font-display uppercase tracking-[0.2em] text-muted sm:max-w-[220px]">
               Status
               <select className="h-10 px-3" value={filter} onChange={(event) => setFilter(event.target.value)}>
+                <option value="active">Planned + Live</option>
                 <option value="">All</option>
                 <option value="planned">Planned</option>
                 <option value="live">Live</option>

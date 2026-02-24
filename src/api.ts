@@ -22,6 +22,58 @@ type GameMutationPayload = Partial<Omit<Game, 'show_theme' | 'allow_participant_
   show_theme?: boolean | number | null;
   allow_participant_audio_stop?: boolean | number | null;
 };
+type EventMutationPayload = Partial<Omit<Event, 'allow_participant_web_submissions'>> & {
+  allow_participant_web_submissions?: boolean | number | null;
+};
+type EventSubmissionExpectedPart = { label: string; answer: string; points: number };
+type EventSubmissionResponsePart = { label: string; answer: string };
+type EventSubmissionAiPart = {
+  label: string;
+  expected_answer: string;
+  submitted_answer: string;
+  max_points: number;
+  awarded_points: number;
+  is_correct: boolean;
+  confidence: number;
+  reason: string;
+};
+type EventSubmissionAiGrade = {
+  source: 'ai' | 'fallback';
+  total_points: number;
+  max_points: number;
+  overall_confidence: number;
+  needs_review: boolean;
+  threshold: number;
+  parts: EventSubmissionAiPart[];
+};
+type EventSubmissionRow = {
+  response_id: string | null;
+  edition_item_id: string;
+  team_id: string;
+  team_name: string;
+  event_round_id: string;
+  round_number: number;
+  round_label: string;
+  question_type: string | null;
+  item_ordinal: number;
+  prompt: string;
+  expected_parts: EventSubmissionExpectedPart[];
+  max_points: number;
+  submitted_at: string | null;
+  response_parts: EventSubmissionResponsePart[];
+  normalized_response_parts: EventSubmissionResponsePart[];
+  ai_grade_status: string;
+  ai_grade: EventSubmissionAiGrade | null;
+  ai_graded_at: string | null;
+  ai_grade_error: string | null;
+  approved_points: number | null;
+  approved_at: string | null;
+};
+type EventSubmissionsPayload = {
+  rounds: Array<{ id: string; round_number: number; label: string; status: string }>;
+  teams: Array<{ id: string; name: string }>;
+  rows: EventSubmissionRow[];
+};
 
 async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<ApiEnvelope<T>> {
   const requestId = createRequestId();
@@ -232,10 +284,10 @@ export const api = {
     apiFetch<{ ok: true }>(`/api/edition-items/${itemId}`, { method: 'DELETE' }),
 
   listEvents: () => apiFetch<Event[]>('/api/events'),
-  createEvent: (payload: Partial<Event>) =>
+  createEvent: (payload: EventMutationPayload) =>
     apiFetch<Event>('/api/events', { method: 'POST', body: JSON.stringify(payload) }),
   getEvent: (id: string) => apiFetch<Event>(`/api/events/${id}`),
-  updateEvent: (id: string, payload: Partial<Event>) =>
+  updateEvent: (id: string, payload: EventMutationPayload) =>
     apiFetch<Event>(`/api/events/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
   deleteEvent: (id: string) => apiFetch<{ ok: true }>(`/api/events/${id}`, { method: 'DELETE' }),
   uploadEventDocument: async (eventId: string, type: 'scoresheet' | 'answersheet', file: File) => {
@@ -274,6 +326,15 @@ export const api = {
     apiFetch<Event>(`/api/events/${eventId}/documents?type=${type}`, { method: 'DELETE' }),
 
   getEventBootstrap: (eventId: string) => apiFetch<EventBootstrap>(`/api/events/${eventId}/bootstrap`),
+  listEventSubmissions: (eventId: string) => apiFetch<EventSubmissionsPayload>(`/api/events/${eventId}/responses`),
+  gradeEventItemResponse: (responseId: string, payload: { approved_points: number | null }) =>
+    apiFetch<{ response_id: string; event_round_id: string; team_id: string; approved_points: number | null; round_total: number }>(
+      `/api/event-item-responses/${responseId}/grade`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(payload)
+      }
+    ),
   listEventRounds: (eventId: string) => apiFetch<EventRound[]>(`/api/events/${eventId}/rounds`),
   createEventRound: (eventId: string, payload: Partial<EventRound>) =>
     apiFetch<EventRound>(`/api/events/${eventId}/rounds`, {
@@ -291,6 +352,17 @@ export const api = {
     apiFetch<{ inserted: number }>(`/api/event-rounds/${roundId}/sync`, { method: 'POST' }),
   listEventRoundItems: (roundId: string) =>
     apiFetch<EditionItem[]>(`/api/event-rounds/${roundId}/items`),
+  listEventRoundResponses: (roundId: string, itemId: string) =>
+    apiFetch<{
+      item_id: string;
+      labels: string[];
+      rows: Array<{
+        team_id: string;
+        team_name: string;
+        submitted_at: string | null;
+        response_parts: Array<{ label: string; answer: string }> | null;
+      }>;
+    }>(`/api/event-rounds/${roundId}/responses?item_id=${encodeURIComponent(itemId)}`),
   clearRoundResponses: (roundId: string, itemId?: string | null) => {
     const query = itemId ? `?item_id=${encodeURIComponent(itemId)}` : '';
     return apiFetch<{ ok: true }>(`/api/event-rounds/${roundId}/clear-responses${query}`, { method: 'POST' });
@@ -363,8 +435,16 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(payload)
     }),
-  publicSubmitChoice: (code: string, payload: { team_id: string; item_id: string; choice_index: number; session_token: string }) =>
-    apiFetch<{ ok: true; choice_index: number; choice_text: string }>(`/api/public/event/${code}/responses`, {
+  publicSubmitResponse: (
+    code: string,
+    payload:
+      | { team_id: string; item_id: string; session_token: string; choice_index: number }
+      | { team_id: string; item_id: string; session_token: string; answers: Array<{ label: string; answer: string }> }
+  ) =>
+    apiFetch<
+      | { ok: true; mode: 'multiple_choice'; choice_index: number; choice_text: string }
+      | { ok: true; mode: 'text_parts'; response_parts: Array<{ label: string; answer: string }> }
+    >(`/api/public/event/${code}/responses`, {
       method: 'POST',
       body: JSON.stringify(payload)
     }),

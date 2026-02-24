@@ -64,6 +64,7 @@ type PublicEventResponse = {
     status: string;
     public_code: string;
     location_name: string | null;
+    allow_participant_web_submissions?: boolean;
   };
   rounds: {
     id: string;
@@ -157,6 +158,9 @@ export function PlayEventPage() {
   const [audioAnswerDrafts, setAudioAnswerDrafts] = useState<Record<string, string>>({});
   const [audioAnswerStatus, setAudioAnswerStatus] = useState<'idle' | 'submitting' | 'submitted' | 'error'>('idle');
   const [audioAnswerError, setAudioAnswerError] = useState<string | null>(null);
+  const [textResponseDrafts, setTextResponseDrafts] = useState<Record<string, string>>({});
+  const [textResponseStatus, setTextResponseStatus] = useState<'idle' | 'submitting' | 'submitted' | 'error'>('idle');
+  const [textResponseError, setTextResponseError] = useState<string | null>(null);
   const [visualIndex, setVisualIndex] = useState(0);
   const [selectedChoiceIndex, setSelectedChoiceIndex] = useState<number | null>(null);
   const [submittedChoiceIndex, setSubmittedChoiceIndex] = useState<number | null>(null);
@@ -174,6 +178,7 @@ export function PlayEventPage() {
   const [responseSync, setResponseSync] = useState<{ expectedTotal: number; expiresAt: number } | null>(null);
   const [graphDelayUntil, setGraphDelayUntil] = useState<number | null>(null);
   const graphDelayItemRef = useRef<string | null>(null);
+  const textAutoSubmitItemRef = useRef<string | null>(null);
   const normalizedCode = useMemo(() => (code ?? '').trim().toUpperCase(), [code]);
   const sanitizedDigits = (value: string) => value.replace(/\D/g, '');
   const teamCodeValue = teamCode.join('');
@@ -307,9 +312,13 @@ export function PlayEventPage() {
     setAudioAnswerDrafts({});
     setAudioAnswerStatus('idle');
     setAudioAnswerError(null);
+    setTextResponseDrafts({});
+    setTextResponseStatus('idle');
+    setTextResponseError(null);
     setResponseSync(null);
     setGraphDelayUntil(null);
     graphDelayItemRef.current = null;
+    textAutoSubmitItemRef.current = null;
   }, [data?.live?.active_round_id, data?.live?.current_item_ordinal, data?.current_item?.id]);
 
   useEffect(() => {
@@ -384,6 +393,40 @@ export function PlayEventPage() {
   const suppressItemTimer = Boolean(data?.visual_round);
   const timerExpired = !suppressItemTimer && timerRemainingSeconds !== null && timerRemainingSeconds <= 0;
   const responseCounts = data?.response_counts ?? null;
+  const answerPartLabels = displayItem?.answer_part_labels ?? [];
+  const showAudioClue = speedRoundMode || displayItem?.media_type === 'audio';
+  const canRequestAudioStop = Boolean(
+    showAudioClue &&
+    activeRound?.allow_participant_audio_stop &&
+    data?.live?.audio_playing &&
+    teamId &&
+    teamSession
+  );
+  const canSubmitStoppedAudioAnswer = Boolean(
+    showAudioClue &&
+    !data?.live?.audio_playing &&
+    data?.live?.participant_audio_stopped_by_team_id === teamId &&
+    teamId &&
+    teamSession &&
+    displayItem?.id &&
+    answerPartLabels.length > 0
+  );
+  const missingAudioAnswerLabels = answerPartLabels.filter((label) => !(audioAnswerDrafts[label] ?? '').trim());
+  const choiceOptions = displayItem?.question_type === 'multiple_choice' ? parseChoices(displayItem.choices_json) : [];
+  const allowParticipantWebSubmissions = Boolean(data?.event?.allow_participant_web_submissions);
+  const isDedicatedAudioStopFlowItem = Boolean(
+    showAudioClue && activeRound?.allow_participant_audio_stop && (speedRoundMode || displayItem?.media_type === 'audio')
+  );
+  const textResponseLabels = answerPartLabels;
+  const canShowTextResponsePanel = Boolean(
+    allowParticipantWebSubmissions &&
+    displayItem?.question_type !== 'multiple_choice' &&
+    !isDedicatedAudioStopFlowItem &&
+    teamId &&
+    teamSession &&
+    displayItem?.id
+  );
+  const canSubmitTextResponse = Boolean(canShowTextResponsePanel);
 
   useEffect(() => {
     if (!visualMode) {
@@ -538,6 +581,8 @@ export function PlayEventPage() {
     setJoinError(message);
     setSubmitStatus('error');
     setSubmitError(message);
+    setTextResponseStatus('error');
+    setTextResponseError(message);
   };
 
   const handleSubmitChoice = async () => {
@@ -553,7 +598,7 @@ export function PlayEventPage() {
     }
     setSubmitStatus('submitting');
     setSubmitError(null);
-    const res = await api.publicSubmitChoice(data.event.public_code, {
+    const res = await api.publicSubmitResponse(data.event.public_code, {
       team_id: teamId,
       item_id: displayItem.id,
       choice_index: selectedChoiceIndex,
@@ -572,6 +617,40 @@ export function PlayEventPage() {
       setSubmitStatus('error');
       setSubmitError(formatApiError(res, 'Failed to submit choice.'));
     }
+  };
+
+  const handleSubmitTextResponse = async () => {
+    if (!data?.event?.public_code || !teamId || !displayItem?.id || !canSubmitTextResponse) return;
+    if (!teamSession) {
+      handleSessionExpired('Your team session expired. Re-enter the team code to continue.');
+      return;
+    }
+
+    setTextResponseStatus('submitting');
+    setTextResponseError(null);
+    const answers = textResponseLabels.map((label) => ({
+      label,
+      answer: textResponseDrafts[label] ?? ''
+    }));
+
+    const res = await api.publicSubmitResponse(data.event.public_code, {
+      team_id: teamId,
+      item_id: displayItem.id,
+      session_token: teamSession,
+      answers
+    });
+
+    if (res.ok) {
+      setTextResponseStatus('submitted');
+      setTextResponseError(null);
+      return;
+    }
+    if (res.error?.code === 'team_session_invalid' || res.error?.code === 'team_session_required') {
+      handleSessionExpired(res.error.message ?? 'Your team session expired. Re-enter the team code to continue.');
+      return;
+    }
+    setTextResponseStatus('error');
+    setTextResponseError(formatApiError(res, 'Failed to submit answers.'));
   };
 
   const handleStopAudio = async () => {
@@ -658,6 +737,16 @@ export function PlayEventPage() {
     teamSession
   ]);
 
+  useEffect(() => {
+    if (!timerExpired) return;
+    if (!canSubmitTextResponse) return;
+    if (!displayItem?.id) return;
+    if (textResponseStatus === 'submitting' || textResponseStatus === 'submitted') return;
+    if (textAutoSubmitItemRef.current === displayItem.id) return;
+    textAutoSubmitItemRef.current = displayItem.id;
+    handleSubmitTextResponse();
+  }, [timerExpired, canSubmitTextResponse, displayItem?.id, textResponseStatus]);
+
   if (!normalizedCode) {
     return (
       <PlayShell>
@@ -714,27 +803,6 @@ export function PlayEventPage() {
       : speedRoundMode
         ? 'Play the clip and collect answers before reveal.'
       : '';
-  const showAudioClue = speedRoundMode || displayItem?.media_type === 'audio';
-  const canRequestAudioStop = Boolean(
-    showAudioClue &&
-    activeRound?.allow_participant_audio_stop &&
-    data?.live?.audio_playing &&
-    teamId &&
-    teamSession
-  );
-  const answerPartLabels = displayItem?.answer_part_labels ?? [];
-  const canSubmitStoppedAudioAnswer = Boolean(
-    showAudioClue &&
-    !data?.live?.audio_playing &&
-    data?.live?.participant_audio_stopped_by_team_id === teamId &&
-    teamId &&
-    teamSession &&
-    displayItem?.id &&
-    answerPartLabels.length > 0
-  );
-  const missingAudioAnswerLabels = answerPartLabels.filter((label) => !(audioAnswerDrafts[label] ?? '').trim());
-  const choiceOptions =
-    displayItem?.question_type === 'multiple_choice' ? parseChoices(displayItem.choices_json) : [];
   const awaitingResponseSync = Boolean(responseSync);
   const awaitingGraphDelay = graphDelayUntil !== null;
   const maxResponseCount = responseCounts?.counts
@@ -1221,6 +1289,65 @@ export function PlayEventPage() {
                     </div>
                   )}
                 </>
+              )}
+              {canShowTextResponsePanel && (
+                <div className="w-full max-w-3xl text-left">
+                  <div className="mb-2 flex items-center justify-between text-[11px] font-medium text-muted">
+                    <span>Answer entry</span>
+                    {!suppressItemTimer && (
+                      <span className={timerActive ? 'text-accent-ink' : 'text-muted'}>
+                        {timerActive ? `Timer ${timerLabel}` : `Timer ${timerDurationSeconds}s`}
+                      </span>
+                    )}
+                  </div>
+                  <div className="play-panel rounded-md px-4 py-4">
+                    <div className="grid gap-2.5">
+                      {textResponseLabels.map((label) => (
+                        <label key={`text-answer-${displayItem?.id}-${label}`} className="flex flex-col gap-1.5">
+                          <span className="text-xs font-medium text-muted">{label}</span>
+                          <input
+                            className="play-touch h-11 rounded-md px-3"
+                            value={textResponseDrafts[label] ?? ''}
+                            autoComplete="off"
+                            autoCorrect="off"
+                            autoCapitalize="off"
+                            spellCheck={false}
+                            data-lpignore="true"
+                            data-1p-ignore="true"
+                            onChange={(event) => {
+                              setTextResponseDrafts((prev) => ({ ...prev, [label]: event.target.value }));
+                              if (textResponseStatus !== 'submitting') {
+                                setTextResponseStatus('idle');
+                                setTextResponseError(null);
+                              }
+                            }}
+                            placeholder={`Enter ${label}`}
+                          />
+                        </label>
+                      ))}
+                    </div>
+                    <div className="mt-4 flex flex-col items-center gap-2.5">
+                      <PrimaryCTA
+                        onClick={handleSubmitTextResponse}
+                        disabled={timerBlocked || textResponseStatus === 'submitting' || !canSubmitTextResponse}
+                      >
+                        {textResponseStatus === 'submitting'
+                          ? 'Submitting…'
+                          : textResponseStatus === 'submitted'
+                            ? 'Resubmit answer'
+                            : 'Submit answer'}
+                      </PrimaryCTA>
+                      {!suppressItemTimer && !timerActive && (
+                        <PlayFooterHint>Waiting for timer to start.</PlayFooterHint>
+                      )}
+                      {timerExpired && <PlayFooterHint className="text-danger">Time's up. Auto-submitted.</PlayFooterHint>}
+                      {textResponseStatus === 'submitted' && !timerExpired && (
+                        <PlayFooterHint>Answer submitted. You can resubmit before time expires.</PlayFooterHint>
+                      )}
+                      {textResponseError && <PlayFooterHint className="text-danger">{textResponseError}</PlayFooterHint>}
+                    </div>
+                  </div>
+                </div>
               )}
               {displayItem.question_type === 'multiple_choice' && choiceOptions.length > 0 && (
                 <div className="w-full max-w-3xl text-left">

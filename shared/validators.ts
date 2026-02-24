@@ -161,6 +161,7 @@ export const eventCreateSchema = z.object({
   starts_at: z.string().min(1),
   location_id: idSchema.nullable().optional(),
   host_user_id: idSchema.nullable().optional(),
+  allow_participant_web_submissions: z.boolean().optional(),
   status: eventStatusSchema.default('planned'),
   event_type: eventTypeSchema.default('Pub Trivia'),
   notes: z.string().nullable().optional()
@@ -171,6 +172,7 @@ export const eventUpdateSchema = z.object({
   starts_at: z.string().min(1).optional(),
   location_id: idSchema.nullable().optional(),
   host_user_id: idSchema.nullable().optional(),
+  allow_participant_web_submissions: z.boolean().optional(),
   status: eventStatusSchema.optional(),
   event_type: eventTypeSchema.optional(),
   notes: z.string().nullable().optional(),
@@ -300,6 +302,10 @@ export const eventRoundAudioSubmissionMarkSchema = z.object({
 
 export const eventRoundAudioSubmissionResetSchema = z.object({
   edition_item_id: idSchema
+});
+
+export const eventItemResponseGradeSchema = z.object({
+  approved_points: z.number().min(0).nullable()
 });
 
 export const liveStateUpdateSchema = z.object({

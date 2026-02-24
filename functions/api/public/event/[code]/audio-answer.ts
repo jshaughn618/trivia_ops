@@ -5,6 +5,8 @@ import { publicAudioAnswerSchema } from '../../../../../shared/validators';
 import { normalizeCode } from '../../../../public';
 import { execute, nowIso, queryFirst } from '../../../../db';
 import { checkRateLimit, recordRateLimitHit } from '../../../../rate-limit';
+import { deriveResponseLabels } from '../../../../response-labels';
+import { queueAutoGradeForResponse } from '../../../../answer-grading';
 
 const DEFAULT_PUBLIC_AUDIO_ANSWER_RATE_LIMIT = {
   maxAttempts: 20,
@@ -26,39 +28,7 @@ function parseEnvInt(value: string | undefined, fallback: number) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-function deriveExpectedLabels(item: {
-  answer_parts_json: string | null;
-  answer_a_label: string | null;
-  answer_b_label: string | null;
-  answer_a: string | null;
-  answer_b: string | null;
-}) {
-  const labels: string[] = [];
-  if (item.answer_parts_json) {
-    try {
-      const parsed = JSON.parse(item.answer_parts_json) as Array<{ label?: unknown }>;
-      if (Array.isArray(parsed)) {
-        parsed.forEach((part) => {
-          const label = typeof part?.label === 'string' ? part.label.trim() : '';
-          if (!label) return;
-          if (!labels.includes(label)) labels.push(label);
-        });
-      }
-    } catch {
-      // Ignore malformed answer-parts payload.
-    }
-  }
-
-  const answerAExists = Boolean(item.answer_a?.trim());
-  const answerBExists = Boolean(item.answer_b?.trim());
-  if (labels.length === 0) {
-    if (answerAExists) labels.push(item.answer_a_label?.trim() || 'Part A');
-    if (answerBExists) labels.push(item.answer_b_label?.trim() || 'Part B');
-  }
-  return labels.filter(Boolean);
-}
-
-export const onRequestPost: PagesFunction<Env> = async ({ env, params, request }) => {
+export const onRequestPost: PagesFunction<Env> = async ({ env, params, request, waitUntil }) => {
   const ip = request.headers.get('cf-connecting-ip') ?? 'unknown';
   const code = normalizeCode(params.code as string);
   const limitKey = `public-audio-answer:${ip}:${code}`;
@@ -177,7 +147,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request }
     return jsonError({ code: 'not_current', message: 'Item is not active.' }, 400);
   }
 
-  const expectedLabels = deriveExpectedLabels(currentItem);
+  const expectedLabels = deriveResponseLabels(currentItem);
   if (expectedLabels.length === 0) {
     await recordFailure();
     return jsonError({ code: 'invalid_type', message: 'Active item does not support labeled answer submission.' }, 400);
@@ -254,6 +224,13 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request }
            is_correct = NULL,
            marked_at = NULL,
            marked_by = NULL,
+           ai_grade_status = 'pending',
+           ai_grade_json = NULL,
+           ai_graded_at = NULL,
+           ai_grade_error = NULL,
+           approved_points = NULL,
+           approved_at = NULL,
+           approved_by = NULL,
            deleted = 0,
            deleted_at = NULL,
            deleted_by = NULL
@@ -261,13 +238,20 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request }
       [responsePartsJson, now, now, targetResponseId]
     );
   } else {
+    targetResponseId = crypto.randomUUID();
     await execute(
       env,
       `INSERT INTO event_item_responses
-       (id, event_id, event_round_id, edition_item_id, team_id, response_parts_json, submitted_at, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [crypto.randomUUID(), event.id, event.active_round_id, parsed.data.item_id, team.id, responsePartsJson, now, now, now]
+       (id, event_id, event_round_id, edition_item_id, team_id, response_parts_json,
+        ai_grade_status, ai_grade_json, ai_graded_at, ai_grade_error, approved_points, approved_at, approved_by,
+        submitted_at, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, 'pending', NULL, NULL, NULL, NULL, NULL, NULL, ?, ?, ?)`,
+      [targetResponseId, event.id, event.active_round_id, parsed.data.item_id, team.id, responsePartsJson, now, now, now]
     );
+  }
+
+  if (targetResponseId) {
+    queueAutoGradeForResponse(env, targetResponseId, now, waitUntil);
   }
 
   return jsonOk({ ok: true, answers: orderedAnswers });

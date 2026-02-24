@@ -7,6 +7,8 @@ export type Env = {
   PARTICIPANT_DISPLAY_LINK_TTL_MINUTES?: string;
   OPENAI_API_KEY: string;
   AI_DEFAULT_MODEL?: string;
+  AI_GRADING_MODEL?: string;
+  AI_GRADE_LOW_CONFIDENCE_THRESHOLD?: string;
   LOGIN_RATE_MAX?: string;
   LOGIN_RATE_WINDOW_SECONDS?: string;
   LOGIN_RATE_BLOCK_SECONDS?: string;

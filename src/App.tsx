@@ -12,6 +12,9 @@ const EventsPage = lazy(() => import('./pages/Events').then((mod) => ({ default:
 const EventNewPage = lazy(() => import('./pages/EventNew').then((mod) => ({ default: mod.EventNewPage })));
 const EventDetailPage = lazy(() => import('./pages/EventDetail').then((mod) => ({ default: mod.EventDetailPage })));
 const EventRunPage = lazy(() => import('./pages/EventRun').then((mod) => ({ default: mod.EventRunPage })));
+const EventSubmissionsPage = lazy(() =>
+  import('./pages/EventSubmissions').then((mod) => ({ default: mod.EventSubmissionsPage }))
+);
 const EventLeaderboardPage = lazy(() =>
   import('./pages/EventLeaderboard').then((mod) => ({ default: mod.EventLeaderboardPage }))
 );
@@ -131,6 +134,14 @@ export function App() {
           element={
             <RequireAuth>
               <EventRunPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/events/:eventId/submissions"
+          element={
+            <RequireAuth>
+              <EventSubmissionsPage />
             </RequireAuth>
           }
         />

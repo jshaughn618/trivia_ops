@@ -274,6 +274,8 @@ export function EditionDetailPage() {
       ? Math.max(0, choices.findIndex((choice) => choice.trim() === answerValue))
       : 0;
     const parsedAnswerParts = parseAnswerPartsJson(item.answer_parts_json ?? null, item);
+    const isStandardTextItem = !isMusic && gameTypeId !== 'audio' && questionType !== 'multiple_choice';
+    const primaryAnswer = safeString(parsedAnswerParts[0]?.answer ?? item.answer);
     const answerPartsDraft =
       gameTypeId === 'audio'
         ? parsedAnswerParts.length > 0
@@ -285,13 +287,15 @@ export function EditionDetailPage() {
           : defaultMusicAnswerParts
         : isMusic && parsedAnswerParts.length === 1
           ? parsedAnswerParts
+          : isStandardTextItem && parsedAnswerParts.length > 1
+            ? parsedAnswerParts
           : [];
     return {
       question_type: questionType,
       choices,
       correct_choice_index: correctIndex,
       prompt: safeString(item.prompt),
-      answer: safeString(item.answer),
+      answer: primaryAnswer,
       answer_a: safeString(parsedAnswerParts[0]?.answer ?? item.answer_a),
       answer_b: safeString(parsedAnswerParts[1]?.answer ?? item.answer_b),
       answer_a_label: safeString(parsedAnswerParts[0]?.label ?? item.answer_a_label),
@@ -331,6 +335,24 @@ export function EditionDetailPage() {
       points: Number.isFinite(part.points) ? Math.max(0, Math.trunc(part.points)) : 1
     }))
   });
+
+  const updateDraftPrimaryAnswer = (draft: ItemDraft, nextAnswer: string): ItemDraft => {
+    if (gameTypeId !== 'music' && gameTypeId !== 'audio' && draft.question_type !== 'multiple_choice' && draft.answer_parts.length > 0) {
+      const nextParts = [...draft.answer_parts];
+      const first = nextParts[0] ?? { label: 'Answer', answer: '', points: draft.answer_a_points };
+      nextParts[0] = {
+        ...first,
+        label: safeTrim(first.label) || 'Answer',
+        answer: nextAnswer
+      };
+      return {
+        ...draft,
+        answer: nextAnswer,
+        answer_parts: nextParts
+      };
+    }
+    return { ...draft, answer: nextAnswer };
+  };
 
   const activeItemDraft = useMemo(() => {
     if (!activeItem || activeItemId === 'new') return null;
@@ -493,12 +515,17 @@ export function EditionDetailPage() {
       itemDraft.question_type === 'multiple_choice' &&
       gameTypeId !== 'audio' &&
       !(isMusic && itemDraft.item_mode !== 'text');
+    const isStandardPartBased = !isMusic && gameTypeId !== 'audio' && !isMultipleChoice;
     let answerValue = gameTypeId === 'audio' ? '' : itemDraft.answer.trim();
     let answerPartsPayload: AnswerPart[] | undefined;
     let musicAnswerA: string | null = null;
     let musicAnswerB: string | null = null;
     let musicAnswerALabel: string | null = null;
     let musicAnswerBLabel: string | null = null;
+    let standardAnswerA: string | null = null;
+    let standardAnswerB: string | null = null;
+    let standardAnswerALabel: string | null = null;
+    let standardAnswerBLabel: string | null = null;
     if (!isMusicPartBased && !itemDraft.prompt.trim()) {
       setItemValidationError('Question is required.');
       return;
@@ -527,6 +554,21 @@ export function EditionDetailPage() {
       musicAnswerALabel = partsClean[0]?.label ?? null;
       musicAnswerB = partsClean[1]?.answer ?? null;
       musicAnswerBLabel = partsClean[1]?.label ?? null;
+    } else if (isStandardPartBased) {
+      const partsSource = itemDraft.answer_parts.length > 0
+        ? itemDraft.answer_parts
+        : [{ label: 'Answer', answer: itemDraft.answer, points: itemDraft.answer_a_points }];
+      const partsClean = sanitizeAnswerParts(partsSource);
+      if (partsClean.length === 0) {
+        setItemValidationError('Answer is required.');
+        return;
+      }
+      answerPartsPayload = partsClean;
+      answerValue = partsClean.length === 1 ? partsClean[0].answer : partsClean.map((part) => part.answer).join(' / ');
+      standardAnswerA = partsClean[0]?.answer ?? null;
+      standardAnswerALabel = partsClean[0]?.label ?? null;
+      standardAnswerB = partsClean[1]?.answer ?? null;
+      standardAnswerBLabel = partsClean[1]?.label ?? null;
     } else if (!isMultipleChoice && !itemDraft.answer.trim()) {
       setItemValidationError('Answer is required.');
       return;
@@ -563,24 +605,32 @@ export function EditionDetailPage() {
           ? primaryAudioPart?.answer ?? null
           : isMusicAudio
             ? musicAnswerA
+            : isStandardPartBased
+              ? standardAnswerA
             : itemDraft.answer_a || null,
       answer_b:
         gameTypeId === 'audio'
           ? secondaryAudioPart?.answer ?? null
           : isMusicAudio
             ? musicAnswerB
+            : isStandardPartBased
+              ? standardAnswerB
             : itemDraft.answer_b || null,
       answer_a_label:
         gameTypeId === 'audio'
           ? primaryAudioPart?.label ?? null
           : isMusicAudio
             ? musicAnswerALabel
+            : isStandardPartBased
+              ? standardAnswerALabel
             : itemDraft.answer_a_label || null,
       answer_b_label:
         gameTypeId === 'audio'
           ? secondaryAudioPart?.label ?? null
           : isMusicAudio
             ? musicAnswerBLabel
+            : isStandardPartBased
+              ? standardAnswerBLabel
             : itemDraft.answer_b_label || null,
       answer_parts_json: answerPartsPayload,
       fun_fact: itemDraft.fun_fact || null,
@@ -633,12 +683,17 @@ export function EditionDetailPage() {
       itemDraft.question_type === 'multiple_choice' &&
       gameTypeId !== 'audio' &&
       !(isMusic && itemDraft.item_mode !== 'text');
+    const isStandardPartBased = !isMusic && gameTypeId !== 'audio' && !isMultipleChoice;
     let answerValue = gameTypeId === 'audio' ? '' : itemDraft.answer.trim();
     let answerPartsPayload: AnswerPart[] | undefined;
     let musicAnswerA: string | null = null;
     let musicAnswerB: string | null = null;
     let musicAnswerALabel: string | null = null;
     let musicAnswerBLabel: string | null = null;
+    let standardAnswerA: string | null = null;
+    let standardAnswerB: string | null = null;
+    let standardAnswerALabel: string | null = null;
+    let standardAnswerBLabel: string | null = null;
     if (!isMusicPartBased && !itemDraft.prompt.trim()) {
       const message = 'Question is required.';
       setItemValidationError(message);
@@ -687,6 +742,26 @@ export function EditionDetailPage() {
       musicAnswerALabel = partsClean[0]?.label ?? null;
       musicAnswerB = partsClean[1]?.answer ?? null;
       musicAnswerBLabel = partsClean[1]?.label ?? null;
+    } else if (isStandardPartBased) {
+      const partsSource = itemDraft.answer_parts.length > 0
+        ? itemDraft.answer_parts
+        : [{ label: 'Answer', answer: itemDraft.answer, points: itemDraft.answer_a_points }];
+      const partsClean = sanitizeAnswerParts(partsSource);
+      if (partsClean.length === 0) {
+        const message = 'Answer is required.';
+        setItemValidationError(message);
+        if (source === 'auto') {
+          setItemSaveState('error');
+          setItemSaveError(message);
+        }
+        return false;
+      }
+      answerPartsPayload = partsClean;
+      answerValue = partsClean.length === 1 ? partsClean[0].answer : partsClean.map((part) => part.answer).join(' / ');
+      standardAnswerA = partsClean[0]?.answer ?? null;
+      standardAnswerALabel = partsClean[0]?.label ?? null;
+      standardAnswerB = partsClean[1]?.answer ?? null;
+      standardAnswerBLabel = partsClean[1]?.label ?? null;
     } else if (!isMultipleChoice && !itemDraft.answer.trim()) {
       const message = 'Answer is required.';
       setItemValidationError(message);
@@ -745,24 +820,32 @@ export function EditionDetailPage() {
           ? primaryAudioPart?.answer ?? null
           : isMusicAudio
             ? musicAnswerA
+            : isStandardPartBased
+              ? standardAnswerA
             : itemDraft.answer_a || null,
       answer_b:
         gameTypeId === 'audio'
           ? secondaryAudioPart?.answer ?? null
           : isMusicAudio
             ? musicAnswerB
+            : isStandardPartBased
+              ? standardAnswerB
             : itemDraft.answer_b || null,
       answer_a_label:
         gameTypeId === 'audio'
           ? primaryAudioPart?.label ?? null
           : isMusicAudio
             ? musicAnswerALabel
+            : isStandardPartBased
+              ? standardAnswerALabel
             : itemDraft.answer_a_label || null,
       answer_b_label:
         gameTypeId === 'audio'
           ? secondaryAudioPart?.label ?? null
           : isMusicAudio
             ? musicAnswerBLabel
+            : isStandardPartBased
+              ? standardAnswerBLabel
             : itemDraft.answer_b_label || null,
       answer_parts_json: answerPartsPayload,
       fun_fact: itemDraft.fun_fact || null,
@@ -828,7 +911,7 @@ export function EditionDetailPage() {
         const aiRes = await api.aiImageAnswer({ media_key: uploadRes.data.key });
         setImageAnswerLoading(false);
         if (aiRes.ok) {
-          setItemDraft((draft) => ({ ...draft, answer: aiRes.data.answer }));
+          setItemDraft((draft) => updateDraftPrimaryAnswer(draft, aiRes.data.answer));
         } else {
           setImageAnswerError(aiRes.error.message ?? 'Failed to auto-fill answer.');
         }
@@ -885,7 +968,7 @@ export function EditionDetailPage() {
         const aiRes = await api.aiImageAnswer({ media_key: uploadRes.data.key });
         setImageAnswerLoading(false);
         if (aiRes.ok) {
-          setItemDraft((draft) => ({ ...draft, answer: aiRes.data.answer }));
+          setItemDraft((draft) => updateDraftPrimaryAnswer(draft, aiRes.data.answer));
         } else {
           setImageAnswerError(aiRes.error.message ?? 'Failed to auto-fill answer.');
         }
@@ -1209,7 +1292,7 @@ export function EditionDetailPage() {
       return;
     }
     const line = safeString(res.data.text).split('\n')[0] ?? '';
-    setItemDraft((draft) => ({ ...draft, answer: safeTrim(line) }));
+    setItemDraft((draft) => updateDraftPrimaryAnswer(draft, safeTrim(line)));
   };
 
   const generateFunFact = async () => {
@@ -2292,31 +2375,165 @@ export function EditionDetailPage() {
         {gameTypeId !== 'audio' &&
           itemDraft.question_type !== 'multiple_choice' &&
           !(gameTypeId === 'music' && itemDraft.item_mode !== 'text') && (
-          <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-            <span className="flex items-center justify-between">
-              Answer
-              <button
-                type="button"
-                onClick={() => generateAnswer()}
-                className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
-                disabled={answerLoading}
-              >
-                {answerLoading ? `Generating Answer${AI_ICON}` : `Generate Answer${AI_ICON}`}
-              </button>
-            </span>
-            <input
-              className="h-10 px-3"
-              value={itemDraft.answer}
-              onChange={(event) => setItemDraft((draft) => ({ ...draft, answer: event.target.value }))}
-            />
-            {answerError && <span className="text-[10px] tracking-[0.2em] text-danger">{answerError}</span>}
-            {imageAnswerLoading && (
-              <span className="text-[10px] uppercase tracking-[0.2em] text-muted">Analyzing image…</span>
+          <>
+            {gameTypeId !== 'music' && itemDraft.answer_parts.length > 0 ? (
+              <div className="flex flex-col gap-2">
+                <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">Answer parts</div>
+                <div className="flex flex-col gap-2">
+                  {itemDraft.answer_parts.map((part, idx) => (
+                    <div key={`standard-answer-part-edit-${idx}`} className="grid gap-2 sm:grid-cols-[1fr,2fr,120px,auto] sm:items-end">
+                      <label className="flex flex-col gap-1 text-[10px] font-display uppercase tracking-[0.25em] text-muted">
+                        Label
+                        <input
+                          className="h-10 px-3"
+                          value={part.label}
+                          onChange={(event) =>
+                            setItemDraft((draft) => {
+                              const next = [...draft.answer_parts];
+                              next[idx] = { ...next[idx], label: event.target.value };
+                              return { ...draft, answer_parts: next };
+                            })
+                          }
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1 text-[10px] font-display uppercase tracking-[0.25em] text-muted">
+                        Answer
+                        <input
+                          className="h-10 px-3"
+                          value={part.answer}
+                          onChange={(event) =>
+                            setItemDraft((draft) => {
+                              const next = [...draft.answer_parts];
+                              next[idx] = { ...next[idx], answer: event.target.value };
+                              return { ...draft, answer_parts: next, answer: idx === 0 ? event.target.value : draft.answer };
+                            })
+                          }
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1 text-[10px] font-display uppercase tracking-[0.25em] text-muted">
+                        Points
+                        <input
+                          className="h-10 px-3"
+                          type="number"
+                          min={0}
+                          step={1}
+                          value={part.points}
+                          onChange={(event) =>
+                            setItemDraft((draft) => {
+                              const next = [...draft.answer_parts];
+                              next[idx] = { ...next[idx], points: Number(event.target.value) };
+                              return {
+                                ...draft,
+                                answer_parts: next,
+                                answer_a_points: idx === 0 ? Number(event.target.value) : draft.answer_a_points
+                              };
+                            })
+                          }
+                        />
+                      </label>
+                      {itemDraft.answer_parts.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setItemDraft((draft) => ({
+                              ...draft,
+                              answer_parts: draft.answer_parts.filter((_, partIdx) => partIdx !== idx)
+                            }))
+                          }
+                          className="h-10 rounded-md border border-border px-3 text-xs uppercase tracking-[0.2em] text-muted hover:border-danger hover:text-danger-ink"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <SecondaryButton
+                    onClick={() =>
+                      setItemDraft((draft) => ({
+                        ...draft,
+                        answer_parts: [
+                          ...draft.answer_parts,
+                          { label: `Answer ${draft.answer_parts.length + 1}`, answer: '', points: 1 }
+                        ]
+                      }))
+                    }
+                    className="px-3 py-2 text-xs"
+                  >
+                    Add answer part
+                  </SecondaryButton>
+                  <SecondaryButton
+                    onClick={() =>
+                      setItemDraft((draft) => ({
+                        ...draft,
+                        answer: draft.answer_parts[0]?.answer ?? draft.answer,
+                        answer_a_points: draft.answer_parts[0]?.points ?? draft.answer_a_points,
+                        answer_parts: []
+                      }))
+                    }
+                    className="px-3 py-2 text-xs"
+                  >
+                    Use single answer
+                  </SecondaryButton>
+                </div>
+              </div>
+            ) : (
+              <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+                <span className="flex items-center justify-between">
+                  Answer
+                  <button
+                    type="button"
+                    onClick={() => generateAnswer()}
+                    className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
+                    disabled={answerLoading}
+                  >
+                    {answerLoading ? `Generating Answer${AI_ICON}` : `Generate Answer${AI_ICON}`}
+                  </button>
+                </span>
+                <input
+                  className="h-10 px-3"
+                  value={itemDraft.answer}
+                  onChange={(event) => setItemDraft((draft) => updateDraftPrimaryAnswer(draft, event.target.value))}
+                />
+                {gameTypeId !== 'music' && (
+                  <div className="grid gap-2 sm:grid-cols-[160px,auto] sm:items-end">
+                    <label className="flex flex-col gap-1 text-[10px] font-display uppercase tracking-[0.25em] text-muted">
+                      Points
+                      <input
+                        className="h-10 px-3"
+                        type="number"
+                        min={0}
+                        step={1}
+                        value={itemDraft.answer_a_points}
+                        onChange={(event) =>
+                          setItemDraft((draft) => ({ ...draft, answer_a_points: Number(event.target.value) }))
+                        }
+                      />
+                    </label>
+                    <SecondaryButton
+                      onClick={() =>
+                        setItemDraft((draft) => ({
+                          ...draft,
+                          answer_parts: [{ label: 'Answer', answer: draft.answer, points: draft.answer_a_points }]
+                        }))
+                      }
+                      className="h-10 px-3 text-xs"
+                    >
+                      Use answer parts
+                    </SecondaryButton>
+                  </div>
+                )}
+                {answerError && <span className="text-[10px] tracking-[0.2em] text-danger">{answerError}</span>}
+                {imageAnswerLoading && (
+                  <span className="text-[10px] uppercase tracking-[0.2em] text-muted">Analyzing image…</span>
+                )}
+                {imageAnswerError && (
+                  <span className="text-[10px] tracking-[0.2em] text-danger">{imageAnswerError}</span>
+                )}
+              </label>
             )}
-            {imageAnswerError && (
-              <span className="text-[10px] tracking-[0.2em] text-danger">{imageAnswerError}</span>
-            )}
-          </label>
+          </>
         )}
         {gameTypeId === 'music' && itemDraft.item_mode !== 'text' && (
           <div className="flex flex-col gap-2">
@@ -2887,31 +3104,165 @@ export function EditionDetailPage() {
         {gameTypeId !== 'audio' &&
           itemDraft.question_type !== 'multiple_choice' &&
           !(gameTypeId === 'music' && itemDraft.item_mode !== 'text') && (
-          <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-            <span className="flex items-center justify-between">
-              Answer
-              <button
-                type="button"
-                onClick={() => generateAnswer()}
-                className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
-                disabled={answerLoading}
-              >
-                {answerLoading ? `Generating Answer${AI_ICON}` : `Generate Answer${AI_ICON}`}
-              </button>
-            </span>
-            <input
-              className="h-10 px-3"
-              value={itemDraft.answer}
-              onChange={(event) => setItemDraft((draft) => ({ ...draft, answer: event.target.value }))}
-            />
-            {answerError && <span className="text-[10px] tracking-[0.2em] text-danger">{answerError}</span>}
-            {imageAnswerLoading && (
-              <span className="text-[10px] uppercase tracking-[0.2em] text-muted">Analyzing image…</span>
+          <>
+            {gameTypeId !== 'music' && itemDraft.answer_parts.length > 0 ? (
+              <div className="flex flex-col gap-2">
+                <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">Answer parts</div>
+                <div className="flex flex-col gap-2">
+                  {itemDraft.answer_parts.map((part, idx) => (
+                    <div key={`standard-answer-part-new-${idx}`} className="grid gap-2 sm:grid-cols-[1fr,2fr,120px,auto] sm:items-end">
+                      <label className="flex flex-col gap-1 text-[10px] font-display uppercase tracking-[0.25em] text-muted">
+                        Label
+                        <input
+                          className="h-10 px-3"
+                          value={part.label}
+                          onChange={(event) =>
+                            setItemDraft((draft) => {
+                              const next = [...draft.answer_parts];
+                              next[idx] = { ...next[idx], label: event.target.value };
+                              return { ...draft, answer_parts: next };
+                            })
+                          }
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1 text-[10px] font-display uppercase tracking-[0.25em] text-muted">
+                        Answer
+                        <input
+                          className="h-10 px-3"
+                          value={part.answer}
+                          onChange={(event) =>
+                            setItemDraft((draft) => {
+                              const next = [...draft.answer_parts];
+                              next[idx] = { ...next[idx], answer: event.target.value };
+                              return { ...draft, answer_parts: next, answer: idx === 0 ? event.target.value : draft.answer };
+                            })
+                          }
+                        />
+                      </label>
+                      <label className="flex flex-col gap-1 text-[10px] font-display uppercase tracking-[0.25em] text-muted">
+                        Points
+                        <input
+                          className="h-10 px-3"
+                          type="number"
+                          min={0}
+                          step={1}
+                          value={part.points}
+                          onChange={(event) =>
+                            setItemDraft((draft) => {
+                              const next = [...draft.answer_parts];
+                              next[idx] = { ...next[idx], points: Number(event.target.value) };
+                              return {
+                                ...draft,
+                                answer_parts: next,
+                                answer_a_points: idx === 0 ? Number(event.target.value) : draft.answer_a_points
+                              };
+                            })
+                          }
+                        />
+                      </label>
+                      {itemDraft.answer_parts.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setItemDraft((draft) => ({
+                              ...draft,
+                              answer_parts: draft.answer_parts.filter((_, partIdx) => partIdx !== idx)
+                            }))
+                          }
+                          className="h-10 rounded-md border border-border px-3 text-xs uppercase tracking-[0.2em] text-muted hover:border-danger hover:text-danger-ink"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <SecondaryButton
+                    onClick={() =>
+                      setItemDraft((draft) => ({
+                        ...draft,
+                        answer_parts: [
+                          ...draft.answer_parts,
+                          { label: `Answer ${draft.answer_parts.length + 1}`, answer: '', points: 1 }
+                        ]
+                      }))
+                    }
+                    className="px-3 py-2 text-xs"
+                  >
+                    Add answer part
+                  </SecondaryButton>
+                  <SecondaryButton
+                    onClick={() =>
+                      setItemDraft((draft) => ({
+                        ...draft,
+                        answer: draft.answer_parts[0]?.answer ?? draft.answer,
+                        answer_a_points: draft.answer_parts[0]?.points ?? draft.answer_a_points,
+                        answer_parts: []
+                      }))
+                    }
+                    className="px-3 py-2 text-xs"
+                  >
+                    Use single answer
+                  </SecondaryButton>
+                </div>
+              </div>
+            ) : (
+              <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+                <span className="flex items-center justify-between">
+                  Answer
+                  <button
+                    type="button"
+                    onClick={() => generateAnswer()}
+                    className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
+                    disabled={answerLoading}
+                  >
+                    {answerLoading ? `Generating Answer${AI_ICON}` : `Generate Answer${AI_ICON}`}
+                  </button>
+                </span>
+                <input
+                  className="h-10 px-3"
+                  value={itemDraft.answer}
+                  onChange={(event) => setItemDraft((draft) => updateDraftPrimaryAnswer(draft, event.target.value))}
+                />
+                {gameTypeId !== 'music' && (
+                  <div className="grid gap-2 sm:grid-cols-[160px,auto] sm:items-end">
+                    <label className="flex flex-col gap-1 text-[10px] font-display uppercase tracking-[0.25em] text-muted">
+                      Points
+                      <input
+                        className="h-10 px-3"
+                        type="number"
+                        min={0}
+                        step={1}
+                        value={itemDraft.answer_a_points}
+                        onChange={(event) =>
+                          setItemDraft((draft) => ({ ...draft, answer_a_points: Number(event.target.value) }))
+                        }
+                      />
+                    </label>
+                    <SecondaryButton
+                      onClick={() =>
+                        setItemDraft((draft) => ({
+                          ...draft,
+                          answer_parts: [{ label: 'Answer', answer: draft.answer, points: draft.answer_a_points }]
+                        }))
+                      }
+                      className="h-10 px-3 text-xs"
+                    >
+                      Use answer parts
+                    </SecondaryButton>
+                  </div>
+                )}
+                {answerError && <span className="text-[10px] tracking-[0.2em] text-danger">{answerError}</span>}
+                {imageAnswerLoading && (
+                  <span className="text-[10px] uppercase tracking-[0.2em] text-muted">Analyzing image…</span>
+                )}
+                {imageAnswerError && (
+                  <span className="text-[10px] tracking-[0.2em] text-danger">{imageAnswerError}</span>
+                )}
+              </label>
             )}
-            {imageAnswerError && (
-              <span className="text-[10px] tracking-[0.2em] text-danger">{imageAnswerError}</span>
-            )}
-          </label>
+          </>
         )}
         {gameTypeId === 'music' && itemDraft.item_mode !== 'text' && (
           <div className="flex flex-col gap-2">

@@ -103,6 +103,7 @@ export type Event = {
   location_id: Id | null;
   host_user_id: Id | null;
   public_code?: string | null;
+  allow_participant_web_submissions: number | null;
   status: EventStatus;
   event_type: EventType;
   notes: string | null;

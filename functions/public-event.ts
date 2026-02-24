@@ -2,6 +2,7 @@ import type { Env } from './types';
 import type { ApiError } from '../shared/types';
 import { normalizeCode } from './public';
 import { queryAll, queryFirst } from './db';
+import { deriveResponseLabels } from './response-labels';
 
 export type PublicEventView = 'play' | 'leaderboard' | 'display';
 
@@ -13,6 +14,7 @@ export type PublicEventPayload = {
     status: string;
     public_code: string;
     location_name: string | null;
+    allow_participant_web_submissions: boolean;
   };
   rounds: {
     id: string;
@@ -87,9 +89,11 @@ export async function getPublicEventPayload(env: Env, rawCode: string, view?: Pu
     status: string;
     public_code: string;
     location_name: string | null;
+    allow_participant_web_submissions: number;
   }>(
     env,
-    `SELECT e.id, e.title, e.starts_at, e.status, e.public_code, l.name AS location_name
+    `SELECT e.id, e.title, e.starts_at, e.status, e.public_code, l.name AS location_name,
+            COALESCE(e.allow_participant_web_submissions, 0) AS allow_participant_web_submissions
      FROM events e
      LEFT JOIN locations l ON l.id = e.location_id
      WHERE e.public_code = ? AND COALESCE(e.deleted, 0) = 0`,
@@ -138,37 +142,14 @@ export async function getPublicEventPayload(env: Env, rawCode: string, view?: Pu
   }));
 
   const extractResponseLabels = (item: {
+    question_type: string | null;
     answer_parts_json: string | null;
     answer_a_label: string | null;
     answer_b_label: string | null;
     answer_a: string | null;
     answer_b: string | null;
-  }) => {
-    const labels: string[] = [];
-    if (item.answer_parts_json) {
-      try {
-        const parsed = JSON.parse(item.answer_parts_json) as Array<{ label?: unknown }>;
-        if (Array.isArray(parsed)) {
-          parsed.forEach((part) => {
-            const label = typeof part?.label === 'string' ? part.label.trim() : '';
-            if (!label) return;
-            if (!labels.includes(label)) labels.push(label);
-          });
-        }
-      } catch {
-        // Ignore malformed answer-parts payload.
-      }
-    }
-    if (labels.length === 0) {
-      if (item.answer_a?.trim()) {
-        labels.push(item.answer_a_label?.trim() || 'Part A');
-      }
-      if (item.answer_b?.trim()) {
-        labels.push(item.answer_b_label?.trim() || 'Part B');
-      }
-    }
-    return labels;
-  };
+  }) =>
+    deriveResponseLabels(item, { fallbackSingleAnswer: true });
 
   const live = await queryFirst<{
     id: string;
@@ -512,7 +493,10 @@ export async function getPublicEventPayload(env: Env, rawCode: string, view?: Pu
   }
 
   let data: PublicEventPayload = {
-    event,
+    event: {
+      ...event,
+      allow_participant_web_submissions: Boolean(event.allow_participant_web_submissions)
+    },
     rounds,
     teams,
     leaderboard,
