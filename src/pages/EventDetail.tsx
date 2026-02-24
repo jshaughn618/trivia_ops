@@ -138,9 +138,10 @@ const drawImageSheetHalf = (
     });
 
     const numberText = `${item.ordinal}`;
+    const numberY = imageY + imageHeight + 4;
     page.drawText(numberText, {
-      x: drawX + 4,
-      y: drawY + drawHeight - 12,
+      x: x + 2,
+      y: numberY,
       size: 10,
       font: fonts.bold,
       color: rgb(0, 0, 0)
