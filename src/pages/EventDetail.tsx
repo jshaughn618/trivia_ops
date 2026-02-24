@@ -21,7 +21,8 @@ const PAGE_HEIGHT = 792;
 const PAGE_MARGIN = 36;
 const HEADER_HEIGHT = 60;
 const CELL_PADDING = 12;
-const IMAGE_SHEET_HALF_HEIGHT = PAGE_HEIGHT / 2;
+const IMAGE_SHEET_SECTION_COUNT = 3;
+const IMAGE_SHEET_SECTION_HEIGHT = PAGE_HEIGHT / IMAGE_SHEET_SECTION_COUNT;
 const IMAGE_SHEET_COLUMNS = 5;
 const IMAGE_SHEET_ROW_COUNT = 2;
 const IMAGE_SHEET_ITEMS_PER_SET = IMAGE_SHEET_COLUMNS * IMAGE_SHEET_ROW_COUNT;
@@ -86,17 +87,18 @@ const blobToPngArrayBuffer = async (blob: Blob) => {
   return pngBlob.arrayBuffer();
 };
 
-const drawImageSheetHalf = (
+const drawImageSheetSection = (
   page: any,
   fonts: { regular: any; bold: any },
-  halfY: number,
+  sectionY: number,
+  sectionHeight: number,
   roundTitleText: string,
   items: EmbeddedImageItem[]
 ) => {
-  const halfTop = halfY + IMAGE_SHEET_HALF_HEIGHT;
+  const sectionTop = sectionY + sectionHeight;
   const contentX = PAGE_MARGIN;
   const contentWidth = PAGE_WIDTH - PAGE_MARGIN * 2;
-  const titleY = halfTop - 24;
+  const titleY = sectionTop - 20;
 
   page.drawText(roundTitleText, {
     x: contentX,
@@ -110,10 +112,10 @@ const drawImageSheetHalf = (
   const columnGap = 12;
   const rowGap = 16;
   const cardWidth = (contentWidth - (columns - 1) * columnGap) / columns;
-  const maxImageHeightByRow = (IMAGE_SHEET_HALF_HEIGHT - 68 - rowGap) / IMAGE_SHEET_ROW_COUNT;
+  const maxImageHeightByRow = (sectionHeight - 56 - rowGap) / IMAGE_SHEET_ROW_COUNT;
   const imageHeight = Math.max(70, Math.min(120, cardWidth * 0.85, maxImageHeightByRow));
   const rowBlockHeight = imageHeight;
-  const firstRowImageY = halfTop - 56 - imageHeight;
+  const firstRowImageY = sectionTop - 42 - imageHeight;
   const secondRowImageY = firstRowImageY - rowGap - rowBlockHeight;
 
   items.forEach((item, index) => {
@@ -215,11 +217,25 @@ const buildImageSheetsPdf = async (
       const suffix = chunks.length > 1 ? ` (Set ${chunkIndex + 1})` : '';
       const roundHeading = bundle.round.scoresheet_title?.trim() || bundle.round.label;
       const titleText = `Round ${bundle.round.round_number}: ${roundHeading}${suffix}`;
-      drawImageSheetHalf(page, fonts, IMAGE_SHEET_HALF_HEIGHT, titleText, chunk);
-      drawImageSheetHalf(page, fonts, 0, titleText, chunk);
+      for (let sectionIndex = 0; sectionIndex < IMAGE_SHEET_SECTION_COUNT; sectionIndex += 1) {
+        drawImageSheetSection(
+          page,
+          fonts,
+          sectionIndex * IMAGE_SHEET_SECTION_HEIGHT,
+          IMAGE_SHEET_SECTION_HEIGHT,
+          titleText,
+          chunk
+        );
+      }
       page.drawLine({
-        start: { x: PAGE_MARGIN, y: IMAGE_SHEET_HALF_HEIGHT },
-        end: { x: PAGE_WIDTH - PAGE_MARGIN, y: IMAGE_SHEET_HALF_HEIGHT },
+        start: { x: PAGE_MARGIN, y: IMAGE_SHEET_SECTION_HEIGHT },
+        end: { x: PAGE_WIDTH - PAGE_MARGIN, y: IMAGE_SHEET_SECTION_HEIGHT },
+        thickness: 0.8,
+        color: rgb(0.75, 0.75, 0.75)
+      });
+      page.drawLine({
+        start: { x: PAGE_MARGIN, y: IMAGE_SHEET_SECTION_HEIGHT * 2 },
+        end: { x: PAGE_WIDTH - PAGE_MARGIN, y: IMAGE_SHEET_SECTION_HEIGHT * 2 },
         thickness: 0.8,
         color: rgb(0.75, 0.75, 0.75)
       });
