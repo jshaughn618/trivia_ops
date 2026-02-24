@@ -108,15 +108,11 @@ const drawImageSheetHalf = (
 
   const columns = IMAGE_SHEET_COLUMNS;
   const columnGap = 12;
-  const rowGap = 22;
-  const answerGap = 16;
-  const answerBlockHeight = 24;
+  const rowGap = 16;
   const cardWidth = (contentWidth - (columns - 1) * columnGap) / columns;
-  const maxImageHeightByRow = (
-    IMAGE_SHEET_HALF_HEIGHT - 68 - rowGap - IMAGE_SHEET_ROW_COUNT * (answerGap + answerBlockHeight)
-  ) / IMAGE_SHEET_ROW_COUNT;
-  const imageHeight = Math.max(56, Math.min(92, cardWidth * 0.72, maxImageHeightByRow));
-  const rowBlockHeight = imageHeight + answerGap + answerBlockHeight;
+  const maxImageHeightByRow = (IMAGE_SHEET_HALF_HEIGHT - 68 - rowGap) / IMAGE_SHEET_ROW_COUNT;
+  const imageHeight = Math.max(70, Math.min(120, cardWidth * 0.85, maxImageHeightByRow));
+  const rowBlockHeight = imageHeight;
   const firstRowImageY = halfTop - 56 - imageHeight;
   const secondRowImageY = firstRowImageY - rowGap - rowBlockHeight;
 
@@ -125,7 +121,6 @@ const drawImageSheetHalf = (
     const columnIndex = index % columns;
     const x = contentX + columnIndex * (cardWidth + columnGap);
     const imageY = rowIndex === 0 ? firstRowImageY : secondRowImageY;
-    const answerLineY = imageY - answerGap;
 
     const widthScale = cardWidth / item.image.width;
     const heightScale = imageHeight / item.image.height;
@@ -142,20 +137,13 @@ const drawImageSheetHalf = (
       height: drawHeight
     });
 
-    const numberText = `${item.ordinal}.`;
+    const numberText = `${item.ordinal}`;
     page.drawText(numberText, {
-      x,
-      y: answerLineY + 3,
+      x: drawX + 4,
+      y: drawY + drawHeight - 12,
       size: 10,
       font: fonts.bold,
       color: rgb(0, 0, 0)
-    });
-    const numberWidth = fonts.bold.widthOfTextAtSize(numberText, 10);
-    page.drawLine({
-      start: { x: x + numberWidth + 6, y: answerLineY + 2 },
-      end: { x: x + cardWidth, y: answerLineY + 2 },
-      thickness: 0.8,
-      color: rgb(0.35, 0.35, 0.35)
     });
   });
 };
@@ -224,7 +212,8 @@ const buildImageSheetsPdf = async (
       const page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
       pageCount += 1;
       const suffix = chunks.length > 1 ? ` (Set ${chunkIndex + 1})` : '';
-      const titleText = `Round ${bundle.round.round_number}: ${bundle.round.label}${suffix}`;
+      const roundHeading = bundle.round.scoresheet_title?.trim() || bundle.round.label;
+      const titleText = `Round ${bundle.round.round_number}: ${roundHeading}${suffix}`;
       drawImageSheetHalf(page, fonts, IMAGE_SHEET_HALF_HEIGHT, titleText, chunk);
       drawImageSheetHalf(page, fonts, 0, titleText, chunk);
       page.drawLine({
@@ -232,13 +221,6 @@ const buildImageSheetsPdf = async (
         end: { x: PAGE_WIDTH - PAGE_MARGIN, y: IMAGE_SHEET_HALF_HEIGHT },
         thickness: 0.8,
         color: rgb(0.75, 0.75, 0.75)
-      });
-      page.drawText(event.title, {
-        x: PAGE_MARGIN,
-        y: PAGE_HEIGHT - 16,
-        size: 8,
-        font: fonts.regular,
-        color: rgb(0.35, 0.35, 0.35)
       });
     });
   }
