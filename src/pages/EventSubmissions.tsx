@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { api, formatApiError } from '../api';
 import { AppShell } from '../components/AppShell';
@@ -97,6 +97,9 @@ export function EventSubmissionsPage() {
   const [teamFilter, setTeamFilter] = useState('');
   const [scoreDrafts, setScoreDrafts] = useState<Record<string, string>>({});
   const [savingByResponse, setSavingByResponse] = useState<Record<string, boolean>>({});
+  const [activeTeamByRound, setActiveTeamByRound] = useState<Record<string, string>>({});
+  const [applyingAiAll, setApplyingAiAll] = useState(false);
+  const autosaveTimersRef = useRef<Record<string, number>>({});
 
   const load = useCallback(async (options?: { silent?: boolean }) => {
     if (!eventId) return;
@@ -196,6 +199,21 @@ export function EventSubmissionsPage() {
       });
   }, [filteredRows, roundFilter, rounds, teamFilter, teams]);
 
+  useEffect(() => {
+    setActiveTeamByRound((prev) => {
+      const next = { ...prev };
+      groupedByRound.forEach((group) => {
+        if (group.teams.length === 0) return;
+        const existing = next[group.round.id];
+        const existsInRound = existing ? group.teams.some((team) => team.teamId === existing) : false;
+        if (!existsInRound) {
+          next[group.round.id] = group.teams[0].teamId;
+        }
+      });
+      return next;
+    });
+  }, [groupedByRound]);
+
   const saveApprovedScore = useCallback(
     async (row: SubmissionRow, nextApprovedPoints: number | null) => {
       if (!row.response_id) return;
@@ -216,7 +234,7 @@ export function EventSubmissionsPage() {
         setScoreDrafts((prev) => ({ ...prev, [row.response_id as string]: toDraftValue(res.data.approved_points) }));
         setError(null);
       } else {
-        setError(formatApiError(res, 'Failed to save approved points.'));
+        setError(formatApiError(res, 'Failed to save points.'));
         logError('event_submissions_save_failed', { responseId: row.response_id, error: res.error });
       }
       setSavingByResponse((prev) => ({ ...prev, [row.response_id as string]: false }));
@@ -234,17 +252,74 @@ export function EventSubmissionsPage() {
       }
       const parsed = Number(draftValue);
       if (!Number.isFinite(parsed) || parsed < 0) {
-        setError('Approved points must be a number greater than or equal to zero.');
+        setError('Points must be a number greater than or equal to zero.');
         return;
       }
       if (parsed > row.max_points) {
-        setError(`Approved points cannot exceed max points (${formatPoints(row.max_points)}).`);
+        setError(`Points cannot exceed max points (${formatPoints(row.max_points)}).`);
         return;
       }
       await saveApprovedScore(row, parsed);
     },
     [saveApprovedScore, scoreDrafts]
   );
+
+  const handlePointsChange = useCallback(
+    (row: SubmissionRow, value: string) => {
+      if (!row.response_id) return;
+      setScoreDrafts((prev) => ({ ...prev, [row.response_id as string]: value }));
+      const responseId = row.response_id;
+      const existingTimer = autosaveTimersRef.current[responseId];
+      if (existingTimer) {
+        window.clearTimeout(existingTimer);
+      }
+      autosaveTimersRef.current[responseId] = window.setTimeout(() => {
+        void handleSaveClick(row);
+      }, 450);
+    },
+    [handleSaveClick]
+  );
+
+  useEffect(() => {
+    const timerMap = autosaveTimersRef.current;
+    return () => {
+      Object.values(timerMap).forEach((timerId) => window.clearTimeout(timerId));
+    };
+  }, []);
+
+  const applyAiToVisibleRows = useCallback(async () => {
+    const rowsToApply = groupedByRound.flatMap((group) => {
+      const activeTeamId = activeTeamByRound[group.round.id] ?? group.teams[0]?.teamId;
+      const activeTeam = group.teams.find((team) => team.teamId === activeTeamId);
+      if (!activeTeam) return [];
+      return activeTeam.rows.filter((row) => row.response_id && row.ai_grade && row.ai_grade.total_points !== null);
+    });
+    if (rowsToApply.length === 0) {
+      setError('No AI-graded visible submissions to apply.');
+      return;
+    }
+
+    setApplyingAiAll(true);
+    setError(null);
+    try {
+      await Promise.all(
+        rowsToApply.map(async (row) => {
+          if (!row.response_id || !row.ai_grade) return;
+          const next = Math.max(0, Math.min(row.max_points, row.ai_grade.total_points));
+          const res = await api.gradeEventItemResponse(row.response_id, { approved_points: next });
+          if (!res.ok) {
+            throw new Error(formatApiError(res, `Failed to apply AI score for item #${row.item_ordinal}.`));
+          }
+        })
+      );
+      await load({ silent: true });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to apply AI scores.';
+      setError(message);
+    } finally {
+      setApplyingAiAll(false);
+    }
+  }, [activeTeamByRound, groupedByRound, load]);
 
   if (loading) {
     return (
@@ -262,6 +337,15 @@ export function EventSubmissionsPage() {
           actions={
             eventId ? (
               <>
+                <SecondaryButton
+                  type="button"
+                  onClick={() => {
+                    void applyAiToVisibleRows();
+                  }}
+                  disabled={applyingAiAll}
+                >
+                  {applyingAiAll ? 'Applying AI…' : 'Use AI (Visible)'}
+                </SecondaryButton>
                 <ButtonLink to={`/events/${eventId}`} variant="outline">
                   Event
                 </ButtonLink>
@@ -314,21 +398,56 @@ export function EventSubmissionsPage() {
               <div className="text-sm text-muted">No teams or items found for this round.</div>
             ) : (
               <div className="space-y-3">
-                {group.teams.map((team) => (
-                  <div key={`round-${group.round.id}-team-${team.teamId}`} className="rounded-lg border border-border bg-panel2 p-4">
+                {(() => {
+                  const activeTeamId = activeTeamByRound[group.round.id] ?? group.teams[0].teamId;
+                  const activeIndex = Math.max(0, group.teams.findIndex((team) => team.teamId === activeTeamId));
+                  const team = group.teams[activeIndex] ?? group.teams[0];
+                  return (
+                    <div key={`round-${group.round.id}-team-${team.teamId}`} className="rounded-lg border border-border bg-panel2 p-4">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div>
                         <div className="text-sm font-semibold text-text">{team.teamName}</div>
                         <div className="mt-1 text-xs text-muted">
-                          Approved {formatPoints(team.approvedTotal)} / {formatPoints(team.maxPoints)} • AI suggested{' '}
+                          Points {formatPoints(team.approvedTotal)} / {formatPoints(team.maxPoints)} • AI suggested{' '}
                           {formatPoints(team.suggestedTotal)}
                         </div>
                       </div>
                       <div className="text-right text-xs text-muted">
-                        <div>{team.pendingApproval} awaiting approval</div>
+                        <div>{team.pendingApproval} awaiting points</div>
                         <div>{team.flaggedForReview} flagged by AI</div>
                         <div>{team.missingSubmissions} no submission</div>
                       </div>
+                    </div>
+                    <div className="mt-3 flex items-center justify-between gap-2">
+                      <SecondaryButton
+                        type="button"
+                        className="h-8 px-3 text-xs"
+                        disabled={activeIndex <= 0}
+                        onClick={() =>
+                          setActiveTeamByRound((prev) => ({
+                            ...prev,
+                            [group.round.id]: group.teams[Math.max(0, activeIndex - 1)].teamId
+                          }))
+                        }
+                      >
+                        ← Prev Team
+                      </SecondaryButton>
+                      <div className="text-xs text-muted">
+                        Team {activeIndex + 1} of {group.teams.length}
+                      </div>
+                      <SecondaryButton
+                        type="button"
+                        className="h-8 px-3 text-xs"
+                        disabled={activeIndex >= group.teams.length - 1}
+                        onClick={() =>
+                          setActiveTeamByRound((prev) => ({
+                            ...prev,
+                            [group.round.id]: group.teams[Math.min(group.teams.length - 1, activeIndex + 1)].teamId
+                          }))
+                        }
+                      >
+                        Next Team →
+                      </SecondaryButton>
                     </div>
                     <div className="mt-3 overflow-x-auto">
                       <table className="min-w-full divide-y divide-border text-sm">
@@ -339,14 +458,13 @@ export function EventSubmissionsPage() {
                             <th className="px-2 py-2">Expected</th>
                             <th className="px-2 py-2">Submitted</th>
                             <th className="px-2 py-2">AI pass</th>
-                            <th className="px-2 py-2">Approved</th>
+                            <th className="px-2 py-2">Points</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-border">
                           {team.rows.map((row) => {
                             const currentDraft = row.response_id ? (scoreDrafts[row.response_id] ?? toDraftValue(row.approved_points)) : '';
                             const isSaving = row.response_id ? Boolean(savingByResponse[row.response_id]) : false;
-                            const aiSuggested = row.ai_grade?.total_points ?? null;
                             return (
                               <tr key={`submission-row-${group.round.id}-${team.teamId}-${row.edition_item_id}`}>
                                 <td className="px-2 py-2 text-muted">#{row.item_ordinal}</td>
@@ -358,7 +476,10 @@ export function EventSubmissionsPage() {
                                     <div className="space-y-1">
                                       {row.expected_parts.map((part) => (
                                         <div key={`expected-${row.edition_item_id}-${part.label}`} className="text-xs">
-                                          <span className="text-muted">{part.label}:</span> {part.answer || '—'}{' '}
+                                          {row.expected_parts.length > 1 ? (
+                                            <span className="text-muted">{part.label}:</span>
+                                          ) : null}{' '}
+                                          {part.answer || '—'}{' '}
                                           <span className="text-muted">({formatPoints(part.points)} pt)</span>
                                         </div>
                                       ))}
@@ -372,12 +493,12 @@ export function EventSubmissionsPage() {
                                     <div className="space-y-1">
                                       {row.normalized_response_parts.map((part) => (
                                         <div key={`submitted-${row.response_id}-${part.label}`} className="text-xs">
-                                          <span className="text-muted">{part.label}:</span> {part.answer.trim() || '—'}
+                                          {row.normalized_response_parts.length > 1 ? (
+                                            <span className="text-muted">{part.label}:</span>
+                                          ) : null}{' '}
+                                          {part.answer.trim() || '—'}
                                         </div>
                                       ))}
-                                      <div className="text-[11px] text-muted">
-                                        {row.submitted_at ? `Submitted ${new Date(row.submitted_at).toLocaleTimeString()}` : 'Submitted'}
-                                      </div>
                                     </div>
                                   )}
                                 </td>
@@ -397,13 +518,19 @@ export function EventSubmissionsPage() {
                                         <span className="font-semibold">{formatPoints(row.ai_grade.total_points)}</span> /{' '}
                                         {formatPoints(row.max_points)}
                                       </div>
-                                      <div className="text-muted">
+                                      <div
+                                        className={
+                                          row.ai_grade.overall_confidence < row.ai_grade.threshold
+                                            ? 'font-semibold text-danger-ink'
+                                            : 'text-muted'
+                                        }
+                                      >
                                         Confidence {(row.ai_grade.overall_confidence * 100).toFixed(0)}%
                                       </div>
-                                      {row.ai_grade.needs_review ? (
-                                        <StatusPill status="locked" label="Needs Review" />
+                                      {row.ai_grade.total_points >= row.max_points ? (
+                                        <StatusPill status="live" label="Correct" />
                                       ) : (
-                                        <StatusPill status="live" label="Looks Good" />
+                                        <StatusPill status="canceled" label="Incorrect" />
                                       )}
                                     </div>
                                   ) : (
@@ -422,40 +549,12 @@ export function EventSubmissionsPage() {
                                         step="0.1"
                                         className="h-9 rounded-md border border-border bg-panel px-2 text-sm"
                                         value={currentDraft}
-                                        onChange={(event) =>
-                                          setScoreDrafts((prev) => ({ ...prev, [row.response_id as string]: event.target.value }))
-                                        }
+                                        onChange={(event) => handlePointsChange(row, event.target.value)}
                                         placeholder={`0 - ${formatPoints(row.max_points)}`}
                                       />
-                                      <div className="flex flex-wrap items-center gap-2">
-                                        <SecondaryButton
-                                          type="button"
-                                          className="h-8 px-3 text-xs"
-                                          disabled={isSaving}
-                                          onClick={() => {
-                                            void handleSaveClick(row);
-                                          }}
-                                        >
-                                          {isSaving ? 'Saving…' : 'Save'}
-                                        </SecondaryButton>
-                                        {row.ai_grade && (
-                                          <SecondaryButton
-                                            type="button"
-                                            className="h-8 px-3 text-xs"
-                                            disabled={isSaving}
-                                            onClick={() => {
-                                              if (!row.response_id || aiSuggested === null) return;
-                                              const next = Math.max(0, Math.min(row.max_points, aiSuggested));
-                                              setScoreDrafts((prev) => ({ ...prev, [row.response_id as string]: toDraftValue(next) }));
-                                              void saveApprovedScore(row, next);
-                                            }}
-                                          >
-                                            Use AI ({formatPoints(aiSuggested)})
-                                          </SecondaryButton>
-                                        )}
-                                      </div>
                                       <div className="text-[11px] text-muted">
-                                        Approved: {formatPoints(row.approved_points)} / {formatPoints(row.max_points)}
+                                        Points: {formatPoints(row.approved_points)} / {formatPoints(row.max_points)}
+                                        {isSaving ? ' • Saving…' : ''}
                                       </div>
                                     </div>
                                   )}
@@ -467,7 +566,8 @@ export function EventSubmissionsPage() {
                       </table>
                     </div>
                   </div>
-                ))}
+                  );
+                })()}
               </div>
             )}
           </Section>
