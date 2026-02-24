@@ -22,8 +22,9 @@ const PAGE_MARGIN = 36;
 const HEADER_HEIGHT = 60;
 const CELL_PADDING = 12;
 const IMAGE_SHEET_HALF_HEIGHT = PAGE_HEIGHT / 2;
-const IMAGE_SHEET_ITEMS_PER_SET = 8;
+const IMAGE_SHEET_COLUMNS = 5;
 const IMAGE_SHEET_ROW_COUNT = 2;
+const IMAGE_SHEET_ITEMS_PER_SET = IMAGE_SHEET_COLUMNS * IMAGE_SHEET_ROW_COUNT;
 
 type RoundBundle = {
   round: EventRound;
@@ -105,23 +106,26 @@ const drawImageSheetHalf = (
     color: rgb(0, 0, 0)
   });
 
-  const columns = Math.max(1, Math.ceil(items.length / IMAGE_SHEET_ROW_COUNT));
+  const columns = IMAGE_SHEET_COLUMNS;
   const columnGap = 12;
-  const rowGap = 18;
-  const labelHeight = 20;
+  const rowGap = 22;
+  const answerGap = 16;
+  const answerBlockHeight = 24;
   const cardWidth = (contentWidth - (columns - 1) * columnGap) / columns;
-  const maxImageHeightByRow =
-    (IMAGE_SHEET_HALF_HEIGHT - 68 - rowGap - IMAGE_SHEET_ROW_COUNT * labelHeight) / IMAGE_SHEET_ROW_COUNT;
-  const imageHeight = Math.max(60, Math.min(120, cardWidth * 0.62, maxImageHeightByRow));
+  const maxImageHeightByRow = (
+    IMAGE_SHEET_HALF_HEIGHT - 68 - rowGap - IMAGE_SHEET_ROW_COUNT * (answerGap + answerBlockHeight)
+  ) / IMAGE_SHEET_ROW_COUNT;
+  const imageHeight = Math.max(56, Math.min(92, cardWidth * 0.72, maxImageHeightByRow));
+  const rowBlockHeight = imageHeight + answerGap + answerBlockHeight;
   const firstRowImageY = halfTop - 56 - imageHeight;
-  const secondRowImageY = firstRowImageY - rowGap - labelHeight - imageHeight;
+  const secondRowImageY = firstRowImageY - rowGap - rowBlockHeight;
 
   items.forEach((item, index) => {
     const rowIndex = Math.floor(index / columns);
     const columnIndex = index % columns;
     const x = contentX + columnIndex * (cardWidth + columnGap);
     const imageY = rowIndex === 0 ? firstRowImageY : secondRowImageY;
-    const labelY = imageY - 12;
+    const answerLineY = imageY - answerGap;
 
     const widthScale = cardWidth / item.image.width;
     const heightScale = imageHeight / item.image.height;
@@ -141,15 +145,15 @@ const drawImageSheetHalf = (
     const numberText = `${item.ordinal}.`;
     page.drawText(numberText, {
       x,
-      y: labelY,
+      y: answerLineY + 3,
       size: 10,
       font: fonts.bold,
       color: rgb(0, 0, 0)
     });
     const numberWidth = fonts.bold.widthOfTextAtSize(numberText, 10);
     page.drawLine({
-      start: { x: x + numberWidth + 6, y: labelY + 2 },
-      end: { x: x + cardWidth, y: labelY + 2 },
+      start: { x: x + numberWidth + 6, y: answerLineY + 2 },
+      end: { x: x + cardWidth, y: answerLineY + 2 },
       thickness: 0.8,
       color: rgb(0.35, 0.35, 0.35)
     });
