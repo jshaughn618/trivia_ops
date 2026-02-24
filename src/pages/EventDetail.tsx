@@ -991,21 +991,78 @@ const renderUpcomingBlock = (
   }
 ) => {
   const padding = CELL_PADDING;
+  const headlineSize = 15;
   const upcomingTitleSize = 10.5;
   const upcomingTextSize = 13;
   let cursorY = cell.y + cell.height - padding;
   const upcoming = extras.upcomingLines ?? [];
   if (upcoming.length > 0) {
+    const iconSize = 18;
+    const iconX = cell.x + padding;
+    const iconY = cursorY - iconSize;
+    const iconStroke = rgb(0, 0, 0);
+
+    page.drawRectangle({
+      x: iconX,
+      y: iconY,
+      width: iconSize,
+      height: iconSize,
+      borderColor: iconStroke,
+      borderWidth: 1
+    });
+    page.drawRectangle({
+      x: iconX,
+      y: iconY + iconSize - 5,
+      width: iconSize,
+      height: 5,
+      color: rgb(0.88, 0.88, 0.88)
+    });
+    page.drawLine({
+      start: { x: iconX + 4, y: iconY + iconSize + 1 },
+      end: { x: iconX + 4, y: iconY + iconSize - 3 },
+      thickness: 1.4,
+      color: iconStroke
+    });
+    page.drawLine({
+      start: { x: iconX + iconSize - 4, y: iconY + iconSize + 1 },
+      end: { x: iconX + iconSize - 4, y: iconY + iconSize - 3 },
+      thickness: 1.4,
+      color: iconStroke
+    });
+    page.drawLine({
+      start: { x: iconX + iconSize - 2, y: iconY + 2 },
+      end: { x: iconX + iconSize + 9, y: iconY - 4 },
+      thickness: 1.6,
+      color: iconStroke
+    });
+    page.drawLine({
+      start: { x: iconX + iconSize + 8.2, y: iconY - 3.2 },
+      end: { x: iconX + iconSize + 9.6, y: iconY - 1.8 },
+      thickness: 1.2,
+      color: iconStroke
+    });
+
+    const headingX = iconX + iconSize + 8;
+    const headingMaxWidth = cell.width - padding * 2 - iconSize - 8;
+    const headingText = truncateText(fonts.bold, 'Mark Your Calendars!', headingMaxWidth, headlineSize);
+    page.drawText(headingText, {
+      x: headingX,
+      y: cursorY - headlineSize,
+      size: headlineSize,
+      font: fonts.bold
+    });
+
     const locationLabel = extras.locationName?.trim()
       ? `Upcoming Trivia Events at ${extras.locationName.trim()}`
       : 'Upcoming Trivia Events';
-    page.drawText(locationLabel, {
+    const subtitleText = truncateText(fonts.bold, locationLabel, cell.width - padding * 2, upcomingTitleSize);
+    page.drawText(subtitleText, {
       x: cell.x + padding,
-      y: cursorY - upcomingTitleSize,
+      y: cursorY - headlineSize - upcomingTitleSize - 4,
       size: upcomingTitleSize,
       font: fonts.bold
     });
-    cursorY -= upcomingTitleSize + 28;
+    cursorY -= headlineSize + upcomingTitleSize + 24;
     upcoming.forEach((line) => {
       if (!line.trim()) {
         cursorY -= upcomingTextSize + 8;
