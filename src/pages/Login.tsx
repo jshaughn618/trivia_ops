@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { PrimaryButton, SecondaryButton } from '../components/Buttons';
 import { PromptHero } from '../components/play/PromptHero';
 import { api, formatApiError } from '../api';
@@ -146,6 +146,11 @@ export function LoginPage() {
       <div className="w-full max-w-md border-2 border-border bg-panel p-6">
         <img src={logo} alt="Trivia Ops" className="h-16 w-auto" />
         <div className="mt-2 text-sm leading-tight text-muted">The command center for live trivia fun.</div>
+        <div className="mt-2">
+          <Link className="text-xs text-accent-ink hover:text-accent" to="/about">
+            About Us
+          </Link>
+        </div>
         <div className="mt-4">
           <div className="text-3xl font-display tracking-tight">Join game</div>
           {step === 'event' ? (
