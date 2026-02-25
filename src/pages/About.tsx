@@ -11,8 +11,7 @@ export function AboutPage() {
     <div className="min-h-screen bg-bg px-4 py-10 text-text">
       <div className="mx-auto w-full max-w-3xl border-2 border-border bg-panel p-6 sm:p-8">
         <img src={logo} alt="Trivia Ops" className="h-14 w-auto" />
-        <div className="text-xs uppercase tracking-[0.2em] text-muted">About Us</div>
-        <h1 className="mt-2 text-3xl font-display tracking-tight sm:text-4xl">Trivia Ops</h1>
+        <div className="mt-5 text-xs uppercase tracking-[0.2em] text-muted">About Us</div>
         <p className="mt-4 text-sm leading-relaxed text-muted">
           Trivia Ops is a platform for running live trivia nights. We help hosts organize rounds, manage teams, present
           questions, and keep game flow moving from start to finish.
