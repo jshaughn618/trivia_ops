@@ -15,6 +15,8 @@ export function EventNewPage() {
   const [locationId, setLocationId] = useState('');
   const [hostUserId, setHostUserId] = useState('');
   const [notes, setNotes] = useState('');
+  const [tiebreakerQuestion, setTiebreakerQuestion] = useState('');
+  const [tiebreakerAnswer, setTiebreakerAnswer] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -36,7 +38,9 @@ export function EventNewPage() {
       host_user_id: hostUserId,
       status: 'planned',
       event_type: eventType,
-      notes
+      notes,
+      tiebreaker_question: tiebreakerQuestion || null,
+      tiebreaker_answer: tiebreakerAnswer || null
     });
     if (res.ok) {
       navigate(`/events/${res.data.id}`);
@@ -100,6 +104,22 @@ export function EventNewPage() {
           <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
             Notes
             <textarea className="min-h-[100px] px-3 py-2" value={notes} onChange={(event) => setNotes(event.target.value)} />
+          </label>
+          <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+            Tiebreaker Question
+            <textarea
+              className="min-h-[80px] px-3 py-2"
+              value={tiebreakerQuestion}
+              onChange={(event) => setTiebreakerQuestion(event.target.value)}
+            />
+          </label>
+          <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+            Tiebreaker Answer
+            <textarea
+              className="min-h-[80px] px-3 py-2"
+              value={tiebreakerAnswer}
+              onChange={(event) => setTiebreakerAnswer(event.target.value)}
+            />
           </label>
           <div className="flex items-center gap-2">
             <PrimaryButton onClick={handleCreate}>Create Event</PrimaryButton>

@@ -164,7 +164,9 @@ export const eventCreateSchema = z.object({
   allow_participant_web_submissions: z.boolean().optional(),
   status: eventStatusSchema.default('planned'),
   event_type: eventTypeSchema.default('Pub Trivia'),
-  notes: z.string().nullable().optional()
+  notes: z.string().nullable().optional(),
+  tiebreaker_question: z.string().nullable().optional(),
+  tiebreaker_answer: z.string().nullable().optional()
 });
 
 export const eventUpdateSchema = z.object({
@@ -176,6 +178,8 @@ export const eventUpdateSchema = z.object({
   status: eventStatusSchema.optional(),
   event_type: eventTypeSchema.optional(),
   notes: z.string().nullable().optional(),
+  tiebreaker_question: z.string().nullable().optional(),
+  tiebreaker_answer: z.string().nullable().optional(),
   scoresheet_key: z.string().nullable().optional(),
   scoresheet_name: z.string().nullable().optional(),
   answersheet_key: z.string().nullable().optional(),

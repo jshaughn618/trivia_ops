@@ -37,8 +37,11 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, data }) 
 
   await execute(
     env,
-    `INSERT INTO events (id, title, starts_at, location_id, host_user_id, status, event_type, notes, allow_participant_web_submissions, created_at, public_code)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO events (
+      id, title, starts_at, location_id, host_user_id, status, event_type, notes,
+      tiebreaker_question, tiebreaker_answer, allow_participant_web_submissions, created_at, public_code
+    )
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ,
     [
       id,
@@ -49,6 +52,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, data }) 
       payloadData.status,
       payloadData.event_type ?? 'Pub Trivia',
       payloadData.notes ?? null,
+      payloadData.tiebreaker_question ?? null,
+      payloadData.tiebreaker_answer ?? null,
       payloadData.allow_participant_web_submissions ? 1 : 0,
       createdAt,
       publicCode

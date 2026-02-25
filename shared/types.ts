@@ -107,6 +107,8 @@ export type Event = {
   status: EventStatus;
   event_type: EventType;
   notes: string | null;
+  tiebreaker_question: string | null;
+  tiebreaker_answer: string | null;
   scoresheet_key: string | null;
   scoresheet_name: string | null;
   answersheet_key: string | null;

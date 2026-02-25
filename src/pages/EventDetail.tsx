@@ -1279,6 +1279,8 @@ export function EventDetailPage() {
   const [eventType, setEventType] = useState<'Pub Trivia' | 'Music Trivia'>('Pub Trivia');
   const [allowParticipantWebSubmissions, setAllowParticipantWebSubmissions] = useState(false);
   const [notes, setNotes] = useState('');
+  const [tiebreakerQuestion, setTiebreakerQuestion] = useState('');
+  const [tiebreakerAnswer, setTiebreakerAnswer] = useState('');
   const [locationId, setLocationId] = useState('');
   const [hostUserId, setHostUserId] = useState('');
   const [roundGameId, setRoundGameId] = useState('');
@@ -1373,6 +1375,8 @@ export function EventDetailPage() {
       setEventType(eventRes.data.event_type ?? 'Pub Trivia');
       setAllowParticipantWebSubmissions(Boolean(eventRes.data.allow_participant_web_submissions ?? 0));
       setNotes(eventRes.data.notes ?? '');
+      setTiebreakerQuestion(eventRes.data.tiebreaker_question ?? '');
+      setTiebreakerAnswer(eventRes.data.tiebreaker_answer ?? '');
       setLocationId(eventRes.data.location_id ?? '');
       setHostUserId(eventRes.data.host_user_id ?? '');
     }
@@ -1390,6 +1394,8 @@ export function EventDetailPage() {
     setEventType(res.data.event.event_type ?? 'Pub Trivia');
     setAllowParticipantWebSubmissions(Boolean(res.data.event.allow_participant_web_submissions ?? 0));
     setNotes(res.data.event.notes ?? '');
+    setTiebreakerQuestion(res.data.event.tiebreaker_question ?? '');
+    setTiebreakerAnswer(res.data.event.tiebreaker_answer ?? '');
     setLocationId(res.data.event.location_id ?? '');
     setHostUserId(res.data.event.host_user_id ?? '');
     setRounds(res.data.rounds.sort((a, b) => a.round_number - b.round_number));
@@ -1480,11 +1486,24 @@ export function EventDetailPage() {
       event_type: eventType,
       allow_participant_web_submissions: allowParticipantWebSubmissions,
       notes,
+      tiebreaker_question: tiebreakerQuestion,
+      tiebreaker_answer: tiebreakerAnswer,
       starts_at: parsedStartsAt.iso || event?.starts_at || '',
       location_id: locationId || null,
       host_user_id: hostUserId || null
     }),
-    [status, eventType, allowParticipantWebSubmissions, notes, parsedStartsAt.iso, locationId, hostUserId, event?.starts_at]
+    [
+      status,
+      eventType,
+      allowParticipantWebSubmissions,
+      notes,
+      tiebreakerQuestion,
+      tiebreakerAnswer,
+      parsedStartsAt.iso,
+      locationId,
+      hostUserId,
+      event?.starts_at
+    ]
   );
 
   const eventSettingsSaved = useMemo(
@@ -1495,6 +1514,8 @@ export function EventDetailPage() {
             event_type: event.event_type ?? 'Pub Trivia',
             allow_participant_web_submissions: Boolean(event.allow_participant_web_submissions ?? 0),
             notes: event.notes ?? '',
+            tiebreaker_question: event.tiebreaker_question ?? '',
+            tiebreaker_answer: event.tiebreaker_answer ?? '',
             starts_at: event.starts_at,
             location_id: event.location_id ?? null,
             host_user_id: event.host_user_id ?? null
@@ -3484,6 +3505,22 @@ export function EventDetailPage() {
             className="min-h-[80px] w-full min-w-0 px-3 py-2"
             value={notes}
             onChange={(event) => setNotes(event.target.value)}
+          />
+        </label>
+        <label className="flex min-w-0 flex-col gap-2 text-sm text-muted">
+          <span>Tiebreaker question</span>
+          <textarea
+            className="min-h-[80px] w-full min-w-0 px-3 py-2"
+            value={tiebreakerQuestion}
+            onChange={(event) => setTiebreakerQuestion(event.target.value)}
+          />
+        </label>
+        <label className="flex min-w-0 flex-col gap-2 text-sm text-muted">
+          <span>Tiebreaker answer</span>
+          <textarea
+            className="min-h-[80px] w-full min-w-0 px-3 py-2"
+            value={tiebreakerAnswer}
+            onChange={(event) => setTiebreakerAnswer(event.target.value)}
           />
         </label>
       </div>
