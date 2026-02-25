@@ -20,6 +20,7 @@ export type PublicEventPayload = {
     id: string;
     round_number: number;
     label: string;
+    scoresheet_title: string | null;
     status: string;
     timer_seconds: number | null;
     is_speed_round: boolean;
@@ -108,6 +109,7 @@ export async function getPublicEventPayload(env: Env, rawCode: string, view?: Pu
     id: string;
     round_number: number;
     label: string;
+    scoresheet_title: string | null;
     status: string;
     timer_seconds: number | null;
     is_speed_round: number;
@@ -119,6 +121,7 @@ export async function getPublicEventPayload(env: Env, rawCode: string, view?: Pu
     `SELECT er.id,
             er.round_number,
             CASE WHEN g.show_theme = 0 THEN g.name ELSE er.label END AS label,
+            er.scoresheet_title,
             er.status,
             ed.timer_seconds,
             CASE WHEN g.subtype = 'speed_round' THEN 1 ELSE 0 END AS is_speed_round,
@@ -135,6 +138,7 @@ export async function getPublicEventPayload(env: Env, rawCode: string, view?: Pu
   );
   const rounds = roundsRaw.map((round) => ({
     ...round,
+    scoresheet_title: round.scoresheet_title ?? null,
     is_speed_round: Boolean(round.is_speed_round),
     allow_participant_audio_stop: Boolean(round.allow_participant_audio_stop),
     round_audio_key: round.round_audio_key ?? null,

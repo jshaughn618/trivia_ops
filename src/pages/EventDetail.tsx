@@ -51,6 +51,19 @@ const safeFileName = (value: string, fallback: string) => {
     .replace(/-+$/, '') || fallback;
 };
 
+const eventDateForFile = (startsAt?: string | null) => {
+  if (!startsAt) return 'date-unknown';
+  const parsed = new Date(startsAt);
+  if (Number.isNaN(parsed.getTime())) return 'date-unknown';
+  return parsed.toISOString().slice(0, 10);
+};
+
+const buildEventDocumentBaseName = (event: Event, locationName?: string | null) => {
+  const datePart = eventDateForFile(event.starts_at);
+  const locationPart = locationName?.trim() || 'location';
+  return safeFileName(`${datePart} - ${locationPart}`, `event-${event.id.slice(0, 8)}`);
+};
+
 const chunkArray = <T,>(items: T[], size: number) => {
   const chunks: T[][] = [];
   for (let i = 0; i < items.length; i += size) {
@@ -2353,12 +2366,12 @@ export function EventDetailPage() {
         locationName,
         logoBytes
       });
-      const baseName = safeFileName(event.title, `event-${event.id.slice(0, 8)}`);
-      const scoresheetLabel = teams.length > 1 ? `${baseName}-scoresheets.pdf` : `${baseName}-scoresheet.pdf`;
+      const baseName = buildEventDocumentBaseName(event, locationName);
+      const scoresheetLabel = `${baseName}-scoresheets.pdf`;
       const scoresheetFile = new File([scoresheetBytes], scoresheetLabel, {
         type: 'application/pdf'
       });
-      const answersheetFile = new File([answersheetBytes], `${baseName}-answersheet.pdf`, {
+      const answersheetFile = new File([answersheetBytes], `${baseName}-answersheets.pdf`, {
         type: 'application/pdf'
       });
 
@@ -2405,6 +2418,7 @@ export function EventDetailPage() {
       if (imageBundles.length === 0) {
         throw new Error('No image rounds found for this event.');
       }
+      const locationName = locations.find((location) => location.id === event.location_id)?.name ?? '';
 
       const imageSheetBytes = await buildImageSheetsPdf(event, imageBundles, async (mediaKey) => {
         const response = await fetch(api.mediaUrl(mediaKey), { credentials: 'include' });
@@ -2418,8 +2432,8 @@ export function EventDetailPage() {
         };
       });
 
-      const baseName = safeFileName(event.title, `event-${event.id.slice(0, 8)}`);
-      const imagesheetFile = new File([imageSheetBytes], `${baseName}-imagesheet.pdf`, {
+      const baseName = buildEventDocumentBaseName(event, locationName);
+      const imagesheetFile = new File([imageSheetBytes], `${baseName}-image-sheet.pdf`, {
         type: 'application/pdf'
       });
 

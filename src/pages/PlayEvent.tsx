@@ -70,6 +70,7 @@ type PublicEventResponse = {
     id: string;
     round_number: number;
     label: string;
+    scoresheet_title?: string | null;
     status: string;
     timer_seconds?: number | null;
     is_speed_round?: boolean;
@@ -836,7 +837,9 @@ export function PlayEventPage() {
       {waitingShowNextRound && nextRound && (
         <div className="text-sm text-muted">
           Up next: Round {nextRound.round_number}
-          {nextRound.label ? ` — ${nextRound.label}` : ''}
+          {(nextRound.scoresheet_title?.trim() || nextRound.label)?.trim()
+            ? ` — ${(nextRound.scoresheet_title?.trim() || nextRound.label).trim()}`
+            : ''}
         </div>
       )}
     </div>
