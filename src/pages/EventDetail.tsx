@@ -114,7 +114,7 @@ const drawImageSheetSection = (
   const contentWidth = PAGE_WIDTH - PAGE_MARGIN * 2;
   const titleY = sectionTop - 20;
 
-  page.drawText(roundTitleText, {
+  drawPdfText(page, roundTitleText, {
     x: contentX,
     y: titleY,
     size: 12,
@@ -155,7 +155,7 @@ const drawImageSheetSection = (
 
     const numberText = `${item.ordinal}`;
     const numberY = imageY + imageHeight + 4;
-    page.drawText(numberText, {
+    drawPdfText(page, numberText, {
       x: x + 2,
       y: numberY,
       size: 10,
@@ -440,13 +440,35 @@ const resolveTotalPossiblePoints = (item: EditionItem) => {
   return 1;
 };
 
+const sanitizePdfText = (value: unknown) => {
+  const text = String(value ?? '');
+  return text
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\u00a0/g, ' ')
+    .replace(/[\u2010-\u2015\u2212]/g, '-')
+    .replace(/[\u2018-\u201b]/g, "'")
+    .replace(/[\u201c-\u201f]/g, '"')
+    .replace(/\u2026/g, '...')
+    .replace(/[^\x09\x0a\x0d\x20-\x7e]/g, '');
+};
+
+const measurePdfText = (font: any, text: unknown, size: number) => {
+  return font.widthOfTextAtSize(sanitizePdfText(text), size);
+};
+
+const drawPdfText = (page: any, text: unknown, options: { x: number; y: number; size: number; font: any; color?: any }) => {
+  page.drawText(sanitizePdfText(text), options);
+};
+
 const truncateText = (font: any, text: string, maxWidth: number, size: number) => {
-  if (font.widthOfTextAtSize(text, size) <= maxWidth) return text;
-  let truncated = text;
-  while (truncated.length > 0 && font.widthOfTextAtSize(`${truncated}…`, size) > maxWidth) {
+  const normalized = sanitizePdfText(text);
+  if (measurePdfText(font, normalized, size) <= maxWidth) return normalized;
+  let truncated = normalized;
+  while (truncated.length > 0 && measurePdfText(font, `${truncated}...`, size) > maxWidth) {
     truncated = truncated.slice(0, -1);
   }
-  return `${truncated}…`;
+  return `${truncated}...`;
 };
 
 const drawPageHeader = (
@@ -461,7 +483,7 @@ const drawPageHeader = (
   const headerTop = PAGE_HEIGHT - PAGE_MARGIN;
   const titleY = headerTop - titleSize;
   const metaLine = formatHeaderMetaLine(event, locationName);
-  page.drawText(event.title, {
+  drawPdfText(page, event.title, {
     x: PAGE_MARGIN,
     y: titleY,
     size: titleSize,
@@ -469,7 +491,7 @@ const drawPageHeader = (
   });
 
   if (metaLine) {
-    page.drawText(metaLine, {
+    drawPdfText(page, metaLine, {
       x: PAGE_MARGIN,
       y: titleY - metaSize - 4,
       size: metaSize,
@@ -480,7 +502,7 @@ const drawPageHeader = (
   if (options?.showEventCode && event.public_code) {
     const codeText = `Event Code: ${event.public_code}`;
     const codeSize = metaSize;
-    page.drawText(codeText, {
+    drawPdfText(page, codeText, {
       x: PAGE_MARGIN,
       y: titleY - codeSize * (metaLine ? 2 : 1) - (metaLine ? 8 : 4),
       size: codeSize,
@@ -516,7 +538,7 @@ const drawMusicScoresheetHeader = (
   const metaLine = formatHeaderMetaLine(event, extras?.locationName ?? '');
 
   const title = truncateText(fonts.bold, event.title, leftColumnWidth, titleSize);
-  page.drawText(title, {
+  drawPdfText(page, title, {
     x: PAGE_MARGIN,
     y: titleY,
     size: titleSize,
@@ -525,7 +547,7 @@ const drawMusicScoresheetHeader = (
 
   if (metaLine) {
     const metaText = truncateText(fonts.regular, metaLine, leftColumnWidth, metaSize);
-    page.drawText(metaText, {
+    drawPdfText(page, metaText, {
       x: PAGE_MARGIN,
       y: titleY - metaSize - 3,
       size: metaSize,
@@ -535,7 +557,7 @@ const drawMusicScoresheetHeader = (
 
   if (eventCode) {
     const codeText = truncateText(fonts.regular, `Event Code: ${eventCode}`, leftColumnWidth, metaSize);
-    page.drawText(codeText, {
+    drawPdfText(page, codeText, {
       x: PAGE_MARGIN,
       y: titleY - (metaSize + 3) * (metaLine ? 2 : 1),
       size: metaSize,
@@ -594,8 +616,8 @@ const drawMusicScoresheetHeader = (
     const rawTeamName = extras?.teamName?.trim() ?? '';
     const teamLabel = 'Team Name:';
     const teamLabelSize = 10.5;
-    const teamLabelWidth = fonts.bold.widthOfTextAtSize(teamLabel, teamLabelSize);
-    page.drawText(teamLabel, {
+    const teamLabelWidth = measurePdfText(fonts.bold, teamLabel, teamLabelSize);
+    drawPdfText(page, teamLabel, {
       x: rightX,
       y: titleY,
       size: teamLabelSize,
@@ -608,7 +630,7 @@ const drawMusicScoresheetHeader = (
         Math.max(30, rightColumnWidth - teamLabelWidth - 8),
         teamLabelSize
       );
-      page.drawText(nameText, {
+      drawPdfText(page, nameText, {
         x: rightX + teamLabelWidth + 6,
         y: titleY,
         size: teamLabelSize,
@@ -631,7 +653,7 @@ const drawMusicScoresheetHeader = (
       metaSize
     );
 
-    page.drawText(teamCodeLine, {
+    drawPdfText(page, teamCodeLine, {
       x: rightX,
       y: titleY - metaSize - 3,
       size: metaSize,
@@ -681,7 +703,7 @@ const renderRoundBlock = (
   const answerColumns = resolveScoresheetAnswerColumns(items);
   const hasSplitAnswerColumns = answerColumns.length > 0;
   const titleY = cell.y + cell.height - CELL_PADDING - titleSize;
-  page.drawText(roundTitle(bundle.round), {
+  drawPdfText(page, roundTitle(bundle.round), {
     x: cell.x + CELL_PADDING,
     y: titleY,
     size: titleSize,
@@ -690,7 +712,7 @@ const renderRoundBlock = (
 
   const titleGap = 14;
   let contentTop = titleY - titleGap;
-  const numberWidth = fonts.regular.widthOfTextAtSize('00.', numberSize);
+  const numberWidth = measurePdfText(fonts.regular, '00.', numberSize);
   const contentX = cell.x + CELL_PADDING;
   const textStartX = contentX + numberWidth + 6;
   const availableWidth = cell.width - CELL_PADDING * 2 - numberWidth - 6;
@@ -709,7 +731,7 @@ const renderRoundBlock = (
     const totalGap = gap * Math.max(0, colCount - 1);
     const colWidth = (responseWidth - totalGap) / colCount;
     answerColumns.forEach((columnLabel, index) => {
-      page.drawText(columnLabel, {
+      drawPdfText(page, columnLabel, {
         x: textStartX + index * (colWidth + gap),
         y: labelY,
         size: labelSize,
@@ -718,7 +740,7 @@ const renderRoundBlock = (
     });
   }
   if (showPointsColumn) {
-    page.drawText('Points', {
+    drawPdfText(page, 'Points', {
       x: pointsX,
       y: labelY,
       size: labelSize,
@@ -738,7 +760,7 @@ const renderRoundBlock = (
   const baseY = contentTop - numberSize;
 
   if (itemCount === 0) {
-    page.drawText('No items.', {
+    drawPdfText(page, 'No items.', {
       x: contentX,
       y: baseY,
       size: textSize,
@@ -755,20 +777,20 @@ const renderRoundBlock = (
     if (mode === 'scoresheet') {
       if (inlineLabel) {
         numberedRow += 1;
-        page.drawText(`${numberedRow}.`, {
+        drawPdfText(page, `${numberedRow}.`, {
           x: contentX,
           y: rowY,
           size: numberSize,
           font: fonts.regular
         });
         const labelText = `${inlineLabel}:`;
-        page.drawText(labelText, {
+        drawPdfText(page, labelText, {
           x: textStartX,
           y: rowY,
           size: textSize,
           font: fonts.regular
         });
-        const labelWidth = fonts.regular.widthOfTextAtSize(labelText, textSize);
+        const labelWidth = measurePdfText(fonts.regular, labelText, textSize);
         const lineY = rowY - 2;
         const lineStart = Math.min(textStartX + labelWidth + 6, responseEndX - 12);
         page.drawLine({
@@ -787,7 +809,7 @@ const renderRoundBlock = (
         }
       } else if (hasSplitAnswerColumns) {
         numberedRow += 1;
-        page.drawText(`${numberedRow}.`, {
+        drawPdfText(page, `${numberedRow}.`, {
           x: contentX,
           y: rowY,
           size: numberSize,
@@ -817,7 +839,7 @@ const renderRoundBlock = (
         }
       } else {
         numberedRow += 1;
-        page.drawText(`${numberedRow}.`, {
+        drawPdfText(page, `${numberedRow}.`, {
           x: contentX,
           y: rowY,
           size: numberSize,
@@ -840,7 +862,7 @@ const renderRoundBlock = (
         }
       }
     } else {
-      page.drawText(`${index + 1}.`, {
+      drawPdfText(page, `${index + 1}.`, {
         x: contentX,
         y: rowY,
         size: numberSize,
@@ -851,7 +873,7 @@ const renderRoundBlock = (
         const isSingleLabeledResponse = answerTypeLabels.length === 1;
         if (isSingleLabeledResponse) {
           const answer = truncateText(fonts.regular, formatAnswer(item), responseWidth, textSize);
-          page.drawText(answer, {
+          drawPdfText(page, answer, {
             x: textStartX,
             y: rowY,
             size: textSize,
@@ -865,7 +887,7 @@ const renderRoundBlock = (
           const columnAnswers = resolveAnswerColumnValues(item, colCount);
           columnAnswers.forEach((columnAnswer, columnIndex) => {
             const answer = truncateText(fonts.regular, columnAnswer, colWidth, textSize);
-            page.drawText(answer, {
+            drawPdfText(page, answer, {
               x: textStartX + columnIndex * (colWidth + gap),
               y: rowY,
               size: textSize,
@@ -875,7 +897,7 @@ const renderRoundBlock = (
         }
       } else {
         const answer = truncateText(fonts.regular, formatAnswer(item), responseWidth, textSize);
-        page.drawText(answer, {
+        drawPdfText(page, answer, {
           x: textStartX,
           y: rowY,
           size: textSize,
@@ -884,8 +906,8 @@ const renderRoundBlock = (
       }
       if (showPointsColumn) {
         const pointsText = String(resolveTotalPossiblePoints(item));
-        const pointsWidth = fonts.bold.widthOfTextAtSize(pointsText, textSize);
-        page.drawText(pointsText, {
+        const pointsWidth = measurePdfText(fonts.bold, pointsText, textSize);
+        drawPdfText(page, pointsText, {
           x: pointsX + Math.max(0, (pointsLineWidth - pointsWidth) / 2),
           y: rowY,
           size: textSize,
@@ -926,7 +948,7 @@ const renderTeamBlock = (
 
   const teamName = extras.teamName?.trim() ?? '';
   if (teamName && !extras.teamPlaceholder) {
-    page.drawText(`Team: ${teamName}`, {
+    drawPdfText(page, `Team: ${teamName}`, {
       x: cell.x + padding,
       y: cursorY - textSize,
       size: textSize,
@@ -935,11 +957,11 @@ const renderTeamBlock = (
     cursorY -= textSize + 36;
   } else {
     const label = 'Team Name:';
-    const labelWidth = fonts.bold.widthOfTextAtSize(label, textSize);
+    const labelWidth = measurePdfText(fonts.bold, label, textSize);
     const baseY = cursorY - textSize;
     const lineStartX = cell.x + padding + labelWidth + 6;
     const lineEndX = cell.x + cell.width - padding;
-    page.drawText(label, {
+    drawPdfText(page, label, {
       x: cell.x + padding,
       y: baseY,
       size: textSize,
@@ -976,7 +998,7 @@ const renderTeamBlock = (
   cursorY -= textSize * 0.5;
 
   const teamCodeText = extras.teamCode ? `Team Code: ${extras.teamCode}` : 'Team Code: —';
-  page.drawText(teamCodeText, {
+  drawPdfText(page, teamCodeText, {
     x: cell.x + padding,
     y: cursorY - textSize,
     size: textSize,
@@ -1028,7 +1050,7 @@ const renderUpcomingBlock = (
     const headingX = iconX + iconWidth + 8;
     const headingMaxWidth = cell.width - padding * 2 - iconWidth - 8;
     const headingText = truncateText(fonts.bold, 'Mark Your Calendars!', headingMaxWidth, headlineSize);
-    page.drawText(headingText, {
+    drawPdfText(page, headingText, {
       x: headingX,
       y: cursorY - headlineSize,
       size: headlineSize,
@@ -1039,7 +1061,7 @@ const renderUpcomingBlock = (
       ? `Upcoming Trivia Events at ${extras.locationName.trim()}`
       : 'Upcoming Trivia Events';
     const subtitleText = truncateText(fonts.bold, locationLabel, cell.width - padding * 2, upcomingTitleSize);
-    page.drawText(subtitleText, {
+    drawPdfText(page, subtitleText, {
       x: cell.x + padding,
       y: cursorY - headlineSize - upcomingTitleSize - 14,
       size: upcomingTitleSize,
@@ -1051,7 +1073,7 @@ const renderUpcomingBlock = (
         cursorY -= upcomingTextSize + 8;
         return;
       }
-      page.drawText(line, {
+      drawPdfText(page, line, {
         x: cell.x + padding,
         y: cursorY - upcomingTextSize,
         size: upcomingTextSize,
