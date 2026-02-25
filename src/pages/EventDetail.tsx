@@ -389,6 +389,10 @@ const resolveInlineResponseLabel = (item: EditionItem) => {
 const formatAnswer = (item: EditionItem) => {
   const answerParts = parseAnswerPartsJson(item.answer_parts_json);
   if (answerParts.length > 0) {
+    if (answerParts.length === 1) {
+      const singleAnswer = answerParts[0]?.answer?.trim() ?? '';
+      if (singleAnswer) return singleAnswer;
+    }
     const joined = answerParts
       .filter((part) => part.answer.length > 0)
       .map((part) => `${part.label}: ${part.answer}`)
