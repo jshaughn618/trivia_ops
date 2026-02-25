@@ -407,8 +407,8 @@ const formatAnswer = (item: EditionItem) => {
     if (answerA && answerB) {
       return `${labelA}: ${answerA}  ${labelB}: ${answerB}`;
     }
-    if (answerA) return `${labelA}: ${answerA}`;
-    if (answerB) return `${labelB}: ${answerB}`;
+    if (answerA) return answerA;
+    if (answerB) return answerB;
   }
   return item.answer?.trim() || '—';
 };
