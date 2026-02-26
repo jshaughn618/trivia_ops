@@ -41,6 +41,19 @@ const parseAnswerParts = (value?: string | null): AnswerPart[] => {
   }
 };
 
+const parseChoices = (choicesJson?: string | null) => {
+  if (!choicesJson) return [];
+  try {
+    const parsed = JSON.parse(choicesJson);
+    if (Array.isArray(parsed)) {
+      return parsed.filter((choice) => typeof choice === 'string' && choice.trim().length > 0);
+    }
+  } catch {
+    return [];
+  }
+  return [];
+};
+
 export function EventRunPage() {
   const { eventId } = useParams();
   const query = useQuery();
@@ -266,6 +279,10 @@ export function EventRunPage() {
       : isSpeedRoundMode
         ? speedRoundPrompt
         : item?.prompt ?? '';
+  const multipleChoiceOptions = useMemo(
+    () => (item?.question_type === 'multiple_choice' ? parseChoices(item.choices_json) : []),
+    [item?.question_type, item?.choices_json]
+  );
   const participantWebSubmissionsEnabled = Boolean(event?.allow_participant_web_submissions ?? 0);
   const isDedicatedAudioStopFlowItem = Boolean(
     activeGame?.allow_participant_audio_stop && (isSpeedRoundMode || isAudioItem)
@@ -811,7 +828,7 @@ export function EventRunPage() {
       waiting_show_leaderboard: waitingShowLeaderboard,
       waiting_show_next_round: waitingShowNextRound,
       audio_playing: false,
-      show_full_leaderboard: false
+      show_full_leaderboard: showFullLeaderboard
     });
     if (!res.ok) {
       setWaitingError(formatApiError(res, 'Failed to update waiting room.'));
@@ -1030,6 +1047,24 @@ export function EventRunPage() {
                     )}
                   </div>
                   <div className="mt-3 text-xl font-semibold leading-snug text-text">{questionLabel}</div>
+                  {item.question_type === 'multiple_choice' && (
+                    <div className="mt-4 space-y-2">
+                      {multipleChoiceOptions.length > 0 ? (
+                        multipleChoiceOptions.map((choice, choiceIndex) => {
+                          const choiceLabel = String.fromCharCode(65 + choiceIndex);
+                          return (
+                            <div key={`${item.id}-choice-${choiceIndex}`} className="rounded-md border border-border bg-panel px-3 py-2 text-sm text-text">
+                              <span className="font-semibold text-muted">{choiceLabel}.</span> {choice}
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <div className="rounded-md border border-border bg-panel px-3 py-2 text-sm text-muted">
+                          No choices configured for this question.
+                        </div>
+                      )}
+                    </div>
+                  )}
                   {item.media_type === 'image' && item.media_key && (
                     <div className="mt-4 rounded-lg border border-border bg-panel p-2">
                       <img
