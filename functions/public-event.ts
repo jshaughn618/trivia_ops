@@ -249,7 +249,10 @@ export async function getPublicEventPayload(env: Env, rawCode: string, view?: Pu
   };
 
   const isLeaderboardView = view === 'leaderboard';
-  const includeLeaderboard = isLeaderboardView || Boolean(normalizedLive?.waiting_show_leaderboard);
+  const includeLeaderboard =
+    isLeaderboardView ||
+    Boolean(normalizedLive?.waiting_show_leaderboard) ||
+    Boolean(normalizedLive?.show_full_leaderboard);
   const includeTeams = !isLeaderboardView;
 
   const teams = includeTeams
