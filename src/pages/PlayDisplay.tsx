@@ -74,6 +74,7 @@ type PublicEventResponse = {
   }[];
   teams: { id: string; name: string }[];
   leaderboard: { team_id: string; name: string; total: number }[];
+  round_scores?: { event_round_id: string; team_id: string; score: number }[];
   live: {
     active_round_id: string | null;
     current_item_ordinal: number | null;
@@ -316,6 +317,22 @@ export function PlayDisplayPage() {
   }, []);
 
   const activeRound = data?.rounds.find((round) => round.id === data?.live?.active_round_id) ?? null;
+  const orderedRounds = (data?.rounds ?? []).slice().sort((a, b) => a.round_number - b.round_number);
+  const lastCompletedRound = [...orderedRounds]
+    .reverse()
+    .find((round) => round.status === 'completed' || round.status === 'locked');
+  const scoreMap = new Map<string, Record<string, number>>();
+  (data?.round_scores ?? []).forEach((row) => {
+    const teamScores = scoreMap.get(row.team_id) ?? {};
+    teamScores[row.event_round_id] = row.score;
+    scoreMap.set(row.team_id, teamScores);
+  });
+  const leaderboardRows = [...(data?.leaderboard ?? [])]
+    .map((row) => ({
+      ...row,
+      roundScores: scoreMap.get(row.team_id) ?? {}
+    }))
+    .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
   const isLive = activeRound?.status === 'live';
   const speedRoundMode = Boolean(isLive && activeRound?.is_speed_round);
   const visualItems = data?.visual_items ?? [];
@@ -519,17 +536,62 @@ export function PlayDisplayPage() {
         {showingFullLeaderboard ? (
           <div className="w-full max-w-2xl space-y-3 text-left">
             <div className="play-chip">Leaderboard</div>
-            {data.leaderboard.length === 0 && <div className="text-sm text-muted">No scores yet.</div>}
-            <div className="play-panel divide-y divide-border rounded-md">
-              {data.leaderboard.map((entry, index) => (
-                <div key={entry.team_id} className="play-list-row text-text">
-                  <div className="flex items-center gap-3">
+            {leaderboardRows.length === 0 && <div className="text-sm text-muted">No scores yet.</div>}
+            <div className="landscape:hidden space-y-2 max-h-[70dvh] overflow-y-auto pr-0.5">
+              {leaderboardRows.map((row, index) => (
+                <div key={row.team_id} className="play-list-row">
+                  <div className="flex min-w-0 items-center gap-3">
                     <span className={`play-rank ${index < 3 ? 'play-rank-top' : ''}`}>#{index + 1}</span>
-                    <div className="text-sm font-semibold">{entry.name}</div>
+                    <span className="truncate text-sm font-semibold text-text">{row.name}</span>
                   </div>
-                  <div className="text-sm font-semibold">{entry.total}</div>
+                  <div className={`grid gap-3 text-right ${lastCompletedRound ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                    {lastCompletedRound && (
+                      <div>
+                        <div className="text-[10px] font-medium text-muted">Last round</div>
+                        <div className="text-sm font-semibold text-text">
+                          {row.roundScores[lastCompletedRound.id] ?? 0}
+                        </div>
+                      </div>
+                    )}
+                    <div>
+                      <div className="text-[10px] font-medium text-muted">Total</div>
+                      <div className="text-base font-semibold text-text">{row.total}</div>
+                    </div>
+                  </div>
                 </div>
               ))}
+            </div>
+            <div className="hidden landscape:block">
+              <div className="overflow-x-auto border border-border bg-panel2">
+                <table className="min-w-full text-left text-sm">
+                  <thead className="bg-panel3/70">
+                    <tr>
+                      <th className="px-3 py-2 text-xs font-medium text-muted">Rank</th>
+                      <th className="px-3 py-2 text-xs font-medium text-muted">Team</th>
+                      {orderedRounds.map((round) => (
+                        <th key={round.id} className="px-3 py-2 text-xs font-medium text-muted">
+                          R{round.round_number}
+                        </th>
+                      ))}
+                      <th className="px-3 py-2 text-xs font-medium text-muted">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {leaderboardRows.map((row, index) => (
+                      <tr key={row.team_id}>
+                        <td className="px-3 py-2 text-xs text-muted">{index + 1}</td>
+                        <td className="px-3 py-2 text-sm font-semibold text-text">{row.name}</td>
+                        {orderedRounds.map((round) => (
+                          <td key={round.id} className="px-3 py-2 text-sm text-text">
+                            {row.roundScores[round.id] ?? 0}
+                          </td>
+                        ))}
+                        <td className="px-3 py-2 text-sm font-semibold text-text">{row.total}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         ) : isLive ? (

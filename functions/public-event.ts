@@ -253,6 +253,7 @@ export async function getPublicEventPayload(env: Env, rawCode: string, view?: Pu
     isLeaderboardView ||
     Boolean(normalizedLive?.waiting_show_leaderboard) ||
     Boolean(normalizedLive?.show_full_leaderboard);
+  const includeRoundScores = isLeaderboardView || Boolean(normalizedLive?.show_full_leaderboard);
   const includeTeams = !isLeaderboardView;
 
   const teams = includeTeams
@@ -277,7 +278,7 @@ export async function getPublicEventPayload(env: Env, rawCode: string, view?: Pu
     )
     : [];
 
-  const roundScores = isLeaderboardView
+  const roundScores = includeRoundScores
     ? await queryAll<{ event_round_id: string; team_id: string; score: number }>(
       env,
       `SELECT event_round_id, team_id, score
