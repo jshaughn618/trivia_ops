@@ -105,6 +105,7 @@ type PublicEventResponse = {
     media_type: string | null;
     media_key: string | null;
     ordinal: number;
+    is_example_item?: boolean;
   }[];
   speed_round_answers?: { ordinal: number; answer: string; song: string | null; artist: string | null }[] | null;
   current_item: {
@@ -121,6 +122,7 @@ type PublicEventResponse = {
     fun_fact?: string | null;
     media_type: string | null;
     media_key: string | null;
+    is_example_item?: boolean;
   } | null;
   response_counts?: {
     total: number;
@@ -424,7 +426,9 @@ export function PlayDisplayPage() {
     ? `Round ${activeRound?.round_number ?? ''} • Image ${visualIndex + 1} of ${visualItems.length}`.trim()
     : speedRoundMode
       ? `Round ${activeRound?.round_number ?? ''} • Speed round`.trim()
-      : activeRound && data.live?.current_item_ordinal
+      : displayItem?.is_example_item
+        ? `Round ${activeRound?.round_number ?? ''} • Example`.trim()
+      : activeRound && data.live?.current_item_ordinal !== null && data.live?.current_item_ordinal !== undefined
         ? `Round ${activeRound.round_number} • Question ${data.live.current_item_ordinal}`
         : 'Question';
   const answerParts = parseAnswerParts(displayItem?.answer_parts_json);

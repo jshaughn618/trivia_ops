@@ -4,6 +4,7 @@ import { parseJson } from '../../request';
 import { gameUpdateSchema } from '../../../shared/validators';
 import { execute, nowIso, queryFirst } from '../../db';
 import { requireAdmin } from '../../access';
+import { serializeGameExampleItem } from '../../game-example-item';
 
 export const onRequestGet: PagesFunction<Env> = async ({ env, params, data }) => {
   const guard = requireAdmin(data.user ?? null);
@@ -59,10 +60,14 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
       : merged.allow_participant_audio_stop
       ? 1
       : 0;
+  const exampleItemJson =
+    parsed.data.example_item === undefined
+      ? (existing as { example_item_json?: string | null }).example_item_json ?? null
+      : serializeGameExampleItem(parsed.data.example_item);
   await execute(
     env,
     `UPDATE games
-     SET name = ?, game_code = ?, game_type_id = ?, description = ?, subtype = ?, default_settings_json = ?, show_theme = ?, allow_participant_audio_stop = ?
+     SET name = ?, game_code = ?, game_type_id = ?, description = ?, subtype = ?, default_settings_json = ?, show_theme = ?, allow_participant_audio_stop = ?, example_item_json = ?
      WHERE id = ?`,
     [
       name,
@@ -73,6 +78,7 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
       merged.default_settings_json ?? null,
       showThemeValue,
       allowParticipantAudioStopValue,
+      exampleItemJson,
       params.id
     ]
   );

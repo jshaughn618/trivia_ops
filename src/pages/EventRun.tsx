@@ -169,7 +169,7 @@ export function EventRunPage() {
 
   const loadItems = async (selectedRoundId: string) => {
     if (!selectedRoundId) return;
-    const res = await api.listEventRoundItems(selectedRoundId);
+    const res = await api.listEventRoundItems(selectedRoundId, { includeExample: true });
     if (res.ok) {
       const sorted = res.data.sort((a, b) => a.ordinal - b.ordinal);
       setItems(sorted);
@@ -263,6 +263,7 @@ export function EventRunPage() {
   const activeGame = activeEdition ? gameById[activeEdition.game_id] : null;
   const isSpeedRoundMode = activeGame?.subtype === 'speed_round';
   const item = items[index];
+  const isExampleItem = Boolean(item?.is_example_item);
   const isAudioItem = item?.media_type === 'audio';
   const isImageItem = item?.media_type === 'image';
   const roundAudioKey = activeRound?.edition_audio_key ?? activeRound?.audio_key ?? null;
@@ -293,6 +294,8 @@ export function EventRunPage() {
     item.question_type !== 'multiple_choice' &&
     !isDedicatedAudioStopFlowItem
   );
+  const hasAudioSubmissionWorkflow = Boolean(isSpeedRoundMode || isAudioItem);
+  const hasParticipantAnswerWorkflow = Boolean(participantWebSubmissionsEnabled && hasAudioSubmissionWorkflow);
 
   const loadRoundResponses = useCallback(
     async (selectedRoundId: string, selectedItemId: string, silent = false) => {
@@ -364,17 +367,17 @@ export function EventRunPage() {
   );
 
   useEffect(() => {
-    if (!activeRound?.id) {
+    if (!activeRound?.id || !hasParticipantAnswerWorkflow) {
       setAudioSubmissions([]);
       setAudioSubmissionsLoading(false);
       setAudioSubmissionsError(null);
       return;
     }
     void loadAudioSubmissions(activeRound.id);
-  }, [activeRound?.id, activeRound?.status, loadAudioSubmissions]);
+  }, [activeRound?.id, activeRound?.status, hasParticipantAnswerWorkflow, loadAudioSubmissions]);
 
   useEffect(() => {
-    if (!activeRound?.id || activeRound.status !== 'live') return;
+    if (!activeRound?.id || activeRound.status !== 'live' || !hasParticipantAnswerWorkflow) return;
     let closed = false;
     const tick = async () => {
       if (closed) return;
@@ -387,7 +390,7 @@ export function EventRunPage() {
       closed = true;
       window.clearInterval(timer);
     };
-  }, [activeRound?.id, activeRound?.status, loadAudioSubmissions]);
+  }, [activeRound?.id, activeRound?.status, hasParticipantAnswerWorkflow, loadAudioSubmissions]);
 
   const audioSubmissionByItemId = useMemo(
     () => new Map(audioSubmissions.map((submission) => [submission.edition_item_id, submission])),
@@ -398,7 +401,6 @@ export function EventRunPage() {
     () => parseAnswerParts(currentAudioSubmission?.response_parts_json),
     [currentAudioSubmission?.response_parts_json]
   );
-  const hasAudioSubmissionWorkflow = Boolean(isSpeedRoundMode || isAudioItem);
   const audioSummaryRows = useMemo(
     () =>
       [...items]
@@ -1028,7 +1030,9 @@ export function EventRunPage() {
                 <div className="surface-inset p-5">
                   <div className="flex items-center justify-between gap-3">
                     <div className="ui-label">
-                      {isSpeedRoundMode
+                      {isExampleItem
+                        ? 'Example item'
+                        : isSpeedRoundMode
                         ? 'Speed round clip'
                         : item.media_type === 'audio'
                         ? `Clip ${index + 1}`
@@ -1140,7 +1144,7 @@ export function EventRunPage() {
               ) : (
                 <div className="text-sm text-muted">No items in this round.</div>
               )}
-              {item && hasAudioSubmissionWorkflow && (
+              {item && hasParticipantAnswerWorkflow && (
                 <div className="surface-inset p-5">
                   <div className="flex items-center justify-between gap-3">
                     <div className="ui-label">Participant Submission</div>
@@ -1367,8 +1371,17 @@ export function EventRunPage() {
                   className="h-11"
                   onClick={() => {
                     const next = !showAnswer;
+                    const hasFactoid = Boolean(item?.fun_fact?.trim());
                     setShowAnswer(next);
-                    if (eventId) api.updateLiveState(eventId, { reveal_answer: next });
+                    if (next && hasFactoid) {
+                      setShowFact(true);
+                    }
+                    if (eventId) {
+                      api.updateLiveState(eventId, {
+                        reveal_answer: next,
+                        ...(next && hasFactoid ? { reveal_fun_fact: true } : {})
+                      });
+                    }
                   }}
                   disabled={!item}
                 >
@@ -1416,7 +1429,7 @@ export function EventRunPage() {
                   {clearResponsesMessage}
                 </div>
               )}
-              {hasAudioSubmissionWorkflow &&
+              {hasParticipantAnswerWorkflow &&
                 (activeRound?.status === 'completed' || activeRound?.status === 'locked') &&
                 audioSummaryByTeam.length > 0 && (
                 <div className="surface-inset p-5">
@@ -1436,7 +1449,9 @@ export function EventRunPage() {
                             return (
                               <div key={`audio-summary-item-${summaryItem.id}`} className="rounded-md border border-border bg-panel2 px-3 py-2">
                                 <div className="flex flex-wrap items-center justify-between gap-2">
-                                  <div className="text-sm font-semibold text-text">Item {summaryItem.ordinal}</div>
+                                  <div className="text-sm font-semibold text-text">
+                                    {summaryItem.is_example_item ? 'Example' : `Item ${summaryItem.ordinal}`}
+                                  </div>
                                   <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold tracking-[0.04em] ${submissionOutcomeClass(submission)}`}>
                                     {submissionOutcome(submission)}
                                   </span>
@@ -1461,7 +1476,7 @@ export function EventRunPage() {
                   </div>
                 </div>
               )}
-              {hasAudioSubmissionWorkflow &&
+              {hasParticipantAnswerWorkflow &&
                 (activeRound?.status === 'completed' || activeRound?.status === 'locked') &&
                 audioSummaryByTeam.length === 0 && (
                 <div className="surface-inset p-5">

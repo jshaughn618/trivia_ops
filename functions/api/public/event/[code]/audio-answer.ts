@@ -7,6 +7,7 @@ import { execute, nowIso, queryFirst } from '../../../../db';
 import { checkRateLimit, recordRateLimitHit } from '../../../../rate-limit';
 import { deriveResponseLabels } from '../../../../response-labels';
 import { queueAutoGradeForResponse } from '../../../../answer-grading';
+import { buildRuntimeGameExampleItem, getGameExampleItemId } from '../../../../game-example-item';
 
 const DEFAULT_PUBLIC_AUDIO_ANSWER_RATE_LIMIT = {
   maxAttempts: 20,
@@ -60,6 +61,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request, 
     active_round_status: string | null;
     game_type_code: string | null;
     allow_participant_audio_stop: number | null;
+    game_id: string | null;
+    example_item_json: string | null;
   }>(
     env,
     `SELECT e.id,
@@ -70,7 +73,9 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request, 
             ls.participant_audio_stopped_by_team_id,
             er.status AS active_round_status,
             gt.code AS game_type_code,
-            g.allow_participant_audio_stop
+            g.allow_participant_audio_stop,
+            g.id AS game_id,
+            g.example_item_json
      FROM events e
      LEFT JOIN event_live_state ls ON ls.event_id = e.id AND COALESCE(ls.deleted, 0) = 0
      LEFT JOIN event_rounds er ON er.id = ls.active_round_id AND COALESCE(er.deleted, 0) = 0
@@ -89,7 +94,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request, 
     await recordFailure();
     return jsonError({ code: 'event_closed', message: 'Event is closed' }, 403);
   }
-  if (!event.active_round_id || !event.current_item_ordinal || event.active_round_status !== 'live') {
+  if (!event.active_round_id || event.current_item_ordinal === null || event.current_item_ordinal === undefined || event.active_round_status !== 'live') {
     await recordFailure();
     return jsonError({ code: 'not_live', message: 'No active item is live.' }, 400);
   }
@@ -119,6 +124,42 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request, 
   if (Boolean(event.audio_playing)) {
     await recordFailure();
     return jsonError({ code: 'audio_still_playing', message: 'Stop audio before submitting your answer.' }, 400);
+  }
+
+  const exampleItem =
+    event.game_id && event.current_item_ordinal === 0
+      ? buildRuntimeGameExampleItem(event.game_id, event.example_item_json)
+      : null;
+  if (exampleItem) {
+    const currentExampleItemId = getGameExampleItemId(event.game_id as string);
+    if (currentExampleItemId !== parsed.data.item_id) {
+      await recordFailure();
+      return jsonError({ code: 'not_current', message: 'Item is not active.' }, 400);
+    }
+    const expectedLabels = deriveResponseLabels(exampleItem);
+    if (expectedLabels.length === 0) {
+      await recordFailure();
+      return jsonError({ code: 'invalid_type', message: 'Active item does not support labeled answer submission.' }, 400);
+    }
+    const answersByLabel = new Map<string, string>();
+    parsed.data.answers.forEach((entry) => {
+      const label = entry.label.trim().toLowerCase();
+      const answer = entry.answer.trim();
+      if (!label || !answer) return;
+      answersByLabel.set(label, answer);
+    });
+    const missing = expectedLabels.filter((label) => !answersByLabel.get(label.toLowerCase()));
+    if (missing.length > 0) {
+      await recordFailure();
+      return jsonError({ code: 'validation_error', message: `Missing answers for: ${missing.join(', ')}` }, 400);
+    }
+    return jsonOk({
+      ok: true,
+      answers: expectedLabels.map((label) => ({
+        label,
+        answer: answersByLabel.get(label.toLowerCase()) ?? ''
+      }))
+    });
   }
 
   const currentItem = await queryFirst<{

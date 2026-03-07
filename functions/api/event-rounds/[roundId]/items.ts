@@ -1,13 +1,16 @@
 import type { Env } from '../../../types';
 import { jsonOk } from '../../../responses';
-import { queryAll } from '../../../db';
+import { queryAll, queryFirst } from '../../../db';
 import { requireHostOrAdmin, requireRoundAccess } from '../../../access';
+import { buildRuntimeGameExampleItem } from '../../../game-example-item';
 
-export const onRequestGet: PagesFunction<Env> = async ({ env, params, data }) => {
+export const onRequestGet: PagesFunction<Env> = async ({ env, params, data, request }) => {
   const guard = requireHostOrAdmin(data.user ?? null);
   if (guard) return guard;
   const access = await requireRoundAccess(env, data.user ?? null, params.roundId as string);
   if (access.response) return access.response;
+  const url = new URL(request.url);
+  const includeExample = url.searchParams.get('include_example') === '1';
   const rows = await queryAll(
     env,
     `SELECT
@@ -28,7 +31,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params, data }) =>
       ei.media_key,
       ei.audio_answer_key,
       ei.media_caption,
-      ei.created_at
+      ei.created_at,
+      0 AS is_example_item
     FROM event_round_items eri
     JOIN edition_items ei ON ei.id = eri.edition_item_id
     WHERE eri.event_round_id = ? AND COALESCE(eri.deleted, 0) = 0 AND COALESCE(ei.deleted, 0) = 0
@@ -36,5 +40,20 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params, data }) =>
     [params.roundId]
   );
 
-  return jsonOk(rows);
+  if (!includeExample) {
+    return jsonOk(rows);
+  }
+
+  const round = await queryFirst<{ game_id: string; example_item_json: string | null }>(
+    env,
+    `SELECT g.id AS game_id, g.example_item_json
+     FROM event_rounds er
+     JOIN editions ed ON ed.id = er.edition_id AND COALESCE(ed.deleted, 0) = 0
+     JOIN games g ON g.id = ed.game_id AND COALESCE(g.deleted, 0) = 0
+     WHERE er.id = ? AND COALESCE(er.deleted, 0) = 0`,
+    [params.roundId]
+  );
+
+  const exampleItem = round ? buildRuntimeGameExampleItem(round.game_id, round.example_item_json) : null;
+  return jsonOk(exampleItem ? [exampleItem, ...rows] : rows);
 };

@@ -7,6 +7,7 @@ import type {
   EventRound,
   EventRoundAudioSubmission,
   EventRoundScore,
+  GameExampleItem,
   Game,
   GameEdition,
   GameType,
@@ -18,9 +19,10 @@ import { createRequestId, logError, logInfo, logWarn } from './lib/log';
 
 type AnswerPartPayload = { label: string; answer: string; points?: number };
 type EditionItemPayload = Partial<EditionItem> & { answer_parts_json?: AnswerPartPayload[] };
-type GameMutationPayload = Partial<Omit<Game, 'show_theme' | 'allow_participant_audio_stop'>> & {
+type GameMutationPayload = Partial<Omit<Game, 'show_theme' | 'allow_participant_audio_stop' | 'example_item_json'>> & {
   show_theme?: boolean | number | null;
   allow_participant_audio_stop?: boolean | number | null;
+  example_item?: GameExampleItem | null;
 };
 type EventMutationPayload = Partial<
   Omit<
@@ -369,8 +371,10 @@ export const api = {
     apiFetch<{ ok: true }>(`/api/event-rounds/${roundId}`, { method: 'DELETE' }),
   syncEventRoundItems: (roundId: string) =>
     apiFetch<{ inserted: number }>(`/api/event-rounds/${roundId}/sync`, { method: 'POST' }),
-  listEventRoundItems: (roundId: string) =>
-    apiFetch<EditionItem[]>(`/api/event-rounds/${roundId}/items`),
+  listEventRoundItems: (roundId: string, options?: { includeExample?: boolean }) => {
+    const query = options?.includeExample ? '?include_example=1' : '';
+    return apiFetch<EditionItem[]>(`/api/event-rounds/${roundId}/items${query}`);
+  },
   listEventRoundResponses: (roundId: string, itemId: string) =>
     apiFetch<{
       item_id: string;

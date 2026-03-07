@@ -6,6 +6,7 @@ import { execute, nowIso, queryFirst } from '../../../../db';
 import { checkRateLimit, recordRateLimitHit } from '../../../../rate-limit';
 import { deriveResponseLabels, normalizeResponseParts } from '../../../../response-labels';
 import { queueAutoGradeForResponse } from '../../../../answer-grading';
+import { buildRuntimeGameExampleItem, getGameExampleItemId } from '../../../../game-example-item';
 
 const DEFAULT_PUBLIC_RESPONSE_RATE_LIMIT = {
   maxAttempts: 20,
@@ -94,6 +95,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request, 
     game_type_code: string | null;
     game_subtype: string | null;
     allow_participant_audio_stop: number | null;
+    game_id: string | null;
+    example_item_json: string | null;
   }>(
     env,
     `SELECT ls.active_round_id,
@@ -102,7 +105,9 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request, 
             ls.timer_duration_seconds,
             gt.code AS game_type_code,
             g.subtype AS game_subtype,
-            g.allow_participant_audio_stop
+            g.allow_participant_audio_stop,
+            g.id AS game_id,
+            g.example_item_json
      FROM event_live_state ls
      LEFT JOIN event_rounds er ON er.id = ls.active_round_id AND COALESCE(er.deleted, 0) = 0
      LEFT JOIN editions ed ON ed.id = er.edition_id AND COALESCE(ed.deleted, 0) = 0
@@ -112,7 +117,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request, 
     [event.id]
   );
 
-  if (!live?.active_round_id || !live.current_item_ordinal) {
+  if (!live?.active_round_id || live.current_item_ordinal === null || live.current_item_ordinal === undefined) {
     await recordFailure();
     return jsonError({ code: 'not_live', message: 'No active question.' }, 400);
   }
@@ -127,6 +132,81 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request, 
   if (Number.isNaN(expiresAt) || Date.now() > expiresAt + graceMs) {
     await recordFailure();
     return jsonError({ code: 'timer_expired', message: 'Timer expired.' }, 400);
+  }
+
+  const exampleItem =
+    live.game_id && live.current_item_ordinal === 0
+      ? buildRuntimeGameExampleItem(live.game_id, live.example_item_json)
+      : null;
+
+  if (exampleItem) {
+    const exampleItemId = getGameExampleItemId(live.game_id as string);
+    if (itemId !== exampleItemId) {
+      await recordFailure();
+      return jsonError({ code: 'not_current', message: 'Item is not active.' }, 400);
+    }
+
+    if (hasChoiceMode) {
+      if (exampleItem.question_type !== 'multiple_choice') {
+        await recordFailure();
+        return jsonError({ code: 'invalid_type', message: 'Item is not multiple choice.' }, 400);
+      }
+      let choices: string[] = [];
+      if (exampleItem.choices_json) {
+        try {
+          const parsed = JSON.parse(exampleItem.choices_json);
+          if (Array.isArray(parsed)) {
+            choices = parsed.filter((choice) => typeof choice === 'string');
+          }
+        } catch {
+          choices = [];
+        }
+      }
+      if (choiceIndex === null || choiceIndex < 0 || choiceIndex >= choices.length) {
+        await recordFailure();
+        return jsonError({ code: 'invalid_choice', message: 'Choice is out of range.' }, 400);
+      }
+      return jsonOk({ ok: true, mode: 'multiple_choice', choice_index: choiceIndex, choice_text: choices[choiceIndex] });
+    }
+
+    if (Number(event.allow_participant_web_submissions ?? 0) !== 1) {
+      await recordFailure();
+      return jsonError({ code: 'forbidden', message: 'Participant web submissions are not enabled for this event.' }, 403);
+    }
+
+    if (exampleItem.question_type === 'multiple_choice') {
+      await recordFailure();
+      return jsonError({ code: 'invalid_type', message: 'Use multiple-choice submission for this item.' }, 400);
+    }
+
+    const isMusicAudioStopExample =
+      live.game_type_code === 'music' &&
+      Number(live.allow_participant_audio_stop ?? 0) === 1 &&
+      (live.game_subtype === 'speed_round' || exampleItem.media_type === 'audio');
+    if (isMusicAudioStopExample) {
+      await recordFailure();
+      return jsonError({ code: 'use_audio_submission', message: 'Use the audio-stop submission flow for this item.' }, 400);
+    }
+
+    const answersPayload = payloadData?.answers;
+    if (!Array.isArray(answersPayload)) {
+      await recordFailure();
+      return jsonError({ code: 'validation_error', message: 'answers is required for non-multiple-choice submissions.' }, 400);
+    }
+
+    const answers = answersPayload
+      .map((entry) => {
+        if (!entry || typeof entry !== 'object') return null;
+        const label = typeof (entry as { label?: unknown }).label === 'string' ? (entry as { label: string }).label.trim() : '';
+        if (!label) return null;
+        const answer = typeof (entry as { answer?: unknown }).answer === 'string' ? (entry as { answer: string }).answer : '';
+        return { label, answer };
+      })
+      .filter((entry): entry is { label: string; answer: string } => Boolean(entry));
+
+    const expectedLabels = deriveResponseLabels(exampleItem, { fallbackSingleAnswer: true });
+    const responseParts = normalizeResponseParts(expectedLabels, answers);
+    return jsonOk({ ok: true, mode: 'text_parts', response_parts: responseParts });
   }
 
   const current = await queryFirst<{

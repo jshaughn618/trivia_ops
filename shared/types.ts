@@ -48,6 +48,7 @@ export type Game = {
   default_settings_json: string | null;
   show_theme: number | null;
   allow_participant_audio_stop: number | null;
+  example_item_json: string | null;
   created_at: string;
 };
 
@@ -94,6 +95,24 @@ export type EditionItem = {
   media_caption: string | null;
   audio_answer_key: string | null;
   created_at: string;
+  is_example_item?: number | null;
+};
+
+export type GameExampleItem = {
+  question_type: 'text' | 'multiple_choice';
+  choices_json: string[] | null;
+  prompt: string;
+  answer: string;
+  answer_a: string | null;
+  answer_b: string | null;
+  answer_a_label: string | null;
+  answer_b_label: string | null;
+  answer_parts_json: Array<{ label: string; answer: string; points?: number }> | null;
+  fun_fact: string | null;
+  media_type: MediaType | null;
+  media_key: string | null;
+  media_caption: string | null;
+  audio_answer_key: string | null;
 };
 
 export type Event = {

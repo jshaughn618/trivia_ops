@@ -3,6 +3,7 @@ import type { ApiError } from '../shared/types';
 import { normalizeCode } from './public';
 import { queryAll, queryFirst } from './db';
 import { deriveResponseLabels } from './response-labels';
+import { buildRuntimeGameExampleItem } from './game-example-item';
 
 export type PublicEventView = 'play' | 'leaderboard' | 'display';
 
@@ -75,6 +76,7 @@ export type PublicItem = {
   answer_parts_json?: string | null;
   audio_answer_key?: string | null;
   fun_fact?: string | null;
+  is_example_item?: boolean;
 };
 
 type PublicEventResult =
@@ -116,6 +118,8 @@ export async function getPublicEventPayload(env: Env, rawCode: string, view?: Pu
     allow_participant_audio_stop: number;
     round_audio_key: string | null;
     round_audio_name: string | null;
+    game_id: string;
+    example_item_json: string | null;
   }>(
     env,
     `SELECT er.id,
@@ -127,7 +131,9 @@ export async function getPublicEventPayload(env: Env, rawCode: string, view?: Pu
             CASE WHEN g.subtype = 'speed_round' THEN 1 ELSE 0 END AS is_speed_round,
             CASE WHEN gt.code = 'music' THEN COALESCE(g.allow_participant_audio_stop, 0) ELSE 0 END AS allow_participant_audio_stop,
             ed.speed_round_audio_key AS round_audio_key,
-            ed.speed_round_audio_name AS round_audio_name
+            ed.speed_round_audio_name AS round_audio_name,
+            g.id AS game_id,
+            g.example_item_json
      FROM event_rounds er
      JOIN editions ed ON ed.id = er.edition_id
      JOIN games g ON g.id = ed.game_id
@@ -230,6 +236,7 @@ export async function getPublicEventPayload(env: Env, rawCode: string, view?: Pu
       media_key: item.media_key,
       media_caption: item.media_caption ?? null,
       ordinal: item.ordinal,
+      is_example_item: Boolean((item as { is_example_item?: number | boolean | null }).is_example_item ?? 0),
       answer_part_labels: extractResponseLabels(item)
     };
 
@@ -298,6 +305,10 @@ export async function getPublicEventPayload(env: Env, rawCode: string, view?: Pu
   let responseCounts: { total: number; counts: number[] } | null = null;
 
   if (!isLeaderboardView && live?.active_round_id) {
+    const activeRoundMeta = roundsRaw.find((round) => round.id === live.active_round_id);
+    const exampleItem = activeRoundMeta
+      ? buildRuntimeGameExampleItem(activeRoundMeta.game_id, activeRoundMeta.example_item_json)
+      : null;
     const roundStatus = await queryFirst<{ status: string }>(
       env,
       'SELECT status FROM event_rounds WHERE id = ? AND COALESCE(deleted, 0) = 0',
@@ -320,6 +331,7 @@ export async function getPublicEventPayload(env: Env, rawCode: string, view?: Pu
         media_key: string | null;
         audio_answer_key: string | null;
         ordinal: number;
+        is_example_item?: number;
       }>(
         env,
         `SELECT
@@ -345,16 +357,24 @@ export async function getPublicEventPayload(env: Env, rawCode: string, view?: Pu
          ORDER BY eri.ordinal ASC`,
         [live.active_round_id]
       );
-      const imageItems = roundItems.filter((item) => item.media_type === 'image' && item.media_key);
-      if (roundItems.length > 0 && imageItems.length === roundItems.length) {
+      const combinedItems = exampleItem ? [exampleItem, ...roundItems] : roundItems;
+      const imageItems = combinedItems.filter((item) => item.media_type === 'image' && item.media_key);
+      if (combinedItems.length > 0 && imageItems.length === combinedItems.length) {
         visualRound = true;
         visualItems = imageItems.map((item) => sanitizeItem(item));
       }
     }
   }
 
-  if (!isLeaderboardView && live?.active_round_id && live.current_item_ordinal) {
-    const rawItem = await queryFirst<{
+  if (!isLeaderboardView && live?.active_round_id && live.current_item_ordinal !== null && live.current_item_ordinal !== undefined) {
+    const activeRoundMeta = roundsRaw.find((round) => round.id === live.active_round_id);
+    const exampleItem = activeRoundMeta
+      ? buildRuntimeGameExampleItem(activeRoundMeta.game_id, activeRoundMeta.example_item_json)
+      : null;
+    if (live.current_item_ordinal === 0 && exampleItem) {
+      currentItem = sanitizeItem(exampleItem);
+    } else {
+      const rawItem = await queryFirst<{
       id: string;
       question_type: string | null;
       choices_json: string | null;
@@ -371,9 +391,10 @@ export async function getPublicEventPayload(env: Env, rawCode: string, view?: Pu
       audio_answer_key: string | null;
       media_caption?: string | null;
       ordinal: number;
-    }>(
-      env,
-      `SELECT
+      is_example_item?: number;
+      }>(
+        env,
+        `SELECT
         ei.id,
         ei.edition_id,
         ei.question_type,
@@ -389,15 +410,17 @@ export async function getPublicEventPayload(env: Env, rawCode: string, view?: Pu
         ei.media_type,
         ei.media_key,
         ei.audio_answer_key,
-        ei.media_caption
+        ei.media_caption,
+        eri.ordinal
        FROM event_round_items eri
        JOIN edition_items ei ON ei.id = eri.edition_item_id
        WHERE eri.event_round_id = ? AND eri.ordinal = ? AND COALESCE(eri.deleted, 0) = 0 AND COALESCE(ei.deleted, 0) = 0
        LIMIT 1`,
-      [live.active_round_id, live.current_item_ordinal]
-    );
-    if (rawItem) {
-      currentItem = sanitizeItem(rawItem);
+        [live.active_round_id, live.current_item_ordinal]
+      );
+      if (rawItem) {
+        currentItem = sanitizeItem(rawItem);
+      }
     }
   }
 
@@ -463,7 +486,14 @@ export async function getPublicEventPayload(env: Env, rawCode: string, view?: Pu
     }
   }
 
-  if (!isLeaderboardView && currentItem?.choices_json && live?.active_round_id && normalizedLive?.timer_started_at && normalizedLive?.timer_duration_seconds) {
+  if (
+    !isLeaderboardView &&
+    currentItem?.choices_json &&
+    !currentItem.is_example_item &&
+    live?.active_round_id &&
+    normalizedLive?.timer_started_at &&
+    normalizedLive?.timer_duration_seconds
+  ) {
     const startMs = Date.parse(normalizedLive.timer_started_at);
     const expiresAt = startMs + normalizedLive.timer_duration_seconds * 1000;
     const graceMs = 5000;

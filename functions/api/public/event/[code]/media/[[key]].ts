@@ -3,6 +3,7 @@ import { jsonError } from '../../../../../responses';
 import { normalizeCode } from '../../../../../public';
 import { queryFirst } from '../../../../../db';
 import { logError, logInfo, logWarn } from '../../../../../_lib/log';
+import { parseGameExampleItem } from '../../../../../game-example-item';
 
 export const onRequestGet: PagesFunction<Env> = async ({ env, params, request, data }) => {
   const requestUrl = new URL(request.url);
@@ -63,6 +64,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params, request, d
     (activeRound.audio_key && activeRound.audio_key === key) ||
     (activeRound.edition_audio_key && activeRound.edition_audio_key === key);
   if (!isRoundAudio) {
+    let allowed = false;
     const mediaMatch = await queryFirst<{ media_key: string }>(
       env,
       `SELECT ei.media_key
@@ -75,8 +77,25 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params, request, d
        LIMIT 1`,
       [live.active_round_id, key]
     );
+    if (mediaMatch) {
+      allowed = true;
+    } else if (live.current_item_ordinal === 0) {
+      const roundGame = await queryFirst<{ example_item_json: string | null }>(
+        env,
+        `SELECT g.example_item_json
+         FROM event_rounds er
+         JOIN editions ed ON ed.id = er.edition_id AND COALESCE(ed.deleted, 0) = 0
+         JOIN games g ON g.id = ed.game_id AND COALESCE(g.deleted, 0) = 0
+         WHERE er.id = ? AND COALESCE(er.deleted, 0) = 0`,
+        [live.active_round_id]
+      );
+      const exampleItem = parseGameExampleItem(roundGame?.example_item_json);
+      if (exampleItem && (exampleItem.media_key === key || exampleItem.audio_answer_key === key)) {
+        allowed = true;
+      }
+    }
 
-    if (!mediaMatch) {
+    if (!allowed) {
       return jsonError({ code: 'forbidden', message: 'Media not available' }, 403);
     }
   }

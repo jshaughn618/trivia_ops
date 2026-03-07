@@ -3,6 +3,7 @@ import { jsonError, jsonOk } from '../../../responses';
 import { queryAll, queryFirst } from '../../../db';
 import { requireHostOrAdmin, requireRoundAccess } from '../../../access';
 import { deriveResponseLabels, normalizeResponseParts } from '../../../response-labels';
+import { buildRuntimeGameExampleItem, getGameExampleItemId, parseGameExampleItem } from '../../../game-example-item';
 
 type ParsedResponsePart = { label: string; answer: string };
 
@@ -35,6 +36,41 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params, request, d
   const itemId = (url.searchParams.get('item_id') ?? '').trim();
   if (!itemId) {
     return jsonError({ code: 'validation_error', message: 'item_id is required.' }, 400);
+  }
+
+  const round = await queryFirst<{ event_id: string; game_id: string; example_item_json: string | null }>(
+    env,
+    `SELECT er.event_id, g.id AS game_id, g.example_item_json
+     FROM event_rounds er
+     JOIN editions ed ON ed.id = er.edition_id AND COALESCE(ed.deleted, 0) = 0
+     JOIN games g ON g.id = ed.game_id AND COALESCE(g.deleted, 0) = 0
+     WHERE er.id = ? AND COALESCE(er.deleted, 0) = 0`,
+    [params.roundId]
+  );
+
+  const exampleItem = parseGameExampleItem(round?.example_item_json);
+  if (round && exampleItem && itemId === getGameExampleItemId(round.game_id)) {
+    const runtimeExample = buildRuntimeGameExampleItem(round.game_id, round.example_item_json);
+    const labels = runtimeExample ? deriveResponseLabels(runtimeExample, { fallbackSingleAnswer: true }) : [];
+    const teams = await queryAll<{ id: string; name: string }>(
+      env,
+      `SELECT id, name
+       FROM teams
+       WHERE event_id = ? AND COALESCE(deleted, 0) = 0
+       ORDER BY name ASC`,
+      [round.event_id]
+    );
+
+    return jsonOk({
+      item_id: itemId,
+      labels,
+      rows: teams.map((team) => ({
+        team_id: team.id,
+        team_name: team.name,
+        submitted_at: null,
+        response_parts: null
+      }))
+    });
   }
 
   const item = await queryFirst<{
@@ -161,4 +197,3 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params, request, d
     rows
   });
 };
-

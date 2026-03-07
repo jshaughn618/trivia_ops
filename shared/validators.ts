@@ -23,7 +23,8 @@ export const gameCreateSchema = z.object({
   subtype: z.string().nullable().optional(),
   default_settings_json: z.string().nullable().optional(),
   show_theme: z.boolean().optional(),
-  allow_participant_audio_stop: z.boolean().optional()
+  allow_participant_audio_stop: z.boolean().optional(),
+  example_item: z.lazy(() => gameExampleItemSchema).nullable().optional()
 });
 
 export const gameUpdateSchema = z.object({
@@ -34,7 +35,8 @@ export const gameUpdateSchema = z.object({
   subtype: z.string().nullable().optional(),
   default_settings_json: z.string().nullable().optional(),
   show_theme: z.boolean().optional(),
-  allow_participant_audio_stop: z.boolean().optional()
+  allow_participant_audio_stop: z.boolean().optional(),
+  example_item: z.lazy(() => gameExampleItemSchema).nullable().optional()
 });
 
 const editionStatusSchema = z.enum(['draft', 'published', 'archived']);
@@ -94,6 +96,46 @@ const editionItemBaseSchema = z.object({
   audio_answer_key: z.string().nullable().optional(),
   media_caption: z.string().nullable().optional()
 });
+
+const gameExampleItemBaseSchema = editionItemBaseSchema.omit({ ordinal: true });
+
+export const gameExampleItemSchema = gameExampleItemBaseSchema
+  .refine((data) => {
+    if (!data.answer_parts_json) return true;
+    return data.answer_parts_json.length > 0;
+  }, {
+    message: 'Answer parts must include at least one entry.',
+    path: ['answer_parts_json']
+  })
+  .refine((data) => {
+    if (data.media_type === 'audio') return true;
+    const isSinglePartLabeledResponse =
+      Array.isArray(data.answer_parts_json) &&
+      data.answer_parts_json.length === 1 &&
+      data.question_type !== 'multiple_choice';
+    if (isSinglePartLabeledResponse) return true;
+    return data.prompt.trim().length > 0;
+  }, {
+    message: 'Question is required',
+    path: ['prompt']
+  })
+  .refine((data) => {
+    const hasAnswerParts = Boolean(data.answer_parts_json && data.answer_parts_json.length > 0);
+    if (data.media_type === 'image') {
+      return Boolean(data.answer) || hasAnswerParts;
+    }
+    return hasAnswerParts || Boolean(data.answer) || (Boolean(data.answer_a) && Boolean(data.answer_b));
+  }, {
+    message: 'Provide an answer, answer parts, or both answer_a and answer_b',
+    path: ['answer']
+  })
+  .refine((data) => {
+    if (data.question_type !== 'multiple_choice') return true;
+    return Array.isArray(data.choices_json) && data.choices_json.length >= 2 && Boolean(data.answer);
+  }, {
+    message: 'Multiple choice items need at least two choices and a correct answer.',
+    path: ['choices_json']
+  });
 
 export const editionItemCreateSchema = editionItemBaseSchema
   .refine((data) => {
@@ -323,7 +365,7 @@ export const eventItemResponseGradeSchema = z.object({
 
 export const liveStateUpdateSchema = z.object({
   active_round_id: idSchema.nullable().optional(),
-  current_item_ordinal: z.number().int().min(1).nullable().optional(),
+  current_item_ordinal: z.number().int().min(0).nullable().optional(),
   audio_playing: z.boolean().optional(),
   reveal_answer: z.boolean().optional(),
   reveal_fun_fact: z.boolean().optional(),
@@ -340,6 +382,7 @@ export const liveStateUpdateSchema = z.object({
 
 export type LocationCreate = z.infer<typeof locationCreateSchema>;
 export type GameCreate = z.infer<typeof gameCreateSchema>;
+export type GameExampleItemInput = z.infer<typeof gameExampleItemSchema>;
 export type EditionCreate = z.infer<typeof editionCreateSchema>;
 export type EditionItemCreate = z.infer<typeof editionItemCreateSchema>;
 export type EventCreate = z.infer<typeof eventCreateSchema>;
