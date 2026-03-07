@@ -574,9 +574,7 @@ const drawMusicScoresheetHeader = (
   const metaSize = 9.5;
   const leftColumnWidth = 210;
   const showTeamInfo = extras?.showTeamInfo ?? true;
-  const includeOptions = mode === 'scoresheet'
-    ? extras?.includeOptions ?? DEFAULT_SCORESHEET_INCLUDE_OPTIONS
-    : DEFAULT_SCORESHEET_INCLUDE_OPTIONS;
+  const includeOptions = extras?.includeOptions ?? DEFAULT_SCORESHEET_INCLUDE_OPTIONS;
   const rightColumnWidth = showTeamInfo ? 210 : 0;
   const rightX = PAGE_WIDTH - PAGE_MARGIN - rightColumnWidth;
   const titleY = headerTop - titleSize;
