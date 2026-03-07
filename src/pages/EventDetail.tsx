@@ -41,6 +41,35 @@ type EmbeddedImageItem = {
   ordinal: number;
   image: any;
 };
+type ScoresheetIncludeOptions = {
+  eventName: boolean;
+  date: boolean;
+  location: boolean;
+  eventCode: boolean;
+  teamCode: boolean;
+  qrCode: boolean;
+  upcomingEvents: boolean;
+};
+
+const DEFAULT_SCORESHEET_INCLUDE_OPTIONS: ScoresheetIncludeOptions = {
+  eventName: true,
+  date: true,
+  location: true,
+  eventCode: true,
+  teamCode: true,
+  qrCode: true,
+  upcomingEvents: true
+};
+
+const resolveScoresheetIncludeOptions = (event?: Event | null): ScoresheetIncludeOptions => ({
+  eventName: Number(event?.include_scoresheet_event_name ?? 1) === 1,
+  date: Number(event?.include_scoresheet_date ?? 1) === 1,
+  location: Number(event?.include_scoresheet_location ?? 1) === 1,
+  eventCode: Number(event?.include_scoresheet_event_code ?? 1) === 1,
+  teamCode: Number(event?.include_scoresheet_team_code ?? 1) === 1,
+  qrCode: Number(event?.include_scoresheet_qr_code ?? 1) === 1,
+  upcomingEvents: Number(event?.include_scoresheet_upcoming_events ?? 1) === 1
+});
 
 const safeFileName = (value: string, fallback: string) => {
   const trimmed = value.trim().toLowerCase();
@@ -285,12 +314,16 @@ const formatEventDateOnly = (startsAt?: string | null) => {
   });
 };
 
-const formatHeaderMetaLine = (event: Event, locationName: string) => {
+const formatHeaderMetaLine = (event: Event, locationName: string, includeOptions?: ScoresheetIncludeOptions) => {
   const parts: string[] = [];
   const dateText = formatEventDateOnly(event.starts_at);
   const locationText = locationName.trim();
-  if (dateText) parts.push(dateText);
-  if (locationText) parts.push(locationText);
+  if (includeOptions?.date ?? true) {
+    if (dateText) parts.push(dateText);
+  }
+  if (includeOptions?.location ?? true) {
+    if (locationText) parts.push(locationText);
+  }
   return parts.join(' • ');
 };
 
@@ -480,36 +513,41 @@ const drawPageHeader = (
   event: Event,
   locationName: string,
   fonts: { regular: any; bold: any },
-  options?: { showEventCode?: boolean }
+  options?: { showEventCode?: boolean; includeOptions?: ScoresheetIncludeOptions }
 ) => {
   const titleSize = 14;
   const metaSize = 9;
   const headerTop = PAGE_HEIGHT - PAGE_MARGIN;
-  const titleY = headerTop - titleSize;
-  const metaLine = formatHeaderMetaLine(event, locationName);
-  drawPdfText(page, event.title, {
-    x: PAGE_MARGIN,
-    y: titleY,
-    size: titleSize,
-    font: fonts.bold
-  });
+  const includeOptions = options?.includeOptions ?? DEFAULT_SCORESHEET_INCLUDE_OPTIONS;
+  let cursorY = headerTop - titleSize;
+  const metaLine = formatHeaderMetaLine(event, locationName, includeOptions);
+
+  if (includeOptions.eventName) {
+    drawPdfText(page, event.title, {
+      x: PAGE_MARGIN,
+      y: cursorY,
+      size: titleSize,
+      font: fonts.bold
+    });
+    cursorY -= titleSize + 4;
+  }
 
   if (metaLine) {
     drawPdfText(page, metaLine, {
       x: PAGE_MARGIN,
-      y: titleY - metaSize - 4,
+      y: cursorY,
       size: metaSize,
       font: fonts.regular
     });
+    cursorY -= metaSize + 4;
   }
 
-  if (options?.showEventCode && event.public_code) {
+  if ((options?.showEventCode ?? false) && includeOptions.eventCode && event.public_code) {
     const codeText = `Event Code: ${event.public_code}`;
-    const codeSize = metaSize;
     drawPdfText(page, codeText, {
       x: PAGE_MARGIN,
-      y: titleY - codeSize * (metaLine ? 2 : 1) - (metaLine ? 8 : 4),
-      size: codeSize,
+      y: cursorY,
+      size: metaSize,
       font: fonts.regular
     });
   }
@@ -528,6 +566,7 @@ const drawMusicScoresheetHeader = (
     teamName?: string;
     teamPlaceholder?: boolean;
     showTeamInfo?: boolean;
+    includeOptions?: ScoresheetIncludeOptions;
   }
 ) => {
   const headerTop = PAGE_HEIGHT - PAGE_MARGIN;
@@ -535,35 +574,43 @@ const drawMusicScoresheetHeader = (
   const metaSize = 9.5;
   const leftColumnWidth = 210;
   const showTeamInfo = extras?.showTeamInfo ?? true;
+  const includeOptions = mode === 'scoresheet'
+    ? extras?.includeOptions ?? DEFAULT_SCORESHEET_INCLUDE_OPTIONS
+    : DEFAULT_SCORESHEET_INCLUDE_OPTIONS;
   const rightColumnWidth = showTeamInfo ? 210 : 0;
   const rightX = PAGE_WIDTH - PAGE_MARGIN - rightColumnWidth;
   const titleY = headerTop - titleSize;
-  const eventCode = extras?.eventCode ?? event.public_code ?? '';
-  const metaLine = formatHeaderMetaLine(event, extras?.locationName ?? '');
+  const eventCode = includeOptions.eventCode ? extras?.eventCode ?? event.public_code ?? '' : '';
+  const metaLine = formatHeaderMetaLine(event, extras?.locationName ?? '', includeOptions);
+  let leftCursorY = titleY;
 
-  const title = truncateText(fonts.bold, event.title, leftColumnWidth, titleSize);
-  drawPdfText(page, title, {
-    x: PAGE_MARGIN,
-    y: titleY,
-    size: titleSize,
-    font: fonts.bold
-  });
+  if (includeOptions.eventName) {
+    const title = truncateText(fonts.bold, event.title, leftColumnWidth, titleSize);
+    drawPdfText(page, title, {
+      x: PAGE_MARGIN,
+      y: leftCursorY,
+      size: titleSize,
+      font: fonts.bold
+    });
+    leftCursorY -= titleSize + 3;
+  }
 
   if (metaLine) {
     const metaText = truncateText(fonts.regular, metaLine, leftColumnWidth, metaSize);
     drawPdfText(page, metaText, {
       x: PAGE_MARGIN,
-      y: titleY - metaSize - 3,
+      y: leftCursorY,
       size: metaSize,
       font: fonts.regular
     });
+    leftCursorY -= metaSize + 3;
   }
 
   if (eventCode) {
     const codeText = truncateText(fonts.regular, `Event Code: ${eventCode}`, leftColumnWidth, metaSize);
     drawPdfText(page, codeText, {
       x: PAGE_MARGIN,
-      y: titleY - (metaSize + 3) * (metaLine ? 2 : 1),
+      y: leftCursorY,
       size: metaSize,
       font: fonts.regular
     });
@@ -573,7 +620,7 @@ const drawMusicScoresheetHeader = (
   const centerLaneStartX = PAGE_MARGIN + leftColumnWidth + centerLaneInset;
   const centerLaneEndX = showTeamInfo ? rightX - centerLaneInset : PAGE_WIDTH - PAGE_MARGIN - centerLaneInset;
   const centerLaneWidth = Math.max(68, centerLaneEndX - centerLaneStartX);
-  const qrImageSize = extras?.qrImage ? 42 : 0;
+  const qrImageSize = extras?.qrImage && includeOptions.qrCode ? 42 : 0;
 
   let logoWidth = 0;
   let logoHeight = 0;
@@ -607,7 +654,8 @@ const drawMusicScoresheetHeader = (
 
   if (extras?.qrImage && qrImageSize > 0) {
     const qrX = rightX;
-    const qrY = titleY - metaSize - 3 - qrImageSize - 6;
+    const qrAnchorY = includeOptions.eventName ? titleY : titleY + titleSize - 2;
+    const qrY = qrAnchorY - metaSize - 3 - qrImageSize - 6;
     page.drawImage(extras.qrImage, {
       x: qrX,
       y: qrY,
@@ -650,19 +698,21 @@ const drawMusicScoresheetHeader = (
       });
     }
 
-    const teamCodeLine = truncateText(
-      fonts.regular,
-      `Team Code: ${extras?.teamCode?.trim() || '—'}`,
-      rightColumnWidth,
-      metaSize
-    );
+    if (includeOptions.teamCode) {
+      const teamCodeLine = truncateText(
+        fonts.regular,
+        `Team Code: ${extras?.teamCode?.trim() || '—'}`,
+        rightColumnWidth,
+        metaSize
+      );
 
-    drawPdfText(page, teamCodeLine, {
-      x: rightX,
-      y: titleY - metaSize - 3,
-      size: metaSize,
-      font: fonts.regular
-    });
+      drawPdfText(page, teamCodeLine, {
+        x: rightX,
+        y: titleY - metaSize - 3,
+        size: metaSize,
+        font: fonts.regular
+      });
+    }
   }
 };
 
@@ -944,11 +994,13 @@ const renderTeamBlock = (
     teamCode?: string;
     teamName?: string;
     teamPlaceholder?: boolean;
+    includeOptions?: ScoresheetIncludeOptions;
   }
 ) => {
   const padding = CELL_PADDING;
   const textSize = 11;
   let cursorY = cell.y + cell.height - padding;
+  const includeOptions = extras.includeOptions ?? DEFAULT_SCORESHEET_INCLUDE_OPTIONS;
 
   const teamName = extras.teamName?.trim() ?? '';
   if (teamName && !extras.teamPlaceholder) {
@@ -1001,17 +1053,19 @@ const renderTeamBlock = (
 
   cursorY -= textSize * 0.5;
 
-  const teamCodeText = extras.teamCode ? `Team Code: ${extras.teamCode}` : 'Team Code: —';
-  drawPdfText(page, teamCodeText, {
-    x: cell.x + padding,
-    y: cursorY - textSize,
-    size: textSize,
-    font: fonts.bold
-  });
-  cursorY -= textSize + 8;
+  if (includeOptions.teamCode) {
+    const teamCodeText = extras.teamCode ? `Team Code: ${extras.teamCode}` : 'Team Code: —';
+    drawPdfText(page, teamCodeText, {
+      x: cell.x + padding,
+      y: cursorY - textSize,
+      size: textSize,
+      font: fonts.bold
+    });
+    cursorY -= textSize + 8;
+  }
 
   const qrSize = 96;
-  if (extras.qrImage) {
+  if (includeOptions.qrCode && extras.qrImage) {
     page.drawImage(extras.qrImage, {
       x: cell.x + padding,
       y: cursorY - qrSize,
@@ -1029,6 +1083,7 @@ const renderUpcomingBlock = (
     upcomingLines?: string[];
     locationName?: string;
     calendarImage?: any;
+    includeOptions?: ScoresheetIncludeOptions;
   }
 ) => {
   const padding = CELL_PADDING;
@@ -1036,8 +1091,9 @@ const renderUpcomingBlock = (
   const upcomingTitleSize = 10.5;
   const upcomingTextSize = 13;
   let cursorY = cell.y + cell.height - padding;
+  const includeOptions = extras.includeOptions ?? DEFAULT_SCORESHEET_INCLUDE_OPTIONS;
   const upcoming = extras.upcomingLines ?? [];
-  if (upcoming.length > 0) {
+  if (includeOptions.upcomingEvents && upcoming.length > 0) {
     const iconWidth = 24;
     const iconHeight = 20;
     const iconX = cell.x + padding;
@@ -1102,6 +1158,7 @@ const buildPdf = async (
     upcomingLines?: string[];
     locationName?: string;
     logoBytes?: Uint8Array;
+    includeOptions?: ScoresheetIncludeOptions;
   }
 ) => {
   const pdfDoc = await PDFDocument.create();
@@ -1109,10 +1166,11 @@ const buildPdf = async (
     regular: await pdfDoc.embedFont(StandardFonts.Helvetica),
     bold: await pdfDoc.embedFont(StandardFonts.HelveticaBold)
   };
+  const includeOptions = extras?.includeOptions ?? DEFAULT_SCORESHEET_INCLUDE_OPTIONS;
   let qrImage: any | null = null;
   let logoImage: any | null = null;
   let calendarImage: any | null = null;
-  if (mode === 'scoresheet' && extras?.qrDataUrl) {
+  if (mode === 'scoresheet' && includeOptions.qrCode && extras?.qrDataUrl) {
     const qrBytes = dataUrlToBytes(extras.qrDataUrl);
     if (qrBytes.length > 0) {
       try {
@@ -1152,7 +1210,7 @@ const buildPdf = async (
   ) => {
     const page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
     if (drawHeader) {
-      drawPageHeader(page, event, locationName, fonts, { showEventCode });
+      drawPageHeader(page, event, locationName, fonts, { showEventCode, includeOptions });
     }
     drawGridLines(page, layout);
     return page;
@@ -1174,7 +1232,8 @@ const buildPdf = async (
     return { x: cellX, y: cellY, width: gridWidth, height: sectionHeight };
   };
 
-  const hasUpcoming = Boolean(extras?.upcomingLines?.some((line) => line.trim()));
+  const hasUpcoming =
+    includeOptions.upcomingEvents && Boolean(extras?.upcomingLines?.some((line) => line.trim()));
   const useMusicLayout = event.event_type === 'Music Trivia';
 
   if (useMusicLayout) {
@@ -1187,7 +1246,8 @@ const buildPdf = async (
         teamCode: mode === 'scoresheet' ? extras?.teamCode : undefined,
         teamName: mode === 'scoresheet' ? extras?.teamName : undefined,
         teamPlaceholder: mode === 'scoresheet' ? extras?.teamPlaceholder : undefined,
-        showTeamInfo: mode === 'scoresheet'
+        showTeamInfo: mode === 'scoresheet',
+        includeOptions
       });
 
     let page = createPage(false, 'two-up', false);
@@ -1228,14 +1288,15 @@ const buildPdf = async (
     }
 
     const firstPage = pdfDoc.getPages()[0] ?? createPage(true);
-    renderTeamBlock(firstPage, getCell(0), fonts, {
-      qrImage: qrImage ?? undefined,
-      logoImage: logoImage ?? undefined,
-      eventCode: extras?.eventCode,
-      teamCode: extras?.teamCode,
-      teamName: extras?.teamName,
-      teamPlaceholder: extras?.teamPlaceholder
-    });
+      renderTeamBlock(firstPage, getCell(0), fonts, {
+        qrImage: qrImage ?? undefined,
+        logoImage: logoImage ?? undefined,
+        eventCode: extras?.eventCode,
+        teamCode: extras?.teamCode,
+        teamName: extras?.teamName,
+        teamPlaceholder: extras?.teamPlaceholder,
+        includeOptions
+      });
 
     if (hasUpcoming) {
       while (pageCount() < 2) {
@@ -1245,13 +1306,14 @@ const buildPdf = async (
     renderUpcomingBlock(upcomingPage, getCell(3), fonts, {
       upcomingLines: extras?.upcomingLines,
       locationName: extras?.locationName,
-      calendarImage: calendarImage ?? undefined
+      calendarImage: calendarImage ?? undefined,
+      includeOptions
     });
   }
   } else {
     for (let index = 0; index < rounds.length; index += 1) {
       if (index % 4 === 0) {
-        createPage(pageCount() === 0);
+        createPage(pageCount() === 0, 'quad', true);
       }
       const page = pdfDoc.getPages()[pdfDoc.getPages().length - 1];
       const cellIndex = index % 4;
@@ -1281,6 +1343,9 @@ export function EventDetailPage() {
   const [notes, setNotes] = useState('');
   const [tiebreakerQuestion, setTiebreakerQuestion] = useState('');
   const [tiebreakerAnswer, setTiebreakerAnswer] = useState('');
+  const [scoresheetIncludeOptions, setScoresheetIncludeOptions] = useState<ScoresheetIncludeOptions>(
+    DEFAULT_SCORESHEET_INCLUDE_OPTIONS
+  );
   const [locationId, setLocationId] = useState('');
   const [hostUserId, setHostUserId] = useState('');
   const [roundGameId, setRoundGameId] = useState('');
@@ -1377,6 +1442,7 @@ export function EventDetailPage() {
       setNotes(eventRes.data.notes ?? '');
       setTiebreakerQuestion(eventRes.data.tiebreaker_question ?? '');
       setTiebreakerAnswer(eventRes.data.tiebreaker_answer ?? '');
+      setScoresheetIncludeOptions(resolveScoresheetIncludeOptions(eventRes.data));
       setLocationId(eventRes.data.location_id ?? '');
       setHostUserId(eventRes.data.host_user_id ?? '');
     }
@@ -1396,6 +1462,7 @@ export function EventDetailPage() {
     setNotes(res.data.event.notes ?? '');
     setTiebreakerQuestion(res.data.event.tiebreaker_question ?? '');
     setTiebreakerAnswer(res.data.event.tiebreaker_answer ?? '');
+    setScoresheetIncludeOptions(resolveScoresheetIncludeOptions(res.data.event));
     setLocationId(res.data.event.location_id ?? '');
     setHostUserId(res.data.event.host_user_id ?? '');
     setRounds(res.data.rounds.sort((a, b) => a.round_number - b.round_number));
@@ -1488,6 +1555,13 @@ export function EventDetailPage() {
       notes,
       tiebreaker_question: tiebreakerQuestion,
       tiebreaker_answer: tiebreakerAnswer,
+      include_scoresheet_event_name: scoresheetIncludeOptions.eventName,
+      include_scoresheet_date: scoresheetIncludeOptions.date,
+      include_scoresheet_location: scoresheetIncludeOptions.location,
+      include_scoresheet_event_code: scoresheetIncludeOptions.eventCode,
+      include_scoresheet_team_code: scoresheetIncludeOptions.teamCode,
+      include_scoresheet_qr_code: scoresheetIncludeOptions.qrCode,
+      include_scoresheet_upcoming_events: scoresheetIncludeOptions.upcomingEvents,
       starts_at: parsedStartsAt.iso || event?.starts_at || '',
       location_id: locationId || null,
       host_user_id: hostUserId || null
@@ -1499,6 +1573,7 @@ export function EventDetailPage() {
       notes,
       tiebreakerQuestion,
       tiebreakerAnswer,
+      scoresheetIncludeOptions,
       parsedStartsAt.iso,
       locationId,
       hostUserId,
@@ -1516,6 +1591,13 @@ export function EventDetailPage() {
             notes: event.notes ?? '',
             tiebreaker_question: event.tiebreaker_question ?? '',
             tiebreaker_answer: event.tiebreaker_answer ?? '',
+            include_scoresheet_event_name: Number(event.include_scoresheet_event_name ?? 1) === 1,
+            include_scoresheet_date: Number(event.include_scoresheet_date ?? 1) === 1,
+            include_scoresheet_location: Number(event.include_scoresheet_location ?? 1) === 1,
+            include_scoresheet_event_code: Number(event.include_scoresheet_event_code ?? 1) === 1,
+            include_scoresheet_team_code: Number(event.include_scoresheet_team_code ?? 1) === 1,
+            include_scoresheet_qr_code: Number(event.include_scoresheet_qr_code ?? 1) === 1,
+            include_scoresheet_upcoming_events: Number(event.include_scoresheet_upcoming_events ?? 1) === 1,
             starts_at: event.starts_at,
             location_id: event.location_id ?? null,
             host_user_id: event.host_user_id ?? null
@@ -2401,7 +2483,8 @@ export function EventDetailPage() {
           teamPlaceholder: Number(team?.team_placeholder ?? 0) === 1,
           upcomingLines,
           locationName,
-          logoBytes
+          logoBytes,
+          includeOptions: scoresheetIncludeOptions
         });
         const teamDoc = await PDFDocument.load(teamScoresheet);
         const pages = await scoresheetDoc.copyPages(teamDoc, teamDoc.getPageIndices());
@@ -2411,7 +2494,8 @@ export function EventDetailPage() {
       const answersheetBytes = await buildPdf(event, locationName, bundles, 'answersheet', {
         eventCode: event.public_code ?? undefined,
         locationName,
-        logoBytes
+        logoBytes,
+        includeOptions: scoresheetIncludeOptions
       });
       const baseName = buildEventDocumentBaseName(event, locationName);
       const scoresheetLabel = `${baseName}-scoresheets.pdf`;
@@ -3147,6 +3231,82 @@ export function EventDetailPage() {
 
   const documentsContent = (
     <div className="space-y-3" ref={documentMenuRef}>
+      <div className="surface-card space-y-3 p-4">
+        <div>
+          <div className="text-sm font-medium text-text">Scoresheet Content</div>
+          <div className="mt-1 text-xs text-muted">Choose which event details are printed on generated scoresheets.</div>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <label className="flex items-center gap-2 text-sm text-muted">
+            <input
+              type="checkbox"
+              checked={scoresheetIncludeOptions.eventName}
+              onChange={(event) =>
+                setScoresheetIncludeOptions((prev) => ({ ...prev, eventName: event.target.checked }))
+              }
+            />
+            Event name
+          </label>
+          <label className="flex items-center gap-2 text-sm text-muted">
+            <input
+              type="checkbox"
+              checked={scoresheetIncludeOptions.date}
+              onChange={(event) => setScoresheetIncludeOptions((prev) => ({ ...prev, date: event.target.checked }))}
+            />
+            Date
+          </label>
+          <label className="flex items-center gap-2 text-sm text-muted">
+            <input
+              type="checkbox"
+              checked={scoresheetIncludeOptions.location}
+              onChange={(event) =>
+                setScoresheetIncludeOptions((prev) => ({ ...prev, location: event.target.checked }))
+              }
+            />
+            Location
+          </label>
+          <label className="flex items-center gap-2 text-sm text-muted">
+            <input
+              type="checkbox"
+              checked={scoresheetIncludeOptions.eventCode}
+              onChange={(event) =>
+                setScoresheetIncludeOptions((prev) => ({ ...prev, eventCode: event.target.checked }))
+              }
+            />
+            Event code
+          </label>
+          <label className="flex items-center gap-2 text-sm text-muted">
+            <input
+              type="checkbox"
+              checked={scoresheetIncludeOptions.teamCode}
+              onChange={(event) =>
+                setScoresheetIncludeOptions((prev) => ({ ...prev, teamCode: event.target.checked }))
+              }
+            />
+            Team code
+          </label>
+          <label className="flex items-center gap-2 text-sm text-muted">
+            <input
+              type="checkbox"
+              checked={scoresheetIncludeOptions.qrCode}
+              onChange={(event) =>
+                setScoresheetIncludeOptions((prev) => ({ ...prev, qrCode: event.target.checked }))
+              }
+            />
+            QR code
+          </label>
+          <label className="flex items-center gap-2 text-sm text-muted sm:col-span-2">
+            <input
+              type="checkbox"
+              checked={scoresheetIncludeOptions.upcomingEvents}
+              onChange={(event) =>
+                setScoresheetIncludeOptions((prev) => ({ ...prev, upcomingEvents: event.target.checked }))
+              }
+            />
+            Upcoming events
+          </label>
+        </div>
+      </div>
       <div className="flex flex-wrap items-center gap-2">
         <SecondaryButton onClick={generateScoresheets} disabled={scoresheetGenerating}>
           {scoresheetGenerating ? 'Generating…' : 'Generate scoresheets'}

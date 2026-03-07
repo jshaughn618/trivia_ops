@@ -22,8 +22,27 @@ type GameMutationPayload = Partial<Omit<Game, 'show_theme' | 'allow_participant_
   show_theme?: boolean | number | null;
   allow_participant_audio_stop?: boolean | number | null;
 };
-type EventMutationPayload = Partial<Omit<Event, 'allow_participant_web_submissions'>> & {
+type EventMutationPayload = Partial<
+  Omit<
+    Event,
+    | 'allow_participant_web_submissions'
+    | 'include_scoresheet_event_name'
+    | 'include_scoresheet_date'
+    | 'include_scoresheet_location'
+    | 'include_scoresheet_event_code'
+    | 'include_scoresheet_team_code'
+    | 'include_scoresheet_qr_code'
+    | 'include_scoresheet_upcoming_events'
+  >
+> & {
   allow_participant_web_submissions?: boolean | number | null;
+  include_scoresheet_event_name?: boolean | number | null;
+  include_scoresheet_date?: boolean | number | null;
+  include_scoresheet_location?: boolean | number | null;
+  include_scoresheet_event_code?: boolean | number | null;
+  include_scoresheet_team_code?: boolean | number | null;
+  include_scoresheet_qr_code?: boolean | number | null;
+  include_scoresheet_upcoming_events?: boolean | number | null;
 };
 type EventSubmissionExpectedPart = { label: string; answer: string; points: number };
 type EventSubmissionResponsePart = { label: string; answer: string };

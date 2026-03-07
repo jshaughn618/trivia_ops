@@ -37,6 +37,48 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
       : parsed.data.allow_participant_web_submissions
         ? 1
         : 0;
+  const includeScoresheetEventName =
+    parsed.data.include_scoresheet_event_name === undefined
+      ? Number(existing.include_scoresheet_event_name ?? 1)
+      : parsed.data.include_scoresheet_event_name
+        ? 1
+        : 0;
+  const includeScoresheetDate =
+    parsed.data.include_scoresheet_date === undefined
+      ? Number(existing.include_scoresheet_date ?? 1)
+      : parsed.data.include_scoresheet_date
+        ? 1
+        : 0;
+  const includeScoresheetLocation =
+    parsed.data.include_scoresheet_location === undefined
+      ? Number(existing.include_scoresheet_location ?? 1)
+      : parsed.data.include_scoresheet_location
+        ? 1
+        : 0;
+  const includeScoresheetEventCode =
+    parsed.data.include_scoresheet_event_code === undefined
+      ? Number(existing.include_scoresheet_event_code ?? 1)
+      : parsed.data.include_scoresheet_event_code
+        ? 1
+        : 0;
+  const includeScoresheetTeamCode =
+    parsed.data.include_scoresheet_team_code === undefined
+      ? Number(existing.include_scoresheet_team_code ?? 1)
+      : parsed.data.include_scoresheet_team_code
+        ? 1
+        : 0;
+  const includeScoresheetQrCode =
+    parsed.data.include_scoresheet_qr_code === undefined
+      ? Number(existing.include_scoresheet_qr_code ?? 1)
+      : parsed.data.include_scoresheet_qr_code
+        ? 1
+        : 0;
+  const includeScoresheetUpcomingEvents =
+    parsed.data.include_scoresheet_upcoming_events === undefined
+      ? Number(existing.include_scoresheet_upcoming_events ?? 1)
+      : parsed.data.include_scoresheet_upcoming_events
+        ? 1
+        : 0;
   await execute(
     env,
     `UPDATE events
@@ -55,7 +97,14 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
          answersheet_key = ?,
          answersheet_name = ?,
          imagesheet_key = ?,
-         imagesheet_name = ?
+         imagesheet_name = ?,
+         include_scoresheet_event_name = ?,
+         include_scoresheet_date = ?,
+         include_scoresheet_location = ?,
+         include_scoresheet_event_code = ?,
+         include_scoresheet_team_code = ?,
+         include_scoresheet_qr_code = ?,
+         include_scoresheet_upcoming_events = ?
      WHERE id = ?`,
     [
       merged.title,
@@ -74,6 +123,13 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
       merged.answersheet_name ?? null,
       merged.imagesheet_key ?? null,
       merged.imagesheet_name ?? null,
+      includeScoresheetEventName,
+      includeScoresheetDate,
+      includeScoresheetLocation,
+      includeScoresheetEventCode,
+      includeScoresheetTeamCode,
+      includeScoresheetQrCode,
+      includeScoresheetUpcomingEvents,
       params.id
     ]
   );

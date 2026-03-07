@@ -185,7 +185,14 @@ export const eventUpdateSchema = z.object({
   answersheet_key: z.string().nullable().optional(),
   answersheet_name: z.string().nullable().optional(),
   imagesheet_key: z.string().nullable().optional(),
-  imagesheet_name: z.string().nullable().optional()
+  imagesheet_name: z.string().nullable().optional(),
+  include_scoresheet_event_name: z.boolean().optional(),
+  include_scoresheet_date: z.boolean().optional(),
+  include_scoresheet_location: z.boolean().optional(),
+  include_scoresheet_event_code: z.boolean().optional(),
+  include_scoresheet_team_code: z.boolean().optional(),
+  include_scoresheet_qr_code: z.boolean().optional(),
+  include_scoresheet_upcoming_events: z.boolean().optional()
 });
 
 export const eventRoundCreateSchema = z.object({

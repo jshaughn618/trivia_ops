@@ -115,6 +115,13 @@ export type Event = {
   answersheet_name: string | null;
   imagesheet_key: string | null;
   imagesheet_name: string | null;
+  include_scoresheet_event_name: number | null;
+  include_scoresheet_date: number | null;
+  include_scoresheet_location: number | null;
+  include_scoresheet_event_code: number | null;
+  include_scoresheet_team_code: number | null;
+  include_scoresheet_qr_code: number | null;
+  include_scoresheet_upcoming_events: number | null;
   created_at: string;
 };
 
