@@ -97,7 +97,31 @@ const editionItemBaseSchema = z.object({
   media_caption: z.string().nullable().optional()
 });
 
-const gameExampleItemBaseSchema = editionItemBaseSchema.omit({ ordinal: true });
+const gameExampleItemBaseSchema = z.object({
+  prompt: z.string(),
+  question_type: z.enum(['text', 'multiple_choice']).optional(),
+  choices_json: z.array(z.string().min(1)).nullable().optional(),
+  answer: z.string().min(1).optional(),
+  answer_a: z.string().min(1).nullable().optional(),
+  answer_b: z.string().min(1).nullable().optional(),
+  answer_a_label: z.string().min(1).nullable().optional(),
+  answer_b_label: z.string().min(1).nullable().optional(),
+  answer_parts_json: z
+    .array(
+      z.object({
+        label: z.string().min(1),
+        answer: z.string().min(1),
+        points: z.number().int().min(0).optional().default(1)
+      })
+    )
+    .nullable()
+    .optional(),
+  fun_fact: z.string().nullable().optional(),
+  media_type: z.enum(['image', 'audio']).nullable().optional(),
+  media_key: z.string().nullable().optional(),
+  audio_answer_key: z.string().nullable().optional(),
+  media_caption: z.string().nullable().optional()
+});
 
 export const gameExampleItemSchema = gameExampleItemBaseSchema
   .refine((data) => {
