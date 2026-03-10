@@ -9,6 +9,7 @@ import { Panel } from '../components/Panel';
 import type { Location } from '../types';
 
 type PdfFonts = { regular: any; bold: any };
+type WelcomeEventType = 'Pub' | 'Music';
 
 const LETTER_PORTRAIT_WIDTH = 8.5 * 72;
 const LETTER_PORTRAIT_HEIGHT = 11 * 72;
@@ -59,6 +60,7 @@ const drawWelcomeHalfSheet = (
   panelWidth: number,
   panelHeight: number,
   fonts: PdfFonts,
+  eventType: WelcomeEventType,
   locationName: string,
   logoImage?: any
 ) => {
@@ -68,7 +70,7 @@ const drawWelcomeHalfSheet = (
   const contentWidth = panelWidth - sidePadding * 2;
   let cursorY = panelY + panelHeight - topPadding;
 
-  const titleLineOne = 'Pub Trivia';
+  const titleLineOne = `Welcome to ${eventType} Trivia`;
   const titleLineTwo = `@ ${locationName}`;
   const titleSize = 26;
   const subtitleSize = 16;
@@ -199,7 +201,7 @@ const drawWelcomeHalfSheet = (
   drawCenteredText(page, note, fonts.bold, 16, panelX, panelWidth, panelY + 16);
 };
 
-const buildWelcomeSheetPdf = async (locationName: string) => {
+const buildWelcomeSheetPdf = async (eventType: WelcomeEventType, locationName: string) => {
   const pdfDoc = await PDFDocument.create();
   const fonts: PdfFonts = {
     regular: await pdfDoc.embedFont(StandardFonts.Helvetica),
@@ -231,6 +233,7 @@ const buildWelcomeSheetPdf = async (locationName: string) => {
       QUARTER_SHEET_WIDTH,
       QUARTER_SHEET_HEIGHT,
       fonts,
+      eventType,
       locationName,
       logoImage ?? undefined
     );
@@ -268,6 +271,7 @@ export function DocumentsPage() {
   const [locations, setLocations] = useState<Location[]>([]);
   const [locationLoading, setLocationLoading] = useState(true);
   const [locationId, setLocationId] = useState('');
+  const [eventType, setEventType] = useState<WelcomeEventType>('Pub');
   const [locationError, setLocationError] = useState<string | null>(null);
   const [welcomeGenerating, setWelcomeGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -303,12 +307,13 @@ export function DocumentsPage() {
     setError(null);
     try {
       const locationName = selectedLocation.name.trim() || 'Location';
-      const bytes = await buildWelcomeSheetPdf(locationName);
-      const slug = locationName
+      const bytes = await buildWelcomeSheetPdf(eventType, locationName);
+      const locationSlug = locationName
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-+|-+$/g, '');
-      const filename = slug ? `welcome-sheet-${slug}.pdf` : 'welcome-sheet.pdf';
+      const eventTypeSlug = eventType.toLowerCase();
+      const filename = locationSlug ? `welcome-sheet-${eventTypeSlug}-${locationSlug}.pdf` : `welcome-sheet-${eventTypeSlug}.pdf`;
       downloadBytes(bytes, filename);
     } catch {
       setError('Failed to build welcome sheet.');
@@ -331,10 +336,23 @@ export function DocumentsPage() {
                   </div>
                   <p className="max-w-2xl text-sm text-muted">
                     Quarter-sheet handout designed for 4-up printing on letter paper in vertical orientation. Select a
-                    location, then generate a sheet that reads "Welcome to Pub Trivia" and "@ {'{location}'}".
+                    location and event type, then generate a sheet that reads "Welcome to {'{event type}'} Trivia" and
+                    "@ {'{location}'}".
                   </p>
                 </div>
                 <div className="flex w-full flex-col gap-2 sm:w-[280px]">
+                  <label className="ui-label" htmlFor="welcome-event-type">
+                    Event type
+                  </label>
+                  <select
+                    id="welcome-event-type"
+                    value={eventType}
+                    onChange={(event) => setEventType(event.target.value as WelcomeEventType)}
+                    className="h-10"
+                  >
+                    <option value="Pub">Pub</option>
+                    <option value="Music">Music</option>
+                  </select>
                   <label className="ui-label" htmlFor="welcome-location">
                     Location
                   </label>
