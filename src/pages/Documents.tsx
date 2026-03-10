@@ -72,7 +72,7 @@ const drawWelcomeHalfSheet = (
 
   const titleLineOne = `Welcome to ${eventType} Trivia`;
   const titleLineTwo = `@ ${locationName}`;
-  const titleSize = 26;
+  const titleSize = eventType === 'Music' ? 23 : 26;
   const subtitleSize = 16;
   const titleLines = [titleLineOne];
   const subtitleLines = wrapText(fonts.bold, titleLineTwo, panelWidth - 44, subtitleSize);
