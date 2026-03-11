@@ -82,8 +82,11 @@ export function EventRunPage() {
   const [audioRetryAttempt, setAudioRetryAttempt] = useState(0);
   const [localAudioPlaying, setLocalAudioPlaying] = useState(false);
   const [audioStoppedByTeamNotice, setAudioStoppedByTeamNotice] = useState<string | null>(null);
+  const [stopAnswerReceivedNotice, setStopAnswerReceivedNotice] = useState<string | null>(null);
   const remoteAudioPlayingSeenRef = useRef(false);
   const lastAudioKeyRef = useRef<string | null>(null);
+  const stopAnswerNoticeTimerRef = useRef<number | null>(null);
+  const stopAnswerSubmissionKeyRef = useRef('');
   const [waitingMessage, setWaitingMessage] = useState('');
   const [waitingShowLeaderboard, setWaitingShowLeaderboard] = useState(false);
   const [waitingShowNextRound, setWaitingShowNextRound] = useState(true);
@@ -296,7 +299,9 @@ export function EventRunPage() {
     !isDedicatedAudioStopFlowItem
   );
   const hasAudioSubmissionWorkflow = Boolean(isSpeedRoundMode || isAudioItem);
-  const hasParticipantAnswerWorkflow = Boolean(participantWebSubmissionsEnabled && hasAudioSubmissionWorkflow);
+  const hasParticipantAnswerWorkflow = Boolean(
+    isDedicatedAudioStopFlowItem || (participantWebSubmissionsEnabled && hasAudioSubmissionWorkflow)
+  );
 
   const loadRoundResponses = useCallback(
     async (selectedRoundId: string, selectedItemId: string, silent = false) => {
@@ -402,6 +407,50 @@ export function EventRunPage() {
     () => parseAnswerParts(currentAudioSubmission?.response_parts_json),
     [currentAudioSubmission?.response_parts_json]
   );
+
+  useEffect(() => {
+    const submissionKey =
+      item?.id && currentAudioSubmission?.team_id && currentAudioSubmission?.response_parts_json
+        ? `${item.id}:${currentAudioSubmission.team_id}:${currentAudioSubmission.submitted_at ?? currentAudioSubmission.response_parts_json}`
+        : '';
+    stopAnswerSubmissionKeyRef.current = submissionKey;
+    setStopAnswerReceivedNotice(null);
+    if (stopAnswerNoticeTimerRef.current) {
+      window.clearTimeout(stopAnswerNoticeTimerRef.current);
+      stopAnswerNoticeTimerRef.current = null;
+    }
+  }, [item?.id, isDedicatedAudioStopFlowItem]);
+
+  useEffect(() => {
+    if (!item?.id || !isDedicatedAudioStopFlowItem) return;
+    const submissionKey =
+      currentAudioSubmission?.team_id && currentAudioSubmission?.response_parts_json
+        ? `${item.id}:${currentAudioSubmission.team_id}:${currentAudioSubmission.submitted_at ?? currentAudioSubmission.response_parts_json}`
+        : '';
+    const previousKey = stopAnswerSubmissionKeyRef.current;
+    if (submissionKey && submissionKey !== previousKey) {
+      setStopAnswerReceivedNotice(
+        currentAudioSubmission?.team_name?.trim()
+          ? `${currentAudioSubmission.team_name.trim()} answer received`
+          : 'Stop team answer received'
+      );
+      if (stopAnswerNoticeTimerRef.current) {
+        window.clearTimeout(stopAnswerNoticeTimerRef.current);
+      }
+      stopAnswerNoticeTimerRef.current = window.setTimeout(() => {
+        setStopAnswerReceivedNotice(null);
+        stopAnswerNoticeTimerRef.current = null;
+      }, 5000);
+    }
+    stopAnswerSubmissionKeyRef.current = submissionKey;
+  }, [
+    currentAudioSubmission?.response_parts_json,
+    currentAudioSubmission?.submitted_at,
+    currentAudioSubmission?.team_id,
+    currentAudioSubmission?.team_name,
+    isDedicatedAudioStopFlowItem,
+    item?.id
+  ]);
   const audioSummaryRows = useMemo(
     () =>
       [...items]
@@ -465,6 +514,7 @@ export function EventRunPage() {
     });
     if (res.ok) {
       setAudioStoppedByTeamNotice(null);
+      setStopAnswerReceivedNotice(null);
       setShowAnswer(false);
       setShowFact(false);
       setTimerStartedAt(null);
@@ -508,6 +558,14 @@ export function EventRunPage() {
     if (!isSpeedRoundMode || index === 0) return;
     setIndex(0);
   }, [isSpeedRoundMode, index]);
+
+  useEffect(() => {
+    return () => {
+      if (stopAnswerNoticeTimerRef.current) {
+        window.clearTimeout(stopAnswerNoticeTimerRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     setTimerDurationSeconds(activeRound?.timer_seconds ?? 15);
@@ -1100,6 +1158,11 @@ export function EventRunPage() {
                           {audioStoppedByTeamNotice}
                         </div>
                       )}
+                      {stopAnswerReceivedNotice && !audioError && (
+                        <div className="rounded-lg border border-[#2d9a59] bg-panel px-3 py-2 text-sm text-[#8ce7ad]">
+                          {stopAnswerReceivedNotice}
+                        </div>
+                      )}
                       <audio
                         ref={audioRef}
                         className="w-full"
@@ -1112,6 +1175,7 @@ export function EventRunPage() {
                           handleAudioEvent('audio_play_click');
                           remoteAudioPlayingSeenRef.current = false;
                           setAudioStoppedByTeamNotice(null);
+                          setStopAnswerReceivedNotice(null);
                           setLocalAudioPlaying(true);
                           syncAudioPlaying(true);
                         }}
@@ -1366,6 +1430,15 @@ export function EventRunPage() {
                       : item?.question_type === 'multiple_choice'
                         ? 'Clear Responses'
                         : 'Clear Submissions'}
+                  </SecondaryButton>
+                )}
+                {item && isDedicatedAudioStopFlowItem && (
+                  <SecondaryButton
+                    className="h-11"
+                    onClick={() => resetAudioSubmission(item.id)}
+                    disabled={!activeRound || audioMarkingItemId === item.id}
+                  >
+                    Reset Stop! Item
                   </SecondaryButton>
                 )}
                 <SecondaryButton
