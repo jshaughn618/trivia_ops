@@ -112,12 +112,20 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params, data }) =>
     round_number: number;
     label: string;
     status: string;
+    is_stop_round: number;
   }>(
     env,
-    `SELECT id, round_number, label, status
-     FROM event_rounds
-     WHERE event_id = ? AND COALESCE(deleted, 0) = 0
-     ORDER BY round_number ASC`,
+    `SELECT er.id,
+            er.round_number,
+            er.label,
+            er.status,
+            CASE WHEN gt.code = 'music' AND g.subtype = 'stop' THEN 1 ELSE 0 END AS is_stop_round
+     FROM event_rounds er
+     LEFT JOIN editions ed ON ed.id = er.edition_id AND COALESCE(ed.deleted, 0) = 0
+     LEFT JOIN games g ON g.id = ed.game_id AND COALESCE(g.deleted, 0) = 0
+     LEFT JOIN game_types gt ON gt.id = g.game_type_id AND COALESCE(gt.deleted, 0) = 0
+     WHERE er.event_id = ? AND COALESCE(er.deleted, 0) = 0
+     ORDER BY er.round_number ASC`,
     [params.id]
   );
 
@@ -280,7 +288,10 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params, data }) =>
   });
 
   return jsonOk({
-    rounds,
+    rounds: rounds.map((round) => ({
+      ...round,
+      is_stop_round: Boolean(round.is_stop_round)
+    })),
     teams,
     rows
   });

@@ -7,7 +7,7 @@ import { PageHeader } from '../components/PageHeader';
 import { Section } from '../components/Section';
 import { StatusPill } from '../components/StatusPill';
 import { logError } from '../lib/log';
-import type { Event } from '../types';
+import type { Event, EventRoundAudioSubmission } from '../types';
 
 const POLL_INTERVAL_MS = 6000;
 
@@ -16,6 +16,7 @@ type RoundSummary = {
   round_number: number;
   label: string;
   status: string;
+  is_stop_round: boolean;
 };
 
 type TeamSummary = {
@@ -85,6 +86,13 @@ function toStatusLabel(status: string) {
     .join(' ');
 }
 
+function stopResultStatus(submission: EventRoundAudioSubmission | null) {
+  if (!submission?.team_id || !submission.response_parts_json) return { label: 'No Submission', status: 'planned' as const };
+  if (submission.is_correct === true) return { label: 'Correct', status: 'live' as const };
+  if (submission.is_correct === false) return { label: 'Incorrect', status: 'canceled' as const };
+  return { label: 'Pending Review', status: 'planned' as const };
+}
+
 export function EventSubmissionsPage() {
   const { eventId } = useParams();
   const [event, setEvent] = useState<Event | null>(null);
@@ -99,6 +107,10 @@ export function EventSubmissionsPage() {
   const [savingByResponse, setSavingByResponse] = useState<Record<string, boolean>>({});
   const [activeTeamByRound, setActiveTeamByRound] = useState<Record<string, string>>({});
   const [applyingAiAll, setApplyingAiAll] = useState(false);
+  const [visibleStopResults, setVisibleStopResults] = useState<Record<string, boolean>>({});
+  const [stopResultsByRound, setStopResultsByRound] = useState<Record<string, EventRoundAudioSubmission[]>>({});
+  const [stopResultsLoading, setStopResultsLoading] = useState<Record<string, boolean>>({});
+  const [stopResultsError, setStopResultsError] = useState<Record<string, string | null>>({});
   const autosaveTimersRef = useRef<Record<string, number>>({});
 
   const load = useCallback(async (options?: { silent?: boolean }) => {
@@ -287,6 +299,39 @@ export function EventSubmissionsPage() {
     };
   }, []);
 
+  const loadStopResults = useCallback(async (roundId: string, options?: { silent?: boolean }) => {
+    if (!roundId) return;
+    if (!options?.silent) {
+      setStopResultsLoading((prev) => ({ ...prev, [roundId]: true }));
+    }
+    const res = await api.listRoundAudioSubmissions(roundId);
+    if (res.ok) {
+      setStopResultsByRound((prev) => ({ ...prev, [roundId]: res.data }));
+      setStopResultsError((prev) => ({ ...prev, [roundId]: null }));
+    } else if (!options?.silent) {
+      setStopResultsError((prev) => ({
+        ...prev,
+        [roundId]: formatApiError(res, 'Failed to load Stop! results.')
+      }));
+    }
+    if (!options?.silent) {
+      setStopResultsLoading((prev) => ({ ...prev, [roundId]: false }));
+    }
+  }, []);
+
+  useEffect(() => {
+    const activeRoundIds = Object.entries(visibleStopResults)
+      .filter(([, visible]) => visible)
+      .map(([roundId]) => roundId);
+    if (activeRoundIds.length === 0) return;
+    const timer = window.setInterval(() => {
+      activeRoundIds.forEach((roundId) => {
+        void loadStopResults(roundId, { silent: true });
+      });
+    }, POLL_INTERVAL_MS);
+    return () => window.clearInterval(timer);
+  }, [loadStopResults, visibleStopResults]);
+
   const applyAiToVisibleRows = useCallback(async () => {
     const rowsToApply = groupedByRound.flatMap((group) => {
       const activeTeamId = activeTeamByRound[group.round.id] ?? group.teams[0]?.teamId;
@@ -392,9 +437,89 @@ export function EventSubmissionsPage() {
           <Section
             key={`round-submissions-${group.round.id}`}
             title={`Round ${group.round.round_number}: ${group.round.label}`}
-            actions={<StatusPill status={group.round.status} />}
+            actions={
+              <div className="flex items-center gap-2">
+                {group.round.is_stop_round && (
+                  <SecondaryButton
+                    type="button"
+                    className="h-9 px-3 text-xs"
+                    onClick={() => {
+                      const nextVisible = !visibleStopResults[group.round.id];
+                      setVisibleStopResults((prev) => ({ ...prev, [group.round.id]: nextVisible }));
+                      if (nextVisible) {
+                        void loadStopResults(group.round.id);
+                      }
+                    }}
+                  >
+                    {visibleStopResults[group.round.id] ? 'Hide Stop! Results' : 'Display Stop! Results'}
+                  </SecondaryButton>
+                )}
+                <StatusPill status={group.round.status} />
+              </div>
+            }
           >
-            {group.teams.length === 0 ? (
+            {group.round.is_stop_round && visibleStopResults[group.round.id] ? (
+              <div className="space-y-3">
+                {stopResultsLoading[group.round.id] && !stopResultsByRound[group.round.id] ? (
+                  <div className="text-sm text-muted">Loading Stop! results…</div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-border text-sm">
+                      <thead>
+                        <tr className="text-left text-xs uppercase tracking-[0.08em] text-muted">
+                          <th className="px-2 py-2">Item</th>
+                          <th className="px-2 py-2">Prompt</th>
+                          <th className="px-2 py-2">Stopped By</th>
+                          <th className="px-2 py-2">Submitted</th>
+                          <th className="px-2 py-2">Result</th>
+                          <th className="px-2 py-2">Time</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {(stopResultsByRound[group.round.id] ?? []).map((submission) => {
+                          const submittedParts = parseResponseParts(submission.response_parts_json);
+                          const result = stopResultStatus(submission);
+                          return (
+                            <tr key={`stop-result-${group.round.id}-${submission.edition_item_id}`}>
+                              <td className="px-2 py-2 text-muted">#{submission.ordinal}</td>
+                              <td className="max-w-[320px] px-2 py-2 text-text">{submission.prompt?.trim() || '—'}</td>
+                              <td className="px-2 py-2 text-text">{submission.team_name?.trim() || '—'}</td>
+                              <td className="px-2 py-2 text-text">
+                                {submittedParts.length === 0 ? (
+                                  <span className="text-xs text-muted">—</span>
+                                ) : (
+                                  <div className="space-y-1">
+                                    {submittedParts.map((part) => (
+                                      <div key={`stop-result-part-${submission.edition_item_id}-${part.label}`} className="text-xs">
+                                        <span className="text-muted">{part.label}:</span> {part.answer.trim() || '—'}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </td>
+                              <td className="px-2 py-2">
+                                <StatusPill status={result.status} label={result.label} />
+                              </td>
+                              <td className="px-2 py-2 text-xs text-muted">
+                                {submission.submitted_at ? new Date(submission.submitted_at).toLocaleTimeString() : '—'}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                {!stopResultsLoading[group.round.id] && (stopResultsByRound[group.round.id] ?? []).length === 0 && (
+                  <div className="text-sm text-muted">No Stop! items found for this round.</div>
+                )}
+                {stopResultsError[group.round.id] && (
+                  <div className="rounded-lg border border-danger bg-panel2 px-3 py-2 text-xs text-danger-ink">
+                    {stopResultsError[group.round.id]}
+                  </div>
+                )}
+              </div>
+            ) : group.teams.length === 0 ? (
               <div className="text-sm text-muted">No teams or items found for this round.</div>
             ) : (
               <div className="space-y-3">

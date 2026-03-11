@@ -91,7 +91,7 @@ type EventSubmissionRow = {
   approved_at: string | null;
 };
 type EventSubmissionsPayload = {
-  rounds: Array<{ id: string; round_number: number; label: string; status: string }>;
+  rounds: Array<{ id: string; round_number: number; label: string; status: string; is_stop_round: boolean }>;
   teams: Array<{ id: string; name: string }>;
   rows: EventSubmissionRow[];
 };
