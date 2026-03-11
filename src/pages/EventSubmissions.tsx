@@ -88,6 +88,36 @@ function parseResponseParts(value: string | null) {
   }
 }
 
+function parseApprovedParts(value: string | null) {
+  if (!value) return [] as Array<{ label: string; is_correct: boolean | null; awarded_points: number; max_points: number }>;
+  try {
+    const parsed = JSON.parse(value);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map((entry) => {
+        if (!entry || typeof entry !== 'object') return null;
+        const label = typeof (entry as { label?: unknown }).label === 'string' ? (entry as { label: string }).label.trim() : '';
+        if (!label) return null;
+        const isCorrectValue = (entry as { is_correct?: unknown }).is_correct;
+        const awardedPointsValue = (entry as { awarded_points?: unknown }).awarded_points;
+        const maxPointsValue = (entry as { max_points?: unknown }).max_points;
+        return {
+          label,
+          is_correct: typeof isCorrectValue === 'boolean' ? isCorrectValue : null,
+          awarded_points: typeof awardedPointsValue === 'number' && Number.isFinite(awardedPointsValue) ? awardedPointsValue : 0,
+          max_points: typeof maxPointsValue === 'number' && Number.isFinite(maxPointsValue) ? maxPointsValue : 0
+        };
+      })
+      .filter(
+        (
+          entry
+        ): entry is { label: string; is_correct: boolean | null; awarded_points: number; max_points: number } => Boolean(entry)
+      );
+  } catch {
+    return [];
+  }
+}
+
 function formatPoints(value: number | null) {
   if (value === null) return '—';
   return Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/\.?0+$/, '');
@@ -103,13 +133,6 @@ function toStatusLabel(status: string) {
     .split('_')
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(' ');
-}
-
-function stopResultStatus(submission: EventRoundAudioSubmission | null) {
-  if (!submission?.team_id || !submission.response_parts_json) return { label: 'No Submission', status: 'planned' as const };
-  if (submission.is_correct === true) return { label: 'Correct', status: 'live' as const };
-  if (submission.is_correct === false) return { label: 'Incorrect', status: 'canceled' as const };
-  return { label: 'Pending Review', status: 'planned' as const };
 }
 
 export function EventSubmissionsPage() {
@@ -487,21 +510,19 @@ export function EventSubmissionsPage() {
                       <thead>
                         <tr className="text-left text-xs uppercase tracking-[0.08em] text-muted">
                           <th className="px-2 py-2">Item</th>
-                          <th className="px-2 py-2">Prompt</th>
                           <th className="px-2 py-2">Stopped By</th>
                           <th className="px-2 py-2">Submitted</th>
-                          <th className="px-2 py-2">Result</th>
+                          <th className="px-2 py-2">Net Points</th>
                           <th className="px-2 py-2">Time</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border">
                         {(stopResultsByRound[group.round.id] ?? []).map((submission) => {
                           const submittedParts = parseResponseParts(submission.response_parts_json);
-                          const result = stopResultStatus(submission);
+                          const approvedParts = parseApprovedParts(submission.approved_parts_json);
                           return (
                             <tr key={`stop-result-${group.round.id}-${submission.edition_item_id}`}>
                               <td className="px-2 py-2 text-muted">#{submission.ordinal}</td>
-                              <td className="max-w-[320px] px-2 py-2 text-text">{submission.prompt?.trim() || '—'}</td>
                               <td className="px-2 py-2 text-text">{submission.team_name?.trim() || '—'}</td>
                               <td className="px-2 py-2 text-text">
                                 {submittedParts.length === 0 ? (
@@ -510,14 +531,46 @@ export function EventSubmissionsPage() {
                                   <div className="space-y-1">
                                     {submittedParts.map((part) => (
                                       <div key={`stop-result-part-${submission.edition_item_id}-${part.label}`} className="text-xs">
-                                        <span className="text-muted">{part.label}:</span> {part.answer.trim() || '—'}
+                                        <span className="text-muted">{part.label}:</span> {part.answer.trim() || '—'}{' '}
+                                        {(() => {
+                                          const approvedPart = approvedParts.find((entry) => entry.label === part.label);
+                                          if (approvedPart?.is_correct === true) {
+                                            return (
+                                              <span className="font-semibold text-[#8ce7ad]">
+                                                ✓ {formatPoints(approvedPart.awarded_points)}
+                                              </span>
+                                            );
+                                          }
+                                          if (approvedPart?.is_correct === false) {
+                                            return (
+                                              <span className="font-semibold text-danger-ink">
+                                                ✕ {formatPoints(approvedPart.awarded_points)}
+                                              </span>
+                                            );
+                                          }
+                                          return <span className="text-muted">Pending</span>;
+                                        })()}
                                       </div>
                                     ))}
                                   </div>
                                 )}
                               </td>
-                              <td className="px-2 py-2">
-                                <StatusPill status={result.status} label={result.label} />
+                              <td className="px-2 py-2 text-text">
+                                {submission.approved_points === null ? (
+                                  <span className="text-xs text-muted">Pending</span>
+                                ) : (
+                                  <span
+                                    className={
+                                      submission.approved_points > 0
+                                        ? 'font-semibold text-[#8ce7ad]'
+                                        : submission.approved_points < 0
+                                          ? 'font-semibold text-danger-ink'
+                                          : 'font-semibold text-text'
+                                    }
+                                  >
+                                    {formatPoints(submission.approved_points)}
+                                  </span>
+                                )}
                               </td>
                               <td className="px-2 py-2 text-xs text-muted">
                                 {submission.submitted_at ? new Date(submission.submitted_at).toLocaleTimeString() : '—'}
