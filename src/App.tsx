@@ -4,6 +4,7 @@ import { RequireAdmin, RequireAuth, useAuth } from './auth';
 
 const LoginPage = lazy(() => import('./pages/Login').then((mod) => ({ default: mod.LoginPage })));
 const AboutPage = lazy(() => import('./pages/About').then((mod) => ({ default: mod.AboutPage })));
+const BillboardPage = lazy(() => import('./pages/Billboard').then((mod) => ({ default: mod.BillboardPage })));
 const DashboardPage = lazy(() => import('./pages/Dashboard').then((mod) => ({ default: mod.DashboardPage })));
 const GamesPage = lazy(() => import('./pages/Games').then((mod) => ({ default: mod.GamesPage })));
 const GameDetailPage = lazy(() => import('./pages/GameDetail').then((mod) => ({ default: mod.GameDetailPage })));
@@ -55,6 +56,14 @@ export function App() {
         <Route path="/" element={<HomeRedirect />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/about" element={<AboutPage />} />
+        <Route
+          path="/billboard"
+          element={
+            <RequireAuth>
+              <BillboardPage />
+            </RequireAuth>
+          }
+        />
         <Route path="/invite/:token" element={<InviteAcceptPage />} />
         <Route path="/play/:code" element={<PlayEventPage />} />
         <Route path="/play/:code/display" element={<PlayDisplayPage />} />

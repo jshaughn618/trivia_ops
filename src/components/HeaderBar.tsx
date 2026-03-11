@@ -92,6 +92,9 @@ export function HeaderBar() {
                   <NavLink to="/events" className={menuNavLinkClass} onClick={() => setOpen(false)}>
                     Events
                   </NavLink>
+                  <NavLink to="/billboard" className={menuNavLinkClass} onClick={() => setOpen(false)}>
+                    Billboard
+                  </NavLink>
                   {isAdmin && (
                     <NavLink to="/locations" className={menuNavLinkClass} onClick={() => setOpen(false)}>
                       Locations
