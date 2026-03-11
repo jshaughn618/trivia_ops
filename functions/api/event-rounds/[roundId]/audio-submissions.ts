@@ -95,6 +95,7 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
   const existing = await queryFirst<{
     id: string;
     team_id: string;
+    game_subtype: string | null;
     question_type: string | null;
     answer: string | null;
     answer_a: string | null;
@@ -107,6 +108,7 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
     `SELECT
        resp.id,
        resp.team_id,
+       g.subtype AS game_subtype,
        ei.question_type,
        COALESCE(eri.overridden_answer, ei.answer) AS answer,
        ei.answer_a,
@@ -119,6 +121,9 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
        ON eri.event_round_id = resp.event_round_id
       AND eri.edition_item_id = resp.edition_item_id
       AND COALESCE(eri.deleted, 0) = 0
+     JOIN event_rounds er ON er.id = resp.event_round_id AND COALESCE(er.deleted, 0) = 0
+     JOIN editions ed ON ed.id = er.edition_id AND COALESCE(ed.deleted, 0) = 0
+     JOIN games g ON g.id = ed.game_id AND COALESCE(g.deleted, 0) = 0
      JOIN edition_items ei ON ei.id = resp.edition_item_id AND COALESCE(ei.deleted, 0) = 0
      WHERE resp.event_round_id = ?
        AND resp.edition_item_id = ?
@@ -134,6 +139,7 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
 
   const now = nowIso();
   const markerUserId = (data.user as { id?: string } | null | undefined)?.id ?? null;
+  const isStopRound = existing.game_subtype === 'stop';
   const expectedParts = deriveExpectedAnswerParts(
     {
       question_type: existing.question_type,
@@ -153,11 +159,12 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
   const approvedParts = expectedParts.map((part) => {
     const nextMark =
       partMarksByLabel.get(part.label.trim().toLowerCase()) ?? (fallbackMark === undefined ? null : fallbackMark);
+    const effectivePoints = part.points * (isStopRound ? 2 : 1);
     return {
       label: part.label,
       is_correct: nextMark,
-      awarded_points: nextMark === true ? part.points : 0,
-      max_points: part.points
+      awarded_points: nextMark === true ? effectivePoints : nextMark === false && isStopRound ? -effectivePoints : 0,
+      max_points: effectivePoints
     };
   });
   const hasAnyMarks = approvedParts.some((part) => part.is_correct !== null);
@@ -166,6 +173,11 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
     ? approvedParts.reduce((sum, part) => sum + (part.is_correct === true ? part.max_points : 0), 0)
     : null;
   const maxPoints = approvedParts.reduce((sum, part) => sum + part.max_points, 0);
+  const minimumPoints = isStopRound ? approvedParts.reduce((sum, part) => sum - part.max_points, 0) : 0;
+  const normalizedApprovedPoints =
+    approvedPoints === null
+      ? null
+      : approvedParts.reduce((sum, part) => sum + part.awarded_points, 0);
   const overallCorrect = allMarked ? approvedPoints === maxPoints : null;
   await execute(
     env,
@@ -181,7 +193,7 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
      WHERE id = ?`,
     [
       hasAnyMarks ? JSON.stringify(approvedParts) : null,
-      approvedPoints,
+      normalizedApprovedPoints === null ? null : Math.max(minimumPoints, Math.min(maxPoints, normalizedApprovedPoints)),
       hasAnyMarks ? now : null,
       hasAnyMarks ? markerUserId : null,
       overallCorrect === null ? null : overallCorrect ? 1 : 0,

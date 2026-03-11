@@ -1331,7 +1331,7 @@ export function EventRunPage() {
                               </div>
                               <div className="mt-3 flex flex-wrap gap-2">
                                 <SecondaryButton
-                                  className={`h-9 ${correctActive ? 'border-[#2d9a59] bg-[#2d9a59]/20 text-[#8ce7ad]' : ''}`}
+                                  className={`h-9 ${correctActive ? 'border-[#2d9a59] text-[#8ce7ad]' : ''}`}
                                   onClick={() => markAudioSubmission(item.id, { approved_parts: nextPartMarks(true) })}
                                   disabled={audioMarkingItemId === item.id}
                                 >
