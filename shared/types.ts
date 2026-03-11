@@ -206,6 +206,8 @@ export type EventRoundAudioSubmission = {
   team_name: string | null;
   response_parts_json: string | null;
   submitted_at: string | null;
+  approved_points: number | null;
+  approved_parts_json: string | null;
   is_correct: boolean | null;
   marked_at: string | null;
 };

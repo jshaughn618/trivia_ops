@@ -69,6 +69,25 @@ type SubmissionRow = {
   approved_at: string | null;
 };
 
+function parseResponseParts(value: string | null) {
+  if (!value) return [] as Array<{ label: string; answer: string }>;
+  try {
+    const parsed = JSON.parse(value);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map((entry) => {
+        if (!entry || typeof entry !== 'object') return null;
+        const label = typeof (entry as { label?: unknown }).label === 'string' ? (entry as { label: string }).label.trim() : '';
+        if (!label) return null;
+        const answer = typeof (entry as { answer?: unknown }).answer === 'string' ? (entry as { answer: string }).answer : '';
+        return { label, answer };
+      })
+      .filter((entry): entry is { label: string; answer: string } => Boolean(entry));
+  } catch {
+    return [];
+  }
+}
+
 function formatPoints(value: number | null) {
   if (value === null) return '—';
   return Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/\.?0+$/, '');

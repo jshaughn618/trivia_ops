@@ -264,6 +264,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request, 
            response_parts_json = ?,
            submitted_at = ?,
            updated_at = ?,
+           approved_parts_json = NULL,
            is_correct = NULL,
            marked_at = NULL,
            marked_by = NULL,
@@ -286,9 +287,9 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request, 
       env,
       `INSERT INTO event_item_responses
        (id, event_id, event_round_id, edition_item_id, team_id, response_parts_json,
-        ai_grade_status, ai_grade_json, ai_graded_at, ai_grade_error, approved_points, approved_at, approved_by,
+        approved_parts_json, ai_grade_status, ai_grade_json, ai_graded_at, ai_grade_error, approved_points, approved_at, approved_by,
         submitted_at, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, 'pending', NULL, NULL, NULL, NULL, NULL, NULL, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, NULL, 'pending', NULL, NULL, NULL, NULL, NULL, NULL, ?, ?, ?)`,
       [targetResponseId, event.id, event.active_round_id, parsed.data.item_id, team.id, responsePartsJson, now, now, now]
     );
   }

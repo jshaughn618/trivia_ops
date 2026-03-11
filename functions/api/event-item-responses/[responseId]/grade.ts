@@ -91,7 +91,8 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
   await execute(
     env,
     `UPDATE event_item_responses
-     SET approved_points = ?,
+     SET approved_parts_json = NULL,
+         approved_points = ?,
          approved_at = ?,
          approved_by = ?,
          updated_at = ?

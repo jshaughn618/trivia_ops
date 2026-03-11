@@ -4,6 +4,7 @@ import { parseJson } from '../../../request';
 import { eventRoundAudioSubmissionMarkSchema, eventRoundAudioSubmissionResetSchema } from '../../../../shared/validators';
 import { execute, nowIso, queryAll, queryFirst } from '../../../db';
 import { requireHostOrAdmin, requireRoundAccess } from '../../../access';
+import { deriveExpectedAnswerParts } from '../../../response-labels';
 
 type SubmissionRow = {
   event_round_id: string;
@@ -14,6 +15,8 @@ type SubmissionRow = {
   team_name: string | null;
   response_parts_json: string | null;
   submitted_at: string | null;
+  approved_points: number | null;
+  approved_parts_json: string | null;
   is_correct: number | null;
   marked_at: string | null;
 };
@@ -30,6 +33,8 @@ const listSubmissions = (env: Env, roundId: string) =>
       t.name AS team_name,
       resp.response_parts_json,
       resp.submitted_at,
+      resp.approved_points,
+      resp.approved_parts_json,
       resp.is_correct,
       resp.marked_at
      FROM event_round_items eri
@@ -61,6 +66,8 @@ const normalizeRows = (rows: SubmissionRow[]) =>
     team_name: row.team_name ?? null,
     response_parts_json: row.response_parts_json ?? null,
     submitted_at: row.submitted_at ?? null,
+    approved_points: row.approved_points ?? null,
+    approved_parts_json: row.approved_parts_json ?? null,
     is_correct: row.is_correct === null || row.is_correct === undefined ? null : Boolean(row.is_correct),
     marked_at: row.marked_at ?? null
   }));
@@ -85,15 +92,39 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
     return jsonError({ code: 'validation_error', message: 'Invalid audio submission mark', details: parsed.error.flatten() }, 400);
   }
 
-  const existing = await queryFirst<{ id: string }>(
+  const existing = await queryFirst<{
+    id: string;
+    team_id: string;
+    question_type: string | null;
+    answer: string | null;
+    answer_a: string | null;
+    answer_b: string | null;
+    answer_a_label: string | null;
+    answer_b_label: string | null;
+    answer_parts_json: string | null;
+  }>(
     env,
-    `SELECT id
-     FROM event_item_responses
-     WHERE event_round_id = ?
-       AND edition_item_id = ?
-       AND response_parts_json IS NOT NULL
-       AND COALESCE(deleted, 0) = 0
-     ORDER BY submitted_at DESC, updated_at DESC
+    `SELECT
+       resp.id,
+       resp.team_id,
+       ei.question_type,
+       COALESCE(eri.overridden_answer, ei.answer) AS answer,
+       ei.answer_a,
+       ei.answer_b,
+       ei.answer_a_label,
+       ei.answer_b_label,
+       ei.answer_parts_json
+     FROM event_item_responses resp
+     JOIN event_round_items eri
+       ON eri.event_round_id = resp.event_round_id
+      AND eri.edition_item_id = resp.edition_item_id
+      AND COALESCE(eri.deleted, 0) = 0
+     JOIN edition_items ei ON ei.id = resp.edition_item_id AND COALESCE(ei.deleted, 0) = 0
+     WHERE resp.event_round_id = ?
+       AND resp.edition_item_id = ?
+       AND resp.response_parts_json IS NOT NULL
+       AND COALESCE(resp.deleted, 0) = 0
+     ORDER BY resp.submitted_at DESC, resp.updated_at DESC
      LIMIT 1`,
     [params.roundId, parsed.data.edition_item_id]
   );
@@ -103,21 +134,86 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
 
   const now = nowIso();
   const markerUserId = (data.user as { id?: string } | null | undefined)?.id ?? null;
+  const expectedParts = deriveExpectedAnswerParts(
+    {
+      question_type: existing.question_type,
+      answer: existing.answer,
+      answer_a: existing.answer_a,
+      answer_b: existing.answer_b,
+      answer_a_label: existing.answer_a_label,
+      answer_b_label: existing.answer_b_label,
+      answer_parts_json: existing.answer_parts_json
+    },
+    { fallbackSingleAnswer: true }
+  );
+  const partMarksByLabel = new Map(
+    (parsed.data.approved_parts ?? []).map((part) => [part.label.trim().toLowerCase(), part.is_correct])
+  );
+  const fallbackMark = parsed.data.approved_parts ? undefined : parsed.data.is_correct ?? null;
+  const approvedParts = expectedParts.map((part) => {
+    const nextMark =
+      partMarksByLabel.get(part.label.trim().toLowerCase()) ?? (fallbackMark === undefined ? null : fallbackMark);
+    return {
+      label: part.label,
+      is_correct: nextMark,
+      awarded_points: nextMark === true ? part.points : 0,
+      max_points: part.points
+    };
+  });
+  const hasAnyMarks = approvedParts.some((part) => part.is_correct !== null);
+  const allMarked = approvedParts.length > 0 && approvedParts.every((part) => part.is_correct !== null);
+  const approvedPoints = hasAnyMarks
+    ? approvedParts.reduce((sum, part) => sum + (part.is_correct === true ? part.max_points : 0), 0)
+    : null;
+  const maxPoints = approvedParts.reduce((sum, part) => sum + part.max_points, 0);
+  const overallCorrect = allMarked ? approvedPoints === maxPoints : null;
   await execute(
     env,
     `UPDATE event_item_responses
-     SET is_correct = ?,
+     SET approved_parts_json = ?,
+         approved_points = ?,
+         approved_at = ?,
+         approved_by = ?,
+         is_correct = ?,
          marked_at = ?,
          marked_by = ?,
          updated_at = ?
      WHERE id = ?`,
     [
-      parsed.data.is_correct === null ? null : parsed.data.is_correct ? 1 : 0,
-      parsed.data.is_correct === null ? null : now,
-      parsed.data.is_correct === null ? null : markerUserId,
+      hasAnyMarks ? JSON.stringify(approvedParts) : null,
+      approvedPoints,
+      hasAnyMarks ? now : null,
+      hasAnyMarks ? markerUserId : null,
+      overallCorrect === null ? null : overallCorrect ? 1 : 0,
+      hasAnyMarks ? now : null,
+      hasAnyMarks ? markerUserId : null,
       now,
       existing.id
     ]
+  );
+
+  const sumRow = await queryFirst<{ total: number | null }>(
+    env,
+    `SELECT SUM(COALESCE(approved_points, 0)) AS total
+     FROM event_item_responses
+     WHERE event_round_id = ?
+       AND team_id = ?
+       AND COALESCE(deleted, 0) = 0`,
+    [params.roundId, existing.team_id]
+  );
+  const total = sumRow?.total ?? 0;
+  await execute(
+    env,
+    `INSERT INTO event_round_scores
+     (id, event_round_id, team_id, score, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT(event_round_id, team_id)
+     DO UPDATE SET score = excluded.score,
+                   updated_at = excluded.updated_at,
+                   deleted = 0,
+                   deleted_at = NULL,
+                   deleted_by = NULL`,
+    [crypto.randomUUID(), params.roundId as string, existing.team_id, total, now, now]
   );
 
   const rows = await listSubmissions(env, params.roundId as string);
@@ -152,13 +248,16 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request, 
   }
 
   const now = nowIso();
-  const markerUserId = (data.user as { id?: string } | null | undefined)?.id ?? null;
   await execute(
     env,
     `UPDATE event_item_responses
      SET choice_index = NULL,
          choice_text = NULL,
          response_parts_json = NULL,
+         approved_parts_json = NULL,
+         approved_points = NULL,
+         approved_at = NULL,
+         approved_by = NULL,
          is_correct = NULL,
          marked_at = NULL,
          marked_by = NULL,
@@ -171,6 +270,26 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request, 
        AND COALESCE(deleted, 0) = 0`,
     [now, params.roundId, parsed.data.edition_item_id]
   );
+
+  const scoreRows = await queryAll<{ team_id: string; total: number | null }>(
+    env,
+    `SELECT team_id, SUM(COALESCE(approved_points, 0)) AS total
+     FROM event_item_responses
+     WHERE event_round_id = ?
+       AND COALESCE(deleted, 0) = 0
+     GROUP BY team_id`,
+    [params.roundId]
+  );
+  await execute(env, `DELETE FROM event_round_scores WHERE event_round_id = ?`, [params.roundId]);
+  for (const scoreRow of scoreRows) {
+    await execute(
+      env,
+      `INSERT INTO event_round_scores
+       (id, event_round_id, team_id, score, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [crypto.randomUUID(), params.roundId as string, scoreRow.team_id, scoreRow.total ?? 0, now, now]
+    );
+  }
 
   await execute(
     env,

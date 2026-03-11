@@ -405,7 +405,14 @@ export const api = {
     }),
   listRoundAudioSubmissions: (roundId: string) =>
     apiFetch<EventRoundAudioSubmission[]>(`/api/event-rounds/${roundId}/audio-submissions`),
-  markRoundAudioSubmission: (roundId: string, payload: { edition_item_id: string; is_correct: boolean | null }) =>
+  markRoundAudioSubmission: (
+    roundId: string,
+    payload: {
+      edition_item_id: string;
+      is_correct?: boolean | null;
+      approved_parts?: Array<{ label: string; is_correct: boolean | null }>;
+    }
+  ) =>
     apiFetch<EventRoundAudioSubmission>(`/api/event-rounds/${roundId}/audio-submissions`, {
       method: 'PUT',
       body: JSON.stringify(payload)

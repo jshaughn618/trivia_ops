@@ -15,6 +15,8 @@ function useQuery() {
 }
 
 type AnswerPart = { label: string; answer: string };
+type ExpectedAnswerPart = { label: string; answer: string; points: number };
+type ApprovedAnswerPart = { label: string; is_correct: boolean | null; awarded_points: number; max_points: number };
 type EventRoundResponseRow = {
   team_id: string;
   team_name: string;
@@ -36,6 +38,69 @@ const parseAnswerParts = (value?: string | null): AnswerPart[] => {
         return { label, answer } as AnswerPart;
       })
       .filter((part): part is AnswerPart => Boolean(part));
+  } catch {
+    return [];
+  }
+};
+
+const parseExpectedAnswerParts = (item?: EditionItem | null): ExpectedAnswerPart[] => {
+  if (!item) return [];
+  if (item.answer_parts_json) {
+    try {
+      const parsed = JSON.parse(item.answer_parts_json);
+      if (Array.isArray(parsed)) {
+        const parts = parsed
+          .map((entry) => {
+            if (!entry || typeof entry !== 'object') return null;
+            const label = typeof (entry as { label?: unknown }).label === 'string' ? (entry as { label: string }).label.trim() : '';
+            if (!label) return null;
+            const answer = typeof (entry as { answer?: unknown }).answer === 'string' ? (entry as { answer: string }).answer : '';
+            const pointsRaw = (entry as { points?: unknown }).points;
+            const points = typeof pointsRaw === 'number' && Number.isFinite(pointsRaw) ? Math.max(0, Math.trunc(pointsRaw)) : 1;
+            return { label, answer, points };
+          })
+          .filter((part): part is ExpectedAnswerPart => Boolean(part));
+        if (parts.length > 0) return parts;
+      }
+    } catch {
+      // Ignore malformed answer-parts payloads and fall back to legacy fields.
+    }
+  }
+
+  const parts: ExpectedAnswerPart[] = [];
+  if (item.answer_a?.trim()) {
+    parts.push({ label: item.answer_a_label?.trim() || 'Part A', answer: item.answer_a.trim(), points: 1 });
+  }
+  if (item.answer_b?.trim()) {
+    parts.push({ label: item.answer_b_label?.trim() || 'Part B', answer: item.answer_b.trim(), points: 1 });
+  }
+  if (parts.length === 0 && item.answer?.trim()) {
+    parts.push({ label: 'Answer', answer: item.answer.trim(), points: 1 });
+  }
+  return parts;
+};
+
+const parseApprovedAnswerParts = (value?: string | null): ApprovedAnswerPart[] => {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map((entry) => {
+        if (!entry || typeof entry !== 'object') return null;
+        const label = typeof (entry as { label?: unknown }).label === 'string' ? (entry as { label: string }).label.trim() : '';
+        if (!label) return null;
+        const isCorrectValue = (entry as { is_correct?: unknown }).is_correct;
+        const awardedRaw = (entry as { awarded_points?: unknown }).awarded_points;
+        const maxRaw = (entry as { max_points?: unknown }).max_points;
+        return {
+          label,
+          is_correct: typeof isCorrectValue === 'boolean' ? isCorrectValue : null,
+          awarded_points: typeof awardedRaw === 'number' && Number.isFinite(awardedRaw) ? awardedRaw : 0,
+          max_points: typeof maxRaw === 'number' && Number.isFinite(maxRaw) ? maxRaw : 1
+        } as ApprovedAnswerPart;
+      })
+      .filter((part): part is ApprovedAnswerPart => Boolean(part));
   } catch {
     return [];
   }
@@ -403,9 +468,14 @@ export function EventRunPage() {
     [audioSubmissions]
   );
   const currentAudioSubmission = item ? audioSubmissionByItemId.get(item.id) ?? null : null;
+  const currentExpectedAudioParts = useMemo(() => parseExpectedAnswerParts(item), [item]);
   const currentSubmittedParts = useMemo(
     () => parseAnswerParts(currentAudioSubmission?.response_parts_json),
     [currentAudioSubmission?.response_parts_json]
+  );
+  const currentApprovedAudioParts = useMemo(
+    () => parseApprovedAnswerParts(currentAudioSubmission?.approved_parts_json),
+    [currentAudioSubmission?.approved_parts_json]
   );
 
   useEffect(() => {
@@ -483,13 +553,16 @@ export function EventRunPage() {
       .sort((a, b) => a.teamName.localeCompare(b.teamName, undefined, { sensitivity: 'base' }));
   }, [audioSummaryRows]);
 
-  const markAudioSubmission = async (editionItemId: string, isCorrect: boolean | null) => {
+  const markAudioSubmission = async (
+    editionItemId: string,
+    payload: { is_correct?: boolean | null; approved_parts?: Array<{ label: string; is_correct: boolean | null }> }
+  ) => {
     if (!activeRound?.id) return;
     setAudioMarkingItemId(editionItemId);
     setAudioSubmissionsError(null);
     const res = await api.markRoundAudioSubmission(activeRound.id, {
       edition_item_id: editionItemId,
-      is_correct: isCorrect
+      ...payload
     });
     if (res.ok) {
       setAudioSubmissions((prev) =>
@@ -1228,36 +1301,60 @@ export function EventRunPage() {
                         <span className="text-muted">Team:</span>{' '}
                         <span className="font-semibold text-text">{currentAudioSubmission.team_name ?? 'Unknown team'}</span>
                       </div>
-                      <div className="mt-3 grid gap-2">
-                        {currentSubmittedParts.map((part) => (
-                          <div key={`submission-${item.id}-${part.label}`} className="rounded-md border border-border bg-panel px-3 py-2 text-sm">
-                            <span className="text-muted">{part.label}:</span>{' '}
-                            <span className="font-medium text-text">{part.answer}</span>
-                          </div>
-                        ))}
-                      </div>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <SecondaryButton
-                          className="h-10"
-                          onClick={() => markAudioSubmission(item.id, true)}
-                          disabled={audioMarkingItemId === item.id}
-                        >
-                          Mark Correct
-                        </SecondaryButton>
-                        <SecondaryButton
-                          className="h-10"
-                          onClick={() => markAudioSubmission(item.id, false)}
-                          disabled={audioMarkingItemId === item.id}
-                        >
-                          Mark Incorrect
-                        </SecondaryButton>
-                        <SecondaryButton
-                          className="h-10"
-                          onClick={() => markAudioSubmission(item.id, null)}
-                          disabled={audioMarkingItemId === item.id}
-                        >
-                          Clear Mark
-                        </SecondaryButton>
+                      <div className="mt-3 grid gap-3">
+                        {(currentExpectedAudioParts.length > 0 ? currentExpectedAudioParts : currentSubmittedParts).map((part) => {
+                          const submittedPart = currentSubmittedParts.find((entry) => entry.label === part.label);
+                          const approvedPart = currentApprovedAudioParts.find((entry) => entry.label === part.label);
+                          const nextPartMarks = (isCorrect: boolean | null) =>
+                            (currentExpectedAudioParts.length > 0 ? currentExpectedAudioParts : currentSubmittedParts).map((candidate) => {
+                              const existingMark = currentApprovedAudioParts.find((entry) => entry.label === candidate.label);
+                              return {
+                                label: candidate.label,
+                                is_correct: candidate.label === part.label ? isCorrect : existingMark?.is_correct ?? null
+                              };
+                            });
+                          const correctActive = approvedPart?.is_correct === true;
+                          const incorrectActive = approvedPart?.is_correct === false;
+                          const clearActive = approvedPart?.is_correct === null || !approvedPart;
+                          return (
+                            <div key={`submission-${item.id}-${part.label}`} className="rounded-md border border-border bg-panel px-3 py-3 text-sm">
+                              <div className="flex flex-wrap items-start justify-between gap-2">
+                                <div>
+                                  <div className="text-muted">{part.label}</div>
+                                  <div className="font-medium text-text">{submittedPart?.answer?.trim() || '—'}</div>
+                                </div>
+                                {'points' in part && part.points > 0 && (
+                                  <div className="text-xs text-muted">
+                                    {approvedPart?.awarded_points ?? 0} / {part.points} pt
+                                  </div>
+                                )}
+                              </div>
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                <SecondaryButton
+                                  className={`h-9 ${correctActive ? 'border-[#2d9a59] bg-[#2d9a59]/20 text-[#8ce7ad]' : ''}`}
+                                  onClick={() => markAudioSubmission(item.id, { approved_parts: nextPartMarks(true) })}
+                                  disabled={audioMarkingItemId === item.id}
+                                >
+                                  Correct
+                                </SecondaryButton>
+                                <SecondaryButton
+                                  className={`h-9 ${incorrectActive ? 'border-danger bg-danger text-danger-fg' : ''}`}
+                                  onClick={() => markAudioSubmission(item.id, { approved_parts: nextPartMarks(false) })}
+                                  disabled={audioMarkingItemId === item.id}
+                                >
+                                  Incorrect
+                                </SecondaryButton>
+                                <SecondaryButton
+                                  className={`h-9 ${clearActive ? 'border-border-strong bg-panel2' : ''}`}
+                                  onClick={() => markAudioSubmission(item.id, { approved_parts: nextPartMarks(null) })}
+                                  disabled={audioMarkingItemId === item.id}
+                                >
+                                  Clear
+                                </SecondaryButton>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </>
                   )}

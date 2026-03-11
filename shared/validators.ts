@@ -374,10 +374,23 @@ export const roundScoresUpdateSchema = z.object({
   scores: z.array(roundScoreSchema).min(1)
 });
 
-export const eventRoundAudioSubmissionMarkSchema = z.object({
-  edition_item_id: idSchema,
-  is_correct: z.boolean().nullable()
-});
+export const eventRoundAudioSubmissionMarkSchema = z
+  .object({
+    edition_item_id: idSchema,
+    is_correct: z.boolean().nullable().optional(),
+    approved_parts: z
+      .array(
+        z.object({
+          label: z.string().min(1),
+          is_correct: z.boolean().nullable()
+        })
+      )
+      .optional()
+  })
+  .refine((data) => data.is_correct !== undefined || data.approved_parts !== undefined, {
+    message: 'Provide is_correct or approved_parts',
+    path: ['is_correct']
+  });
 
 export const eventRoundAudioSubmissionResetSchema = z.object({
   edition_item_id: idSchema
