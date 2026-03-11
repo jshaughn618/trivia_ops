@@ -119,8 +119,9 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params, request, d
 
   const isMusicAudioStopItem =
     item.game_type_code === 'music' &&
+    item.game_subtype === 'stop' &&
     Number(item.allow_participant_audio_stop ?? 0) === 1 &&
-    (item.game_subtype === 'speed_round' || item.media_type === 'audio');
+    item.media_type === 'audio';
   if (isMusicAudioStopItem) {
     return jsonError({ code: 'invalid_type', message: 'Item uses the dedicated audio-stop submission flow.' }, 400);
   }

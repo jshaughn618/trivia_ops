@@ -55,6 +55,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request }
     audio_playing: number;
     active_round_status: string | null;
     game_type_code: string | null;
+    game_subtype: string | null;
     allow_participant_audio_stop: number | null;
   }>(
     env,
@@ -64,6 +65,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request }
             ls.audio_playing,
             er.status AS active_round_status,
             gt.code AS game_type_code,
+            g.subtype AS game_subtype,
             g.allow_participant_audio_stop
      FROM events e
      LEFT JOIN event_live_state ls ON ls.event_id = e.id AND COALESCE(ls.deleted, 0) = 0
@@ -87,7 +89,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request }
     await recordFailure();
     return jsonError({ code: 'not_live', message: 'No active round is live.' }, 400);
   }
-  if (event.game_type_code !== 'music' || Number(event.allow_participant_audio_stop ?? 0) !== 1) {
+  if (event.game_type_code !== 'music' || event.game_subtype !== 'stop' || Number(event.allow_participant_audio_stop ?? 0) !== 1) {
     await recordFailure();
     return jsonError({ code: 'forbidden', message: 'Participant audio stop is not enabled for this game.' }, 403);
   }

@@ -129,7 +129,7 @@ export async function getPublicEventPayload(env: Env, rawCode: string, view?: Pu
             er.status,
             ed.timer_seconds,
             CASE WHEN g.subtype = 'speed_round' THEN 1 ELSE 0 END AS is_speed_round,
-            CASE WHEN gt.code = 'music' THEN COALESCE(g.allow_participant_audio_stop, 0) ELSE 0 END AS allow_participant_audio_stop,
+            CASE WHEN gt.code = 'music' AND g.subtype = 'stop' THEN COALESCE(g.allow_participant_audio_stop, 0) ELSE 0 END AS allow_participant_audio_stop,
             ed.speed_round_audio_key AS round_audio_key,
             ed.speed_round_audio_name AS round_audio_name,
             g.id AS game_id,

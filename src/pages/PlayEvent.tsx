@@ -418,7 +418,7 @@ export function PlayEventPage() {
   const choiceOptions = displayItem?.question_type === 'multiple_choice' ? parseChoices(displayItem.choices_json) : [];
   const allowParticipantWebSubmissions = Boolean(data?.event?.allow_participant_web_submissions);
   const isDedicatedAudioStopFlowItem = Boolean(
-    showAudioClue && activeRound?.allow_participant_audio_stop && (speedRoundMode || displayItem?.media_type === 'audio')
+    activeRound?.allow_participant_audio_stop && displayItem?.media_type === 'audio'
   );
   const textResponseLabels = answerPartLabels;
   const canShowTextResponsePanel = Boolean(

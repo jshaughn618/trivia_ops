@@ -60,6 +60,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request, 
     participant_audio_stopped_by_team_id: string | null;
     active_round_status: string | null;
     game_type_code: string | null;
+    game_subtype: string | null;
     allow_participant_audio_stop: number | null;
     game_id: string | null;
     example_item_json: string | null;
@@ -73,6 +74,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request, 
             ls.participant_audio_stopped_by_team_id,
             er.status AS active_round_status,
             gt.code AS game_type_code,
+            g.subtype AS game_subtype,
             g.allow_participant_audio_stop,
             g.id AS game_id,
             g.example_item_json
@@ -98,7 +100,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request, 
     await recordFailure();
     return jsonError({ code: 'not_live', message: 'No active item is live.' }, 400);
   }
-  if (event.game_type_code !== 'music' || Number(event.allow_participant_audio_stop ?? 0) !== 1) {
+  if (event.game_type_code !== 'music' || event.game_subtype !== 'stop' || Number(event.allow_participant_audio_stop ?? 0) !== 1) {
     await recordFailure();
     return jsonError({ code: 'forbidden', message: 'Participant audio stop is not enabled for this game.' }, 403);
   }

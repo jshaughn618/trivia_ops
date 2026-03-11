@@ -262,6 +262,7 @@ export function EventRunPage() {
   const activeEdition = activeRound ? editionById[activeRound.edition_id] : null;
   const activeGame = activeEdition ? gameById[activeEdition.game_id] : null;
   const isSpeedRoundMode = activeGame?.subtype === 'speed_round';
+  const isStopMode = activeGame?.subtype === 'stop';
   const item = items[index];
   const isExampleItem = Boolean(item?.is_example_item);
   const isAudioItem = item?.media_type === 'audio';
@@ -286,7 +287,7 @@ export function EventRunPage() {
   );
   const participantWebSubmissionsEnabled = Boolean(event?.allow_participant_web_submissions ?? 0);
   const isDedicatedAudioStopFlowItem = Boolean(
-    activeGame?.allow_participant_audio_stop && (isSpeedRoundMode || isAudioItem)
+    activeGame?.allow_participant_audio_stop && isStopMode && isAudioItem
   );
   const hasTextResponseWorkflow = Boolean(
     participantWebSubmissionsEnabled &&

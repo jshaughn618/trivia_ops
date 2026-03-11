@@ -181,8 +181,9 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request, 
 
     const isMusicAudioStopExample =
       live.game_type_code === 'music' &&
+      live.game_subtype === 'stop' &&
       Number(live.allow_participant_audio_stop ?? 0) === 1 &&
-      (live.game_subtype === 'speed_round' || exampleItem.media_type === 'audio');
+      exampleItem.media_type === 'audio';
     if (isMusicAudioStopExample) {
       await recordFailure();
       return jsonError({ code: 'use_audio_submission', message: 'Use the audio-stop submission flow for this item.' }, 400);
@@ -330,8 +331,9 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request, 
 
   const isMusicAudioStopItem =
     live.game_type_code === 'music' &&
+    live.game_subtype === 'stop' &&
     Number(live.allow_participant_audio_stop ?? 0) === 1 &&
-    (live.game_subtype === 'speed_round' || current.media_type === 'audio');
+    current.media_type === 'audio';
   if (isMusicAudioStopItem) {
     await recordFailure();
     return jsonError({ code: 'use_audio_submission', message: 'Use the audio-stop submission flow for this item.' }, 400);

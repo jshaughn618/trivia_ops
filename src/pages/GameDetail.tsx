@@ -226,6 +226,7 @@ export function GameDetailPage() {
   const navigate = useNavigate();
   const musicSubtypeOptions = [
     { value: '', label: 'Standard' },
+    { value: 'stop', label: 'Stop!' },
     { value: 'speed_round', label: 'Speed Round' },
     { value: 'mashup', label: 'Mashup' },
     { value: 'covers', label: 'Covers' }
@@ -547,7 +548,7 @@ export function GameDetailPage() {
                     checked={allowParticipantAudioStop}
                     onChange={(event) => setAllowParticipantAudioStop(event.target.checked)}
                   />
-                  Allow participants to stop audio
+                  Allow participants to stop audio (Stop! subtype only)
                 </label>
               )}
               {updateError && (
