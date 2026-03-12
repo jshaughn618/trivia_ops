@@ -58,6 +58,13 @@ const parseAnswerParts = (value?: string | null): AnswerPart[] => {
 
 type PublicEventResponse = {
   server_now?: string;
+  stop_attempts?: Array<{
+    team_id: string;
+    team_name: string;
+    won_race: boolean;
+    attempted_at: string;
+  }> | null;
+  stop_attempts_pending?: boolean;
   event: {
     id: string;
     title: string;
@@ -444,6 +451,8 @@ export function PlayEventPage() {
   const isDedicatedAudioStopFlowItem = Boolean(
     activeRound?.allow_participant_audio_stop && displayItem?.media_type === 'audio'
   );
+  const visibleStopAttempts = data?.stop_attempts ?? null;
+  const stopAttemptsPending = Boolean(data?.stop_attempts_pending);
   const textResponseLabels = answerPartLabels;
   const canShowTextResponsePanel = Boolean(
     allowParticipantWebSubmissions &&
@@ -1334,6 +1343,46 @@ export function PlayEventPage() {
                             )}
                             {audioAnswerError && <PlayFooterHint className="text-danger">{audioAnswerError}</PlayFooterHint>}
                           </div>
+                        </div>
+                      )}
+                      {!data.live?.audio_playing && (stopAttemptsPending || (visibleStopAttempts && visibleStopAttempts.length > 0)) && (
+                        <div className="play-panel rounded-md px-4 py-4 text-left">
+                          <div className="text-sm font-semibold text-text">Stop Order</div>
+                          {stopAttemptsPending ? (
+                            <div className="mt-2 text-xs text-muted">
+                              Finalizing stop order. Showing all teams that hit stop in about 5 seconds.
+                            </div>
+                          ) : (
+                            <div className="mt-3 space-y-2">
+                              {visibleStopAttempts?.map((attempt, attemptIndex) => (
+                                <div
+                                  key={`${attempt.team_id}-${attempt.attempted_at}-${attemptIndex}`}
+                                  className="flex items-center justify-between gap-3 rounded-md border border-border bg-panel2 px-3 py-2"
+                                >
+                                  <div className="flex items-center gap-3">
+                                    <span className="inline-flex min-w-8 items-center justify-center rounded-full border border-border bg-panel px-2 py-1 text-[11px] font-semibold text-muted">
+                                      #{attemptIndex + 1}
+                                    </span>
+                                    <div>
+                                      <div className="text-sm font-medium text-text">{attempt.team_name}</div>
+                                      <div className="text-[11px] text-muted">
+                                        {new Date(attempt.attempted_at).toLocaleTimeString()}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div
+                                    className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
+                                      attempt.won_race
+                                        ? 'border-[#2d9a59] bg-[#2d9a59]/20 text-[#8ce7ad]'
+                                        : 'border-border text-muted'
+                                    }`}
+                                  >
+                                    {attempt.won_race ? 'First stop' : 'After'}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>

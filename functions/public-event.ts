@@ -9,6 +9,13 @@ export type PublicEventView = 'play' | 'leaderboard' | 'display';
 
 export type PublicEventPayload = {
   server_now: string;
+  stop_attempts: {
+    team_id: string;
+    team_name: string;
+    won_race: boolean;
+    attempted_at: string;
+  }[] | null;
+  stop_attempts_pending: boolean;
   event: {
     id: string;
     title: string;
@@ -307,6 +314,8 @@ export async function getPublicEventPayload(env: Env, rawCode: string, view?: Pu
   let visualItems: PublicItem[] = [];
   let speedRoundAnswers: { ordinal: number; answer: string; song: string | null; artist: string | null }[] | null = null;
   let responseCounts: { total: number; counts: number[] } | null = null;
+  let stopAttempts: PublicEventPayload['stop_attempts'] = null;
+  let stopAttemptsPending = false;
 
   if (!isLeaderboardView && live?.active_round_id) {
     const activeRoundMeta = roundsRaw.find((round) => round.id === live.active_round_id);
@@ -428,6 +437,39 @@ export async function getPublicEventPayload(env: Env, rawCode: string, view?: Pu
     }
   }
 
+  if (!isLeaderboardView && normalizedLive?.active_round_id && normalizedLive.current_item_ordinal !== null && normalizedLive.participant_audio_stopped_at) {
+    const activeRoundMeta = roundsRaw.find((round) => round.id === normalizedLive.active_round_id);
+    const stoppedAtMs = Date.parse(normalizedLive.participant_audio_stopped_at);
+    const stopResultsReady = !Number.isNaN(stoppedAtMs) && Date.now() >= stoppedAtMs + 5000;
+    if (activeRoundMeta?.allow_participant_audio_stop && stopResultsReady) {
+      stopAttempts = await queryAll<{
+        team_id: string;
+        team_name: string;
+        won_race: number;
+        attempted_at: string;
+      }>(
+        env,
+        `SELECT team_id, team_name, won_race, attempted_at
+         FROM event_audio_stop_attempts
+         WHERE event_id = ?
+           AND event_round_id = ?
+           AND item_ordinal = ?
+           AND COALESCE(deleted, 0) = 0
+         ORDER BY attempted_at ASC, id ASC`,
+        [event.id, normalizedLive.active_round_id, normalizedLive.current_item_ordinal]
+      ).then((rows) =>
+        rows.map((row) => ({
+          team_id: row.team_id,
+          team_name: row.team_name,
+          won_race: Boolean(row.won_race),
+          attempted_at: row.attempted_at
+        }))
+      );
+    } else if (activeRoundMeta?.allow_participant_audio_stop) {
+      stopAttemptsPending = true;
+    }
+  }
+
   if (!isLeaderboardView && live?.active_round_id && canRevealAnswer) {
     const activeRound = rounds.find((round) => round.id === live.active_round_id);
     if (activeRound?.is_speed_round) {
@@ -536,6 +578,8 @@ export async function getPublicEventPayload(env: Env, rawCode: string, view?: Pu
 
   let data: PublicEventPayload = {
     server_now: new Date().toISOString(),
+    stop_attempts: stopAttempts,
+    stop_attempts_pending: stopAttemptsPending,
     event: {
       ...event,
       allow_participant_web_submissions: Boolean(event.allow_participant_web_submissions)
@@ -555,6 +599,8 @@ export async function getPublicEventPayload(env: Env, rawCode: string, view?: Pu
   if (view === 'leaderboard') {
     data = {
       ...data,
+      stop_attempts: null,
+      stop_attempts_pending: false,
       teams: [],
       current_item: null,
       visual_round: false,
