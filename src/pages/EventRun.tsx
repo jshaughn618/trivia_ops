@@ -10,7 +10,8 @@ import { StampBadge } from '../components/StampBadge';
 import { createRequestId, logError, logInfo } from '../lib/log';
 import type { EditionItem, Event, EventRound, Game, GameEdition, Team, EventRoundAudioSubmission, EventRoundScore } from '../types';
 
-const STOP_ENABLE_DELAY_MS = 5000;
+const STOP_ENABLE_DELAY_MS = 1000;
+const STOP_AUDIO_LEAD_IN_SECONDS = 3;
 
 function useQuery() {
   return new URLSearchParams(useLocation().search);
@@ -148,12 +149,14 @@ export function EventRunPage() {
   const [audioRetryToken, setAudioRetryToken] = useState(0);
   const [audioRetryAttempt, setAudioRetryAttempt] = useState(0);
   const [localAudioPlaying, setLocalAudioPlaying] = useState(false);
+  const [stopAudioLeadInSeconds, setStopAudioLeadInSeconds] = useState<number | null>(null);
   const [audioStoppedByTeamNotice, setAudioStoppedByTeamNotice] = useState<string | null>(null);
   const [stopAnswerReceivedNotice, setStopAnswerReceivedNotice] = useState<string | null>(null);
   const remoteAudioPlayingSeenRef = useRef(false);
   const lastAudioKeyRef = useRef<string | null>(null);
   const stopAnswerNoticeTimerRef = useRef<number | null>(null);
   const stopAnswerSubmissionKeyRef = useRef('');
+  const stopAudioLeadInTimerRef = useRef<number | null>(null);
   const [waitingMessage, setWaitingMessage] = useState('');
   const [waitingShowLeaderboard, setWaitingShowLeaderboard] = useState(false);
   const [waitingShowNextRound, setWaitingShowNextRound] = useState(true);
@@ -183,6 +186,16 @@ export function EventRunPage() {
   const preselectRef = useRef(false);
   const auth = useAuth();
   const isAdmin = auth.user?.user_type === 'admin';
+  const stopStateReset = useMemo(
+    () => ({
+      audio_playing: false,
+      stop_enabled_at: null,
+      participant_audio_stopped_by_team_id: null,
+      participant_audio_stopped_by_team_name: null,
+      participant_audio_stopped_at: null
+    }),
+    []
+  );
   const syncAudioPlaying = useCallback((playing: boolean) => {
     if (!eventId) return;
     void api.updateLiveState(eventId, {
@@ -199,6 +212,14 @@ export function EventRunPage() {
         : {})
     });
   }, [eventId]);
+
+  const cancelStopAudioLeadIn = useCallback(() => {
+    if (stopAudioLeadInTimerRef.current) {
+      window.clearInterval(stopAudioLeadInTimerRef.current);
+      stopAudioLeadInTimerRef.current = null;
+    }
+    setStopAudioLeadInSeconds(null);
+  }, []);
 
   const load = async () => {
     if (!eventId) return;
@@ -255,7 +276,7 @@ export function EventRunPage() {
         await api.updateLiveState(eventId, {
           active_round_id: selectedRoundId,
           current_item_ordinal: sorted[0]?.ordinal ?? null,
-          audio_playing: false,
+          ...stopStateReset,
           reveal_answer: false,
           reveal_fun_fact: false,
           timer_started_at: null,
@@ -642,8 +663,9 @@ export function EventRunPage() {
       if (stopAnswerNoticeTimerRef.current) {
         window.clearTimeout(stopAnswerNoticeTimerRef.current);
       }
+      cancelStopAudioLeadIn();
     };
-  }, []);
+  }, [cancelStopAudioLeadIn]);
 
   useEffect(() => {
     setTimerDurationSeconds(activeRound?.timer_seconds ?? 15);
@@ -655,6 +677,7 @@ export function EventRunPage() {
       lastAudioKeyRef.current = nextAudioKey;
       setAudioRetryAttempt(0);
     }
+    cancelStopAudioLeadIn();
     setAudioError(null);
     setAudioRequestId(null);
     remoteAudioPlayingSeenRef.current = false;
@@ -673,7 +696,7 @@ export function EventRunPage() {
     setAudioRequestId(requestId);
     setAudioUrl(`${base}${joiner}request_id=${encodeURIComponent(requestId)}${retryParam}`);
     setAudioLoading(true);
-  }, [effectiveAudioKey, isAudioItem, audioRetryToken, syncAudioPlaying]);
+  }, [cancelStopAudioLeadIn, effectiveAudioKey, isAudioItem, audioRetryToken, syncAudioPlaying]);
 
   useEffect(() => {
     return () => {
@@ -764,6 +787,7 @@ export function EventRunPage() {
     setAudioLoading(false);
     setAudioError('Audio unavailable.');
     setLocalAudioPlaying(false);
+    cancelStopAudioLeadIn();
     syncAudioPlaying(false);
   };
 
@@ -772,6 +796,35 @@ export function EventRunPage() {
     setAudioError(null);
     setAudioRetryAttempt(0);
     handleAudioEvent(event);
+  };
+
+  const startStopAudioLeadIn = () => {
+    if (!audioRef.current || !isDedicatedAudioStopFlowItem || !effectiveAudioKey) return;
+    cancelStopAudioLeadIn();
+    audioRef.current.pause();
+    audioRef.current.currentTime = 0;
+    setAudioStoppedByTeamNotice(null);
+    setStopAnswerReceivedNotice(null);
+    setAudioError(null);
+    setStopAudioLeadInSeconds(STOP_AUDIO_LEAD_IN_SECONDS);
+    stopAudioLeadInTimerRef.current = window.setInterval(() => {
+      setStopAudioLeadInSeconds((prev) => {
+        if (prev === null) return null;
+        if (prev <= 1) {
+          if (stopAudioLeadInTimerRef.current) {
+            window.clearInterval(stopAudioLeadInTimerRef.current);
+            stopAudioLeadInTimerRef.current = null;
+          }
+          void audioRef.current?.play().catch(() => {
+            setAudioError('Audio unavailable.');
+            setLocalAudioPlaying(false);
+            syncAudioPlaying(false);
+          });
+          return null;
+        }
+        return prev - 1;
+      });
+    }, 1000);
   };
 
   useEffect(() => {
@@ -839,16 +892,20 @@ export function EventRunPage() {
 
   const nextItem = () => {
     if (index < items.length - 1) {
+      cancelStopAudioLeadIn();
+      audioRef.current?.pause();
       const nextIndex = index + 1;
       setIndex(nextIndex);
       setShowAnswer(false);
       setShowFact(false);
       setTimerStartedAt(null);
       setTimerRemainingSeconds(null);
+      setAudioStoppedByTeamNotice(null);
+      setStopAnswerReceivedNotice(null);
       if (eventId) {
         api.updateLiveState(eventId, {
           current_item_ordinal: items[nextIndex]?.ordinal ?? null,
-          audio_playing: false,
+          ...stopStateReset,
           reveal_answer: false,
           reveal_fun_fact: false,
           timer_started_at: null,
@@ -861,16 +918,20 @@ export function EventRunPage() {
 
   const prevItem = () => {
     if (index > 0) {
+      cancelStopAudioLeadIn();
+      audioRef.current?.pause();
       const prevIndex = index - 1;
       setIndex(prevIndex);
       setShowAnswer(false);
       setShowFact(false);
       setTimerStartedAt(null);
       setTimerRemainingSeconds(null);
+      setAudioStoppedByTeamNotice(null);
+      setStopAnswerReceivedNotice(null);
       if (eventId) {
         api.updateLiveState(eventId, {
           current_item_ordinal: items[prevIndex]?.ordinal ?? null,
-          audio_playing: false,
+          ...stopStateReset,
           reveal_answer: false,
           reveal_fun_fact: false,
           timer_started_at: null,
@@ -883,6 +944,8 @@ export function EventRunPage() {
 
   const setLive = async () => {
     if (!activeRound) return;
+    cancelStopAudioLeadIn();
+    audioRef.current?.pause();
     const keepRoundId = roundId || activeRound.id;
     const otherLive = rounds.filter((round) => round.id !== activeRound.id && round.status === 'live');
     if (otherLive.length > 0) {
@@ -894,7 +957,7 @@ export function EventRunPage() {
       await api.updateLiveState(eventId, {
         active_round_id: activeRound.id,
         current_item_ordinal: currentOrdinal,
-        audio_playing: false,
+        ...stopStateReset,
         show_full_leaderboard: false
       });
     }
@@ -907,13 +970,15 @@ export function EventRunPage() {
 
   const setPlanned = async () => {
     if (!activeRound) return;
+    cancelStopAudioLeadIn();
+    audioRef.current?.pause();
     const keepRoundId = roundId || activeRound.id;
     await api.updateEventRound(activeRound.id, { status: 'planned' });
     if (eventId) {
       await api.updateLiveState(eventId, {
         active_round_id: roundId || activeRound.id,
         current_item_ordinal: null,
-        audio_playing: false,
+        ...stopStateReset,
         reveal_answer: false,
         reveal_fun_fact: false,
         timer_started_at: null,
@@ -1244,7 +1309,7 @@ export function EventRunPage() {
                       <audio
                         ref={audioRef}
                         className="w-full"
-                        controls
+                        controls={!isDedicatedAudioStopFlowItem}
                         src={audioUrl ?? undefined}
                         onLoadStart={() => setAudioLoading(true)}
                         onLoadedMetadata={() => handleAudioReady('loadedmetadata')}
@@ -1271,6 +1336,39 @@ export function EventRunPage() {
                         }}
                         onError={handleAudioError}
                       />
+                      {isDedicatedAudioStopFlowItem && !audioError && (
+                        <div className="flex flex-wrap items-center gap-2">
+                          {stopAudioLeadInSeconds !== null ? (
+                            <>
+                              <PrimaryButton className="h-11" disabled>
+                                Starting In {stopAudioLeadInSeconds}s
+                              </PrimaryButton>
+                              <SecondaryButton
+                                className="h-11"
+                                onClick={() => {
+                                  cancelStopAudioLeadIn();
+                                  setAudioStoppedByTeamNotice(null);
+                                }}
+                              >
+                                Cancel Countdown
+                              </SecondaryButton>
+                            </>
+                          ) : localAudioPlaying ? (
+                            <SecondaryButton
+                              className="h-11"
+                              onClick={() => {
+                                audioRef.current?.pause();
+                              }}
+                            >
+                              Pause Audio
+                            </SecondaryButton>
+                          ) : (
+                            <PrimaryButton className="h-11" onClick={startStopAudioLeadIn} disabled={audioLoading}>
+                              Start Stop! Audio
+                            </PrimaryButton>
+                          )}
+                        </div>
+                      )}
                       {audioError && (
                         <SecondaryButton className="h-11" onClick={() => setAudioRetryToken((prev) => prev + 1)}>
                           Retry Audio
@@ -1278,7 +1376,7 @@ export function EventRunPage() {
                       )}
                       {isDedicatedAudioStopFlowItem && !audioError && (
                         <div className="text-xs text-muted">
-                          Stop unlocks for participants {STOP_ENABLE_DELAY_MS / 1000} seconds after playback begins.
+                          Stop! rounds use a {STOP_AUDIO_LEAD_IN_SECONDS}-second lead-in, then participants can stop the clip after {STOP_ENABLE_DELAY_MS / 1000} second.
                         </div>
                       )}
                     </div>
