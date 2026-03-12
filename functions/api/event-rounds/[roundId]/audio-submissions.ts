@@ -5,6 +5,7 @@ import { eventRoundAudioSubmissionMarkSchema, eventRoundAudioSubmissionResetSche
 import { execute, nowIso, queryAll, queryFirst } from '../../../db';
 import { requireHostOrAdmin, requireRoundAccess } from '../../../access';
 import { deriveExpectedAnswerParts } from '../../../response-labels';
+import { logWarn } from '../../../_lib/log';
 
 type SubmissionRow = {
   event_round_id: string;
@@ -260,6 +261,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request, 
   }
 
   const now = nowIso();
+  const markerUserId = (data.user as { id?: string } | null | undefined)?.id ?? null;
   await execute(
     env,
     `UPDATE event_item_responses
@@ -310,6 +312,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request, 
          participant_audio_stopped_by_team_name = NULL,
          participant_audio_stopped_at = NULL,
          audio_playing = 0,
+         stop_enabled_at = NULL,
          reveal_answer = 0,
          reveal_fun_fact = 0,
          timer_started_at = NULL,
@@ -321,6 +324,26 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request, 
        AND COALESCE(deleted, 0) = 0`,
     [now, roundItem.event_id, params.roundId, roundItem.ordinal]
   );
+
+  try {
+    await execute(
+      env,
+      `UPDATE event_audio_stop_attempts
+       SET deleted = 1,
+           deleted_at = ?,
+           deleted_by = ?
+       WHERE event_round_id = ?
+         AND item_ordinal = ?
+         AND COALESCE(deleted, 0) = 0`,
+      [now, markerUserId, params.roundId, roundItem.ordinal]
+    );
+  } catch (error) {
+    logWarn(env, 'audio_stop_attempt_cleanup_failed', {
+      roundId: params.roundId,
+      itemOrdinal: roundItem.ordinal,
+      message: error instanceof Error ? error.message : 'unknown_error'
+    });
+  }
 
   const rows = await listSubmissions(env, params.roundId as string);
   const next = normalizeRows(rows).find((row) => row.edition_item_id === parsed.data.edition_item_id);

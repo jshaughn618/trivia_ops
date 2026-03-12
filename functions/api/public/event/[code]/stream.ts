@@ -5,6 +5,7 @@ import { getPublicEventPayload } from '../../../../public-event';
 import { verifyParticipantDisplayToken } from '../../../../participant-display';
 
 const STREAM_POLL_MS = 2000;
+const STREAM_POLL_MS_PLAY = 500;
 const DEFAULT_PUBLIC_STREAM_RATE_LIMIT = {
   maxAttempts: 300,
   windowSeconds: 5 * 60,
@@ -106,7 +107,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params, request })
 
       sendComment('connected');
       tick();
-      const timer = setInterval(tick, STREAM_POLL_MS);
+      const timer = setInterval(tick, viewParam === 'play' ? STREAM_POLL_MS_PLAY : STREAM_POLL_MS);
 
       request.signal.addEventListener('abort', () => {
         clearInterval(timer);

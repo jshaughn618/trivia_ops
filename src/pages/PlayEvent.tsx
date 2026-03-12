@@ -16,8 +16,8 @@ import { PrimaryCTA } from '../components/play/PrimaryCTA';
 import { PlayFooterHint } from '../components/play/PlayFooterHint';
 import { AudioVisualizer } from '../components/play/AudioVisualizer';
 
-const POLL_MS = 8000;
-const POLL_BACKUP_MS = 15000;
+const POLL_MS = 3000;
+const POLL_BACKUP_MS = 3000;
 const STREAM_RETRY_BASE_MS = 2000;
 const STREAM_RETRY_MAX_MS = 30000;
 const RESPONSE_GRAPH_DELAY_MS = 2000;
@@ -57,6 +57,7 @@ const parseAnswerParts = (value?: string | null): AnswerPart[] => {
 };
 
 type PublicEventResponse = {
+  server_now?: string;
   event: {
     id: string;
     title: string;
@@ -84,6 +85,7 @@ type PublicEventResponse = {
     active_round_id: string | null;
     current_item_ordinal: number | null;
     audio_playing: boolean;
+    stop_enabled_at?: string | null;
     reveal_answer: boolean;
     reveal_fun_fact: boolean;
     waiting_message: string | null;
@@ -182,6 +184,8 @@ export function PlayEventPage() {
   const [graphDelayUntil, setGraphDelayUntil] = useState<number | null>(null);
   const graphDelayItemRef = useRef<string | null>(null);
   const textAutoSubmitItemRef = useRef<string | null>(null);
+  const [serverClockOffsetMs, setServerClockOffsetMs] = useState(0);
+  const [clockNowMs, setClockNowMs] = useState(() => Date.now());
   const normalizedCode = useMemo(() => (code ?? '').trim().toUpperCase(), [code]);
   const sanitizedDigits = (value: string) => value.replace(/\D/g, '');
   const teamCodeValue = teamCode.join('');
@@ -191,7 +195,14 @@ export function PlayEventPage() {
     if (!normalizedCode) return;
     const res = await api.publicEvent(normalizedCode, 'play');
     if (res.ok) {
-      setData(res.data as PublicEventResponse);
+      const payload = res.data as PublicEventResponse;
+      if (payload.server_now) {
+        const serverNowMs = new Date(payload.server_now).getTime();
+        if (Number.isFinite(serverNowMs)) {
+          setServerClockOffsetMs(serverNowMs - Date.now());
+        }
+      }
+      setData(payload);
       setError(null);
       setLoading(false);
     } else {
@@ -210,6 +221,12 @@ export function PlayEventPage() {
 
     const applyData = (payload: PublicEventResponse) => {
       if (cancelled) return;
+      if (payload.server_now) {
+        const serverNowMs = new Date(payload.server_now).getTime();
+        if (Number.isFinite(serverNowMs)) {
+          setServerClockOffsetMs(serverNowMs - Date.now());
+        }
+      }
       setData(payload);
       setError(null);
       setLoading(false);
@@ -398,13 +415,20 @@ export function PlayEventPage() {
   const responseCounts = data?.response_counts ?? null;
   const answerPartLabels = displayItem?.answer_part_labels ?? [];
   const showAudioClue = speedRoundMode || displayItem?.media_type === 'audio';
-  const canRequestAudioStop = Boolean(
+  const stopEnabledAtMs = data?.live?.stop_enabled_at ? new Date(data.live.stop_enabled_at).getTime() : null;
+  const effectiveNowMs = clockNowMs + serverClockOffsetMs;
+  const stopWindowOpen =
+    stopEnabledAtMs === null || !Number.isFinite(stopEnabledAtMs) ? true : effectiveNowMs >= stopEnabledAtMs;
+  const stopCountdownMs =
+    stopEnabledAtMs !== null && Number.isFinite(stopEnabledAtMs) ? Math.max(0, stopEnabledAtMs - effectiveNowMs) : 0;
+  const canRenderAudioStop = Boolean(
     showAudioClue &&
     activeRound?.allow_participant_audio_stop &&
     data?.live?.audio_playing &&
     teamId &&
     teamSession
   );
+  const canRequestAudioStop = Boolean(canRenderAudioStop && stopWindowOpen);
   const canSubmitStoppedAudioAnswer = Boolean(
     showAudioClue &&
     !data?.live?.audio_playing &&
@@ -430,6 +454,18 @@ export function PlayEventPage() {
     displayItem?.id
   );
   const canSubmitTextResponse = Boolean(canShowTextResponsePanel);
+
+  useEffect(() => {
+    if (!canRenderAudioStop) return;
+    if (stopWindowOpen) return;
+    const timer = window.setInterval(() => setClockNowMs(Date.now()), 100);
+    return () => window.clearInterval(timer);
+  }, [canRenderAudioStop, stopWindowOpen]);
+
+  useEffect(() => {
+    if (!canRenderAudioStop) return;
+    setClockNowMs(Date.now());
+  }, [canRenderAudioStop, data?.live?.stop_enabled_at]);
 
   useEffect(() => {
     if (!visualMode) {
@@ -1228,16 +1264,23 @@ export function PlayEventPage() {
                         </div>
                       </div>
                       <AudioVisualizer active={Boolean(data.live?.audio_playing)} />
-                      {canRequestAudioStop && (
+                      {canRenderAudioStop && (
                         <div className="flex flex-col items-center gap-2">
                           <button
                             type="button"
                             onClick={handleStopAudio}
-                            disabled={stopAudioLoading}
+                            disabled={stopAudioLoading || !canRequestAudioStop}
                             className="play-touch w-full max-w-sm rounded-md border border-danger bg-danger px-4 py-3 text-base font-semibold text-bg hover:bg-danger/90 disabled:opacity-60"
                           >
-                            {stopAudioLoading ? 'Stopping…' : 'STOP'}
+                            {stopAudioLoading
+                              ? 'Stopping…'
+                              : canRequestAudioStop
+                                ? 'STOP'
+                                : `STOP in ${(stopCountdownMs / 1000).toFixed(stopCountdownMs > 1000 ? 1 : 0)}s`}
                           </button>
+                          {!canRequestAudioStop && (
+                            <PlayFooterHint>Stop unlocks simultaneously for all teams.</PlayFooterHint>
+                          )}
                           {stopAudioError && <PlayFooterHint className="text-danger">{stopAudioError}</PlayFooterHint>}
                         </div>
                       )}

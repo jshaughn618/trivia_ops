@@ -6,6 +6,7 @@ import type {
   EventLiveState,
   EventRound,
   EventRoundAudioSubmission,
+  EventRoundAudioStopAttempt,
   EventRoundScore,
   GameExampleItem,
   Game,
@@ -391,7 +392,10 @@ export const api = {
     return apiFetch<{ ok: true }>(`/api/event-rounds/${roundId}/clear-responses${query}`, { method: 'POST' });
   },
   getLiveState: (eventId: string) => apiFetch<EventLiveState | null>(`/api/events/${eventId}/live-state`),
-  updateLiveState: (eventId: string, payload: Partial<EventLiveState>) =>
+  updateLiveState: (
+    eventId: string,
+    payload: Partial<EventLiveState> & { stop_enable_delay_ms?: number | null }
+  ) =>
     apiFetch<EventLiveState>(`/api/events/${eventId}/live-state`, {
       method: 'PUT',
       body: JSON.stringify(payload)
@@ -405,6 +409,8 @@ export const api = {
     }),
   listRoundAudioSubmissions: (roundId: string) =>
     apiFetch<EventRoundAudioSubmission[]>(`/api/event-rounds/${roundId}/audio-submissions`),
+  listRoundAudioStopAttempts: (roundId: string) =>
+    apiFetch<EventRoundAudioStopAttempt[]>(`/api/event-rounds/${roundId}/audio-stop-attempts`),
   markRoundAudioSubmission: (
     roundId: string,
     payload: {

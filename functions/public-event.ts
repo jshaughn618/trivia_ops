@@ -8,6 +8,7 @@ import { buildRuntimeGameExampleItem } from './game-example-item';
 export type PublicEventView = 'play' | 'leaderboard' | 'display';
 
 export type PublicEventPayload = {
+  server_now: string;
   event: {
     id: string;
     title: string;
@@ -38,6 +39,7 @@ export type PublicEventPayload = {
     active_round_id: string | null;
     current_item_ordinal: number | null;
     audio_playing: boolean;
+    stop_enabled_at: string | null;
     reveal_answer: boolean;
     reveal_fun_fact: boolean;
     waiting_message: string | null;
@@ -167,6 +169,7 @@ export async function getPublicEventPayload(env: Env, rawCode: string, view?: Pu
     active_round_id: string | null;
     current_item_ordinal: number | null;
     audio_playing: number;
+    stop_enabled_at: string | null;
     reveal_answer: number;
     reveal_fun_fact: number;
     waiting_message: string | null;
@@ -181,7 +184,7 @@ export async function getPublicEventPayload(env: Env, rawCode: string, view?: Pu
     updated_at: string;
   }>(
     env,
-    `SELECT id, event_id, active_round_id, current_item_ordinal, audio_playing, reveal_answer, reveal_fun_fact,
+    `SELECT id, event_id, active_round_id, current_item_ordinal, audio_playing, stop_enabled_at, reveal_answer, reveal_fun_fact,
             waiting_message, waiting_show_leaderboard, waiting_show_next_round, show_full_leaderboard, timer_started_at, timer_duration_seconds,
             participant_audio_stopped_by_team_id, participant_audio_stopped_by_team_name, participant_audio_stopped_at, updated_at
      FROM event_live_state WHERE event_id = ? AND COALESCE(deleted, 0) = 0`,
@@ -192,6 +195,7 @@ export async function getPublicEventPayload(env: Env, rawCode: string, view?: Pu
     ? {
         ...live,
         audio_playing: Boolean(live.audio_playing),
+        stop_enabled_at: live.stop_enabled_at ?? null,
         reveal_answer: Boolean(live.reveal_answer),
         reveal_fun_fact: Boolean(live.reveal_fun_fact),
         waiting_message: live.waiting_message ?? null,
@@ -531,6 +535,7 @@ export async function getPublicEventPayload(env: Env, rawCode: string, view?: Pu
   }
 
   let data: PublicEventPayload = {
+    server_now: new Date().toISOString(),
     event: {
       ...event,
       allow_participant_web_submissions: Boolean(event.allow_participant_web_submissions)

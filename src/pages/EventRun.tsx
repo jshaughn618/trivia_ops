@@ -10,6 +10,8 @@ import { StampBadge } from '../components/StampBadge';
 import { createRequestId, logError, logInfo } from '../lib/log';
 import type { EditionItem, Event, EventRound, Game, GameEdition, Team, EventRoundAudioSubmission, EventRoundScore } from '../types';
 
+const STOP_ENABLE_DELAY_MS = 5000;
+
 function useQuery() {
   return new URLSearchParams(useLocation().search);
 }
@@ -185,6 +187,9 @@ export function EventRunPage() {
     if (!eventId) return;
     void api.updateLiveState(eventId, {
       audio_playing: playing,
+      ...(playing
+        ? { stop_enable_delay_ms: STOP_ENABLE_DELAY_MS }
+        : { stop_enabled_at: null }),
       ...(playing
         ? {
             participant_audio_stopped_by_team_id: null,
@@ -1270,6 +1275,11 @@ export function EventRunPage() {
                         <SecondaryButton className="h-11" onClick={() => setAudioRetryToken((prev) => prev + 1)}>
                           Retry Audio
                         </SecondaryButton>
+                      )}
+                      {isDedicatedAudioStopFlowItem && !audioError && (
+                        <div className="text-xs text-muted">
+                          Stop unlocks for participants {STOP_ENABLE_DELAY_MS / 1000} seconds after playback begins.
+                        </div>
                       )}
                     </div>
                   )}

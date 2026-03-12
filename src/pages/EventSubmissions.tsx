@@ -7,7 +7,7 @@ import { PageHeader } from '../components/PageHeader';
 import { Section } from '../components/Section';
 import { StatusPill } from '../components/StatusPill';
 import { logError } from '../lib/log';
-import type { Event, EventRoundAudioSubmission } from '../types';
+import type { Event, EventRoundAudioStopAttempt, EventRoundAudioSubmission } from '../types';
 
 const POLL_INTERVAL_MS = 6000;
 
@@ -151,6 +151,7 @@ export function EventSubmissionsPage() {
   const [applyingAiAll, setApplyingAiAll] = useState(false);
   const [visibleStopResults, setVisibleStopResults] = useState<Record<string, boolean>>({});
   const [stopResultsByRound, setStopResultsByRound] = useState<Record<string, EventRoundAudioSubmission[]>>({});
+  const [stopAttemptsByRound, setStopAttemptsByRound] = useState<Record<string, EventRoundAudioStopAttempt[]>>({});
   const [stopResultsLoading, setStopResultsLoading] = useState<Record<string, boolean>>({});
   const [stopResultsError, setStopResultsError] = useState<Record<string, string | null>>({});
   const autosaveTimersRef = useRef<Record<string, number>>({});
@@ -346,14 +347,25 @@ export function EventSubmissionsPage() {
     if (!options?.silent) {
       setStopResultsLoading((prev) => ({ ...prev, [roundId]: true }));
     }
-    const res = await api.listRoundAudioSubmissions(roundId);
-    if (res.ok) {
-      setStopResultsByRound((prev) => ({ ...prev, [roundId]: res.data }));
+    const [submissionsRes, attemptsRes] = await Promise.all([
+      api.listRoundAudioSubmissions(roundId),
+      api.listRoundAudioStopAttempts(roundId)
+    ]);
+    if (submissionsRes.ok) {
+      setStopResultsByRound((prev) => ({ ...prev, [roundId]: submissionsRes.data }));
+    }
+    if (attemptsRes.ok) {
+      setStopAttemptsByRound((prev) => ({ ...prev, [roundId]: attemptsRes.data }));
+    }
+    if (submissionsRes.ok && attemptsRes.ok) {
       setStopResultsError((prev) => ({ ...prev, [roundId]: null }));
     } else if (!options?.silent) {
+      const message = submissionsRes.ok
+        ? formatApiError(attemptsRes, 'Failed to load Stop! attempts.')
+        : formatApiError(submissionsRes, 'Failed to load Stop! results.');
       setStopResultsError((prev) => ({
         ...prev,
-        [roundId]: formatApiError(res, 'Failed to load Stop! results.')
+        [roundId]: message
       }));
     }
     if (!options?.silent) {
@@ -511,6 +523,7 @@ export function EventSubmissionsPage() {
                         <tr className="text-left text-xs uppercase tracking-[0.08em] text-muted">
                           <th className="px-2 py-2">Item</th>
                           <th className="px-2 py-2">Stopped By</th>
+                          <th className="px-2 py-2">Stop Attempts</th>
                           <th className="px-2 py-2">Submitted</th>
                           <th className="px-2 py-2">Net Points</th>
                           <th className="px-2 py-2">Time</th>
@@ -520,10 +533,38 @@ export function EventSubmissionsPage() {
                         {(stopResultsByRound[group.round.id] ?? []).map((submission) => {
                           const submittedParts = parseResponseParts(submission.response_parts_json);
                           const approvedParts = parseApprovedParts(submission.approved_parts_json);
+                          const attempts = (stopAttemptsByRound[group.round.id] ?? []).filter(
+                            (attempt) => attempt.item_ordinal === submission.ordinal
+                          );
                           return (
                             <tr key={`stop-result-${group.round.id}-${submission.edition_item_id}`}>
                               <td className="px-2 py-2 text-muted">#{submission.ordinal}</td>
                               <td className="px-2 py-2 text-text">{submission.team_name?.trim() || '—'}</td>
+                              <td className="px-2 py-2 text-text">
+                                {attempts.length === 0 ? (
+                                  <span className="text-xs text-muted">No attempts recorded</span>
+                                ) : (
+                                  <div className="space-y-1">
+                                    {attempts.map((attempt) => (
+                                      <div key={attempt.id} className="flex flex-wrap items-center gap-2 text-xs">
+                                        <span className="font-medium text-text">{attempt.team_name.trim() || 'Unknown team'}</span>
+                                        <span className="text-muted">
+                                          {new Date(attempt.attempted_at).toLocaleTimeString()}
+                                        </span>
+                                        <span
+                                          className={`inline-flex items-center rounded-full border px-2 py-0.5 font-semibold ${
+                                            attempt.won_race
+                                              ? 'border-[#2d9a59] bg-[#2d9a59]/20 text-[#8ce7ad]'
+                                              : 'border-border text-muted'
+                                          }`}
+                                        >
+                                          {attempt.won_race ? 'Winner' : 'Late'}
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </td>
                               <td className="px-2 py-2 text-text">
                                 {submittedParts.length === 0 ? (
                                   <span className="text-xs text-muted">—</span>

@@ -5,6 +5,7 @@ import { publicAudioStopSchema } from '../../../../../shared/validators';
 import { normalizeCode } from '../../../../public';
 import { execute, nowIso, queryFirst } from '../../../../db';
 import { checkRateLimit, recordRateLimitHit } from '../../../../rate-limit';
+import { logWarn } from '../../../../_lib/log';
 
 const DEFAULT_PUBLIC_AUDIO_STOP_RATE_LIMIT = {
   maxAttempts: 15,
@@ -52,7 +53,9 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request }
     id: string;
     status: string;
     active_round_id: string | null;
+    current_item_ordinal: number | null;
     audio_playing: number;
+    stop_enabled_at: string | null;
     active_round_status: string | null;
     game_type_code: string | null;
     game_subtype: string | null;
@@ -62,7 +65,9 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request }
     `SELECT e.id,
             e.status,
             ls.active_round_id,
+            ls.current_item_ordinal,
             ls.audio_playing,
+            ls.stop_enabled_at,
             er.status AS active_round_status,
             gt.code AS game_type_code,
             g.subtype AS game_subtype,
@@ -108,8 +113,45 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request }
     return jsonError({ code: 'team_session_invalid', message: 'Team session expired. Please rejoin with your team code.' }, 401);
   }
 
+  const itemOrdinal = event.current_item_ordinal ?? 0;
+  const recordAttempt = async (wonRace: boolean, attemptedAt: string) => {
+    const attemptId = crypto.randomUUID();
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        await execute(
+          env,
+          `INSERT OR IGNORE INTO event_audio_stop_attempts
+           (id, event_id, event_round_id, item_ordinal, team_id, team_name, won_race, attempted_at, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [attemptId, event.id, event.active_round_id, itemOrdinal, team.id, team.name, wonRace ? 1 : 0, attemptedAt, attemptedAt]
+        );
+        return;
+      } catch (error) {
+        if (attempt === 1) {
+          logWarn(env, 'audio_stop_attempt_log_failed', {
+            eventId: event.id,
+            roundId: event.active_round_id,
+            itemOrdinal,
+            teamId: team.id,
+            wonRace,
+            message: error instanceof Error ? error.message : 'unknown_error'
+          });
+        }
+      }
+    }
+  };
+  const stopEnabledAtMs = event.stop_enabled_at ? new Date(event.stop_enabled_at).getTime() : null;
+
   if (!Boolean(event.audio_playing)) {
+    const attemptedAt = nowIso();
+    await recordAttempt(false, attemptedAt);
     return jsonOk({ ok: true, stopped: false });
+  }
+
+  if (stopEnabledAtMs !== null && Number.isFinite(stopEnabledAtMs) && Date.now() < stopEnabledAtMs) {
+    const attemptedAt = nowIso();
+    await recordAttempt(false, attemptedAt);
+    return jsonError({ code: 'stop_not_enabled', message: 'Stop is not enabled yet.' }, 409);
   }
 
   const stoppedAt = nowIso();
@@ -117,6 +159,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request }
     env,
     `UPDATE event_live_state
      SET audio_playing = 0,
+         stop_enabled_at = NULL,
          participant_audio_stopped_by_team_id = ?,
          participant_audio_stopped_by_team_name = ?,
          participant_audio_stopped_at = ?,
@@ -125,7 +168,10 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request }
     [team.id, team.name, stoppedAt, stoppedAt, event.id]
   );
 
-  if ((updateResult.meta?.changes ?? 0) === 0) {
+  const wonRace = (updateResult.meta?.changes ?? 0) > 0;
+  await recordAttempt(wonRace, stoppedAt);
+
+  if (!wonRace) {
     return jsonOk({ ok: true, stopped: false });
   }
 

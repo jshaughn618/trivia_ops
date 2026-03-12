@@ -176,6 +176,7 @@ export type EventLiveState = {
   active_round_id: Id | null;
   current_item_ordinal: number | null;
   audio_playing: boolean;
+  stop_enabled_at: string | null;
   reveal_answer: boolean;
   reveal_fun_fact: boolean;
   waiting_message: string | null;
@@ -210,6 +211,17 @@ export type EventRoundAudioSubmission = {
   approved_parts_json: string | null;
   is_correct: boolean | null;
   marked_at: string | null;
+};
+
+export type EventRoundAudioStopAttempt = {
+  id: Id;
+  event_id: Id;
+  event_round_id: Id;
+  item_ordinal: number;
+  team_id: Id;
+  team_name: string;
+  won_race: boolean;
+  attempted_at: string;
 };
 
 export type Team = {

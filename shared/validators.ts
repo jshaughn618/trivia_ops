@@ -404,6 +404,8 @@ export const liveStateUpdateSchema = z.object({
   active_round_id: idSchema.nullable().optional(),
   current_item_ordinal: z.number().int().min(0).nullable().optional(),
   audio_playing: z.boolean().optional(),
+  stop_enabled_at: z.string().nullable().optional(),
+  stop_enable_delay_ms: z.number().int().min(0).max(30000).nullable().optional(),
   reveal_answer: z.boolean().optional(),
   reveal_fun_fact: z.boolean().optional(),
   waiting_message: z.string().optional().nullable(),
