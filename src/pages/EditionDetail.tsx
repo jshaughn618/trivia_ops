@@ -123,58 +123,123 @@ const answerSummary = (item: EditionItem) => {
 
 const isSvgFile = (file: File) => file.type === 'image/svg+xml' || /\.svg$/i.test(file.name);
 
+const toBase64 = (value: string) => {
+  const bytes = new TextEncoder().encode(value);
+  let binary = '';
+  const chunkSize = 0x8000;
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(index, index + chunkSize));
+  }
+  return btoa(binary);
+};
+
+const normalizeSvgMarkup = (svgText: string) => {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(svgText, 'image/svg+xml');
+  const root = doc.documentElement;
+  if (!root || root.nodeName.toLowerCase() !== 'svg') {
+    throw new Error('Invalid SVG file.');
+  }
+
+  if (root.getAttribute('xmlns') !== 'http://www.w3.org/2000/svg') {
+    root.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+  }
+  if (!root.getAttribute('xmlns:xlink')) {
+    root.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
+  }
+
+  const width = root.getAttribute('width');
+  const height = root.getAttribute('height');
+  if (!width || !height) {
+    const viewBox = root.getAttribute('viewBox');
+    if (viewBox) {
+      const parts = viewBox
+        .trim()
+        .split(/[\s,]+/)
+        .map((part) => Number(part));
+      if (parts.length === 4 && parts.every((part) => Number.isFinite(part))) {
+        const vbWidth = Math.max(1, Math.round(parts[2]));
+        const vbHeight = Math.max(1, Math.round(parts[3]));
+        if (!width) root.setAttribute('width', String(vbWidth));
+        if (!height) root.setAttribute('height', String(vbHeight));
+      }
+    }
+  }
+
+  const parseDimension = (value: string | null) => {
+    if (!value) return 0;
+    const match = /^([0-9]+(?:\.[0-9]+)?)/.exec(value.trim());
+    return match ? Number(match[1]) : 0;
+  };
+
+  const finalWidth = parseDimension(root.getAttribute('width'));
+  const finalHeight = parseDimension(root.getAttribute('height'));
+  if (!finalWidth || !finalHeight) {
+    throw new Error('SVG is missing usable dimensions.');
+  }
+
+  const serializer = new XMLSerializer();
+  return {
+    markup: serializer.serializeToString(root),
+    width: finalWidth,
+    height: finalHeight
+  };
+};
+
+const loadSvgImage = async (sources: string[]) => {
+  let lastError: Error | null = null;
+  for (const source of sources) {
+    try {
+      const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const candidate = new Image();
+        candidate.decoding = 'sync';
+        candidate.onload = () => resolve(candidate);
+        candidate.onerror = () => reject(new Error('Could not render SVG.'));
+        candidate.src = source;
+      });
+      return image;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error('Could not render SVG.');
+    }
+  }
+  throw lastError ?? new Error('Could not render SVG.');
+};
+
 const rasterizeSvgFile = async (file: File) => {
   const svgText = await file.text();
-  const svgBlob = new Blob([svgText], { type: 'image/svg+xml' });
-  const url = URL.createObjectURL(svgBlob);
+  const normalized = normalizeSvgMarkup(svgText);
+  const dataUrl = `data:image/svg+xml;base64,${toBase64(normalized.markup)}`;
+  const blobUrl = URL.createObjectURL(new Blob([normalized.markup], { type: 'image/svg+xml' }));
 
+  let img: HTMLImageElement;
   try {
-    const dimensions = await new Promise<{ width: number; height: number }>((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => {
-        const width = img.naturalWidth || img.width;
-        const height = img.naturalHeight || img.height;
-        if (!width || !height) {
-          reject(new Error('SVG has no renderable dimensions.'));
-          return;
-        }
-        resolve({ width, height });
-      };
-      img.onerror = () => reject(new Error('Could not render SVG.'));
-      img.src = url;
-    });
-
-    const canvas = document.createElement('canvas');
-    canvas.width = dimensions.width;
-    canvas.height = dimensions.height;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error('Canvas is unavailable.');
-
-    await new Promise<void>((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => {
-        ctx.drawImage(img, 0, 0, dimensions.width, dimensions.height);
-        resolve();
-      };
-      img.onerror = () => reject(new Error('Could not draw SVG.'));
-      img.src = url;
-    });
-
-    const blob = await new Promise<Blob>((resolve, reject) => {
-      canvas.toBlob((value) => {
-        if (!value) {
-          reject(new Error('PNG conversion failed.'));
-          return;
-        }
-        resolve(value);
-      }, 'image/png');
-    });
-
-    const pngName = file.name.replace(/\.svg$/i, '.png');
-    return new File([blob], pngName, { type: 'image/png' });
+    img = await loadSvgImage([dataUrl, blobUrl]);
   } finally {
-    URL.revokeObjectURL(url);
+    URL.revokeObjectURL(blobUrl);
   }
+
+  const width = Math.max(1, Math.round(img.naturalWidth || normalized.width));
+  const height = Math.max(1, Math.round(img.naturalHeight || normalized.height));
+
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Canvas is unavailable.');
+  ctx.drawImage(img, 0, 0, width, height);
+
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((value) => {
+      if (!value) {
+        reject(new Error('PNG conversion failed.'));
+        return;
+      }
+      resolve(value);
+    }, 'image/png');
+  });
+
+  const pngName = file.name.replace(/\.svg$/i, '.png');
+  return new File([blob], pngName, { type: 'image/png' });
 };
 
 export function EditionDetailPage() {
