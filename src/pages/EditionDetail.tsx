@@ -121,6 +121,62 @@ const answerSummary = (item: EditionItem) => {
   return answer || answerA || answerB || '';
 };
 
+const isSvgFile = (file: File) => file.type === 'image/svg+xml' || /\.svg$/i.test(file.name);
+
+const rasterizeSvgFile = async (file: File) => {
+  const svgText = await file.text();
+  const svgBlob = new Blob([svgText], { type: 'image/svg+xml' });
+  const url = URL.createObjectURL(svgBlob);
+
+  try {
+    const dimensions = await new Promise<{ width: number; height: number }>((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const width = img.naturalWidth || img.width;
+        const height = img.naturalHeight || img.height;
+        if (!width || !height) {
+          reject(new Error('SVG has no renderable dimensions.'));
+          return;
+        }
+        resolve({ width, height });
+      };
+      img.onerror = () => reject(new Error('Could not render SVG.'));
+      img.src = url;
+    });
+
+    const canvas = document.createElement('canvas');
+    canvas.width = dimensions.width;
+    canvas.height = dimensions.height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Canvas is unavailable.');
+
+    await new Promise<void>((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        ctx.drawImage(img, 0, 0, dimensions.width, dimensions.height);
+        resolve();
+      };
+      img.onerror = () => reject(new Error('Could not draw SVG.'));
+      img.src = url;
+    });
+
+    const blob = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob((value) => {
+        if (!value) {
+          reject(new Error('PNG conversion failed.'));
+          return;
+        }
+        resolve(value);
+      }, 'image/png');
+    });
+
+    const pngName = file.name.replace(/\.svg$/i, '.png');
+    return new File([blob], pngName, { type: 'image/png' });
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+};
+
 export function EditionDetailPage() {
   const { editionId } = useParams();
   const navigate = useNavigate();
@@ -896,10 +952,19 @@ export function EditionDetailPage() {
       setMediaError('Audio rounds require MP3 files.');
       return;
     }
-    const kind = isAudioGame ? 'audio' : file.type.startsWith('audio/') ? 'audio' : 'image';
+    let uploadFile = file;
+    if (!isAudioGame && isSvgFile(file)) {
+      try {
+        uploadFile = await rasterizeSvgFile(file);
+      } catch (error) {
+        setMediaError(error instanceof Error ? error.message : 'SVG conversion failed.');
+        return;
+      }
+    }
+    const kind = isAudioGame ? 'audio' : uploadFile.type.startsWith('audio/') ? 'audio' : 'image';
     setMediaUploading(true);
     setMediaError(null);
-    const uploadRes = await api.uploadMedia(file, kind);
+    const uploadRes = await api.uploadMedia(uploadFile, kind);
     setMediaUploading(false);
     if (uploadRes.ok) {
       await api.updateEditionItem(item.id, {
@@ -910,7 +975,7 @@ export function EditionDetailPage() {
         ...draft,
         media_type: uploadRes.data.media_type,
         media_key: uploadRes.data.key,
-        media_filename: file.name || draft.media_filename
+        media_filename: uploadFile.name || draft.media_filename
       }));
       if (gameTypeId === 'visual' && !itemDraft.answer.trim()) {
         setImageAnswerLoading(true);
@@ -957,17 +1022,26 @@ export function EditionDetailPage() {
       setMediaError('Audio rounds require MP3 files.');
       return;
     }
-    const kind = isAudioGame ? 'audio' : file.type.startsWith('audio/') ? 'audio' : 'image';
+    let uploadFile = file;
+    if (!isAudioGame && isSvgFile(file)) {
+      try {
+        uploadFile = await rasterizeSvgFile(file);
+      } catch (error) {
+        setMediaError(error instanceof Error ? error.message : 'SVG conversion failed.');
+        return;
+      }
+    }
+    const kind = isAudioGame ? 'audio' : uploadFile.type.startsWith('audio/') ? 'audio' : 'image';
     setMediaUploading(true);
     setMediaError(null);
-    const uploadRes = await api.uploadMedia(file, kind);
+    const uploadRes = await api.uploadMedia(uploadFile, kind);
     setMediaUploading(false);
     if (uploadRes.ok) {
       setItemDraft((draft) => ({
         ...draft,
         media_type: uploadRes.data.media_type,
         media_key: uploadRes.data.key,
-        media_filename: file.name || draft.media_filename
+        media_filename: uploadFile.name || draft.media_filename
       }));
       if (gameTypeId === 'visual' && !itemDraft.answer.trim()) {
         setImageAnswerLoading(true);
@@ -2384,7 +2458,19 @@ export function EditionDetailPage() {
 
     for (const [ordinal, entry] of sorted) {
       try {
-        const uploadRes = await api.uploadMedia(entry.file, 'image');
+        let uploadFile = entry.file;
+        if (isSvgFile(entry.file)) {
+          try {
+            uploadFile = await rasterizeSvgFile(entry.file);
+          } catch (error) {
+            errors.push(
+              `SVG conversion failed for ${entry.file.name}: ${error instanceof Error ? error.message : 'Unknown error'}`
+            );
+            continue;
+          }
+        }
+
+        const uploadRes = await api.uploadMedia(uploadFile, 'image');
         if (!uploadRes.ok) {
           errors.push(`Upload failed for ${entry.file.name}`);
           continue;
