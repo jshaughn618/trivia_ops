@@ -40,6 +40,7 @@ const defaultAudioAnswerParts: AnswerPart[] = [{ label: 'Answer 1', answer: '', 
 const MUSIC_AI_PARSE_LIMIT = 60;
 const MUSIC_AI_INSTRUCTION_LIMIT = 600;
 const SPEED_ROUND_MAX_ITEMS = 60;
+const VISUAL_BULK_MAX_ITEMS = 80;
 
 const parseChoices = (choicesJson: string | null) => {
   if (!choicesJson) return ['', '', '', ''];
@@ -167,6 +168,11 @@ export function EditionDetailPage() {
   const [musicBulkResult, setMusicBulkResult] = useState<string | null>(null);
   const [musicBulkStatus, setMusicBulkStatus] = useState<string | null>(null);
   const [musicBulkInstructions, setMusicBulkInstructions] = useState('');
+  const [visualBulkLoading, setVisualBulkLoading] = useState(false);
+  const [visualBulkError, setVisualBulkError] = useState<string | null>(null);
+  const [visualBulkResult, setVisualBulkResult] = useState<string | null>(null);
+  const [visualBulkStatus, setVisualBulkStatus] = useState<string | null>(null);
+  const [visualBulkPrompt, setVisualBulkPrompt] = useState('');
   const [audioDownloadStatus, setAudioDownloadStatus] = useState<string | null>(null);
   const [audioDownloadError, setAudioDownloadError] = useState<string | null>(null);
   const [speedRoundAudioUploading, setSpeedRoundAudioUploading] = useState(false);
@@ -187,6 +193,7 @@ export function EditionDetailPage() {
   const editAudioRef = useRef<HTMLInputElement | null>(null);
   const newAudioRef = useRef<HTMLInputElement | null>(null);
   const musicUploadRef = useRef<HTMLInputElement | null>(null);
+  const visualUploadRef = useRef<HTMLInputElement | null>(null);
   const speedRoundAudioRef = useRef<HTMLInputElement | null>(null);
 
   const load = async () => {
@@ -1792,6 +1799,29 @@ export function EditionDetailPage() {
     return { isAnswer, ordinal, title };
   };
 
+  const parseVisualFilename = (file: File) => {
+    const name = file.name.replace(/\.[^/.]+$/, '').trim();
+    const match = /^(\d{1,3})\s*[-_ ]?\s*(.*)$/.exec(name);
+    if (!match) return null;
+    const ordinal = Number(match[1]);
+    const title = (match[2] ?? '').trim();
+    if (!ordinal) return null;
+    return { ordinal, title };
+  };
+
+  const isLikelyImageFile = (file: File) => {
+    if (file.type.startsWith('image/')) return true;
+    return /\.(png|jpe?g|webp|gif|bmp|svg)$/i.test(file.name);
+  };
+
+  const buildVisualAnswerPrompt = (prompt: string) =>
+    [
+      'You are identifying the answer to a visual trivia question.',
+      `Player prompt: ${prompt}`,
+      'Return only the concise answer text.',
+      'Do not include explanation, punctuation-only wrappers, or extra commentary.'
+    ].join('\n');
+
   const parseArtistPairTitle = (title: string) => {
     // Heuristic fallback for "Artist 1 & Artist 2 - Song".
     const match = /^(.*?)\s*&\s*(.*?)\s*-\s*(.+)$/.exec(title.trim());
@@ -2292,6 +2322,132 @@ export function EditionDetailPage() {
     }
     setMusicBulkStatus(null);
     setMusicBulkLoading(false);
+  };
+
+  const handleVisualBulkUpload = async (files: File[]) => {
+    if (!editionId) return;
+    const sharedPrompt = visualBulkPrompt.trim();
+    if (!sharedPrompt) {
+      setVisualBulkError('Enter the shared question prompt first.');
+      return;
+    }
+
+    setVisualBulkLoading(true);
+    setVisualBulkError(null);
+    setVisualBulkResult(null);
+    setVisualBulkStatus(null);
+
+    const groups = new Map<number, { file: File; title: string }>();
+    const errors: string[] = [];
+    const warnings: string[] = [];
+
+    if (files.length === 0) {
+      setVisualBulkError('No files selected.');
+      setVisualBulkLoading(false);
+      return;
+    }
+
+    for (const file of files) {
+      const parsed = parseVisualFilename(file);
+      if (!parsed) {
+        errors.push(`Unrecognized filename: ${file.name}`);
+        continue;
+      }
+      if (!isLikelyImageFile(file)) {
+        errors.push(`Not an image: ${file.name}`);
+        continue;
+      }
+      if (groups.has(parsed.ordinal)) {
+        errors.push(`Duplicate image for ${parsed.ordinal}`);
+        continue;
+      }
+      groups.set(parsed.ordinal, { file, title: parsed.title });
+    }
+
+    if (errors.length > 0) {
+      setVisualBulkError(errors.join(' • '));
+      setVisualBulkLoading(false);
+      return;
+    }
+
+    const sorted = [...groups.entries()].sort((a, b) => a[0] - b[0]).slice(0, VISUAL_BULK_MAX_ITEMS);
+    if (groups.size > VISUAL_BULK_MAX_ITEMS) {
+      warnings.push(`Only processed the first ${VISUAL_BULK_MAX_ITEMS} numbered images.`);
+    }
+
+    const itemsByOrdinal = new Map(items.map((item) => [item.ordinal, item]));
+    let created = 0;
+    let updated = 0;
+    let processedCount = 0;
+
+    setVisualBulkStatus(`Processing ${processedCount} of ${sorted.length}`);
+
+    for (const [ordinal, entry] of sorted) {
+      try {
+        const uploadRes = await api.uploadMedia(entry.file, 'image');
+        if (!uploadRes.ok) {
+          errors.push(`Upload failed for ${entry.file.name}`);
+          continue;
+        }
+
+        const aiRes = await api.aiImageAnswer({
+          media_key: uploadRes.data.key,
+          prompt: buildVisualAnswerPrompt(sharedPrompt)
+        });
+        if (!aiRes.ok) {
+          errors.push(`AI answer failed for ${entry.file.name}: ${aiRes.error.message}`);
+          continue;
+        }
+
+        const answer = aiRes.data.answer.trim();
+        if (!answer) {
+          errors.push(`AI returned an empty answer for ${entry.file.name}`);
+          continue;
+        }
+
+        const payload: Parameters<typeof api.createEditionItem>[1] = {
+          prompt: sharedPrompt,
+          answer,
+          answer_parts_json: [{ label: 'Answer', answer, points: 1 }],
+          media_type: 'image',
+          media_key: uploadRes.data.key,
+          media_caption: entry.title || null,
+          ordinal
+        };
+
+        const existing = itemsByOrdinal.get(ordinal);
+        if (existing) {
+          const res = await api.updateEditionItem(existing.id, payload);
+          if (res.ok) updated += 1;
+          else errors.push(`Update failed for item ${ordinal}`);
+        } else {
+          const res = await api.createEditionItem(editionId, payload);
+          if (res.ok) created += 1;
+          else errors.push(`Create failed for item ${ordinal}`);
+        }
+      } finally {
+        processedCount += 1;
+        setVisualBulkStatus(`Processing ${processedCount} of ${sorted.length}`);
+      }
+    }
+
+    if (errors.length > 0) {
+      setVisualBulkError(errors.join(' • '));
+    } else {
+      setVisualBulkError(null);
+    }
+
+    const warningText = warnings.length > 0 ? warnings.join(' • ') : '';
+    if (created || updated) {
+      const baseResult = `Created ${created} • Updated ${updated}`;
+      setVisualBulkResult(warningText ? `${baseResult} • ${warningText}` : baseResult);
+      load();
+    } else if (warningText) {
+      setVisualBulkResult(warningText);
+    }
+
+    setVisualBulkStatus(null);
+    setVisualBulkLoading(false);
   };
 
   const renderEditPanel = (item: EditionItem, index: number) => (
@@ -4122,6 +4278,69 @@ export function EditionDetailPage() {
                     <div className="mt-2 text-xs uppercase tracking-[0.2em] text-muted">{musicBulkResult}</div>
                   )}
                 </>
+              )}
+            </div>
+          )}
+          {gameTypeId === 'visual' && (
+            <div className="mb-4 border-2 border-border bg-panel2 p-3">
+              <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">Visual Bulk Upload</div>
+              <div className="mt-2 text-[10px] uppercase tracking-[0.2em] text-muted">
+                Upload images named like “01 - clue.jpg”. Each image becomes that numbered item and uses the same prompt.
+              </div>
+              <label className="mt-3 flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+                Shared question prompt
+                <textarea
+                  className="min-h-[84px] px-3 py-2"
+                  value={visualBulkPrompt}
+                  onChange={(event) => setVisualBulkPrompt(event.target.value)}
+                  placeholder="Example: Name this celebrity."
+                />
+                <span className="text-[10px] normal-case tracking-[0.2em] text-muted">
+                  OpenAI will analyze each image and fill the answer automatically.
+                </span>
+              </label>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <input
+                  ref={visualUploadRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={(event) => {
+                    const selection = Array.from(event.currentTarget.files ?? []);
+                    event.currentTarget.value = '';
+                    if (selection.length > 0) handleVisualBulkUpload(selection);
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => visualUploadRef.current?.click()}
+                  className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
+                  disabled={visualBulkLoading}
+                >
+                  {visualBulkLoading ? 'Uploading' : 'Upload Images'}
+                </button>
+                <SecondaryButton
+                  onClick={() => {
+                    setVisualBulkPrompt('');
+                    setVisualBulkError(null);
+                    setVisualBulkResult(null);
+                    setVisualBulkStatus(null);
+                  }}
+                  className="px-3 py-2 text-xs"
+                  disabled={visualBulkLoading}
+                >
+                  Clear
+                </SecondaryButton>
+              </div>
+              {visualBulkStatus && (
+                <div className="mt-2 text-xs uppercase tracking-[0.2em] text-muted">{visualBulkStatus}</div>
+              )}
+              {visualBulkError && (
+                <div className="mt-2 text-xs uppercase tracking-[0.2em] text-danger">{visualBulkError}</div>
+              )}
+              {visualBulkResult && (
+                <div className="mt-2 text-xs uppercase tracking-[0.2em] text-muted">{visualBulkResult}</div>
               )}
             </div>
           )}
