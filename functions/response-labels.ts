@@ -20,7 +20,7 @@ export type ExpectedAnswerPart = {
 
 function normalizePoints(value: unknown, fallback = 1) {
   if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
-  return Math.max(0, Math.trunc(value));
+  return Math.max(0, Math.round(value * 100) / 100);
 }
 
 export function deriveExpectedAnswerParts(

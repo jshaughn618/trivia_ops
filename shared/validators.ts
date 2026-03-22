@@ -85,7 +85,7 @@ const editionItemBaseSchema = z.object({
       z.object({
         label: z.string().min(1),
         answer: z.string().min(1),
-        points: z.number().int().min(0).optional().default(1)
+        points: z.number().min(0).optional().default(1)
       })
     )
     .optional(),
@@ -111,7 +111,7 @@ const gameExampleItemBaseSchema = z.object({
       z.object({
         label: z.string().min(1),
         answer: z.string().min(1),
-        points: z.number().int().min(0).optional().default(1)
+        points: z.number().min(0).optional().default(1)
       })
     )
     .nullable()

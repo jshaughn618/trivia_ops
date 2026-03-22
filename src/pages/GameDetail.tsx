@@ -22,6 +22,8 @@ type ExampleItemDraft = {
 };
 
 const emptyChoices = ['', '', '', ''];
+const normalizePartPoints = (value: unknown, fallback = 1) =>
+  typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.round(value * 100) / 100) : fallback;
 
 const parseChoices = (choicesJson: string[] | null | undefined) => {
   if (!choicesJson) return [...emptyChoices];
@@ -32,6 +34,12 @@ const parseChoices = (choicesJson: string[] | null | undefined) => {
 
 const defaultAnswerPartsForGame = (gameTypeCode: string | null, subtype: string | null): ExampleAnswerPart[] => {
   if (gameTypeCode === 'music') {
+    if (subtype === 'pub_trivia_audio') {
+      return [
+        { label: 'Song', answer: '', points: 0.5 },
+        { label: 'Artist', answer: '', points: 0.5 }
+      ];
+    }
     if (subtype === 'mashup') {
       return [
         { label: 'Artist 1', answer: '', points: 1 },
@@ -76,7 +84,7 @@ const parseAnswerParts = (item: GameExampleItem | null, gameTypeCode: string | n
     return item.answer_parts_json.map((part) => ({
       label: typeof part.label === 'string' ? part.label : '',
       answer: typeof part.answer === 'string' ? part.answer : '',
-      points: typeof part.points === 'number' && Number.isFinite(part.points) ? Math.max(0, Math.trunc(part.points)) : 1
+      points: normalizePartPoints(part.points, 1)
     }));
   }
 
@@ -140,7 +148,7 @@ const sanitizeAnswerParts = (parts: ExampleAnswerPart[]) =>
     .map((part) => ({
       label: part.label.trim(),
       answer: part.answer.trim(),
-      points: Number.isFinite(part.points) ? Math.max(0, Math.trunc(part.points)) : 1
+      points: normalizePartPoints(part.points, 1)
     }))
     .filter((part) => part.label.length > 0 && part.answer.length > 0);
 
@@ -226,6 +234,7 @@ export function GameDetailPage() {
   const navigate = useNavigate();
   const musicSubtypeOptions = [
     { value: '', label: 'Standard' },
+    { value: 'pub_trivia_audio', label: 'Pub Trivia Audio' },
     { value: 'stop', label: 'Stop!' },
     { value: 'speed_round', label: 'Speed Round' },
     { value: 'mashup', label: 'Mashup' },
@@ -765,6 +774,7 @@ export function GameDetailPage() {
                             className="h-10 px-3"
                             type="number"
                             min={0}
+                            step="0.5"
                             value={part.points}
                             onChange={(event) =>
                               setExampleItemDraft((current) => {

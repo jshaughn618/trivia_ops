@@ -31,10 +31,15 @@ const emptyItem = {
 type ItemDraft = typeof emptyItem & { item_mode: 'text' | 'audio' | 'labeled' };
 
 const choiceLabels = ['A', 'B', 'C', 'D'];
-const defaultMusicAnswerParts: AnswerPart[] = [
-  { label: 'Song', answer: '', points: 1 },
-  { label: 'Artist', answer: '', points: 1 }
+const cloneAnswerParts = (parts: AnswerPart[]) => parts.map((part) => ({ ...part }));
+const normalizeAnswerPartPoints = (value: unknown, fallback = 1) =>
+  typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.round(value * 100) / 100) : fallback;
+const buildSongArtistAnswerParts = (points: number): AnswerPart[] => [
+  { label: 'Song', answer: '', points },
+  { label: 'Artist', answer: '', points }
 ];
+const defaultMusicAnswerPartsForSubtype = (subtype: string) =>
+  subtype === 'pub_trivia_audio' ? buildSongArtistAnswerParts(0.5) : buildSongArtistAnswerParts(1);
 const defaultMusicConnectionPart: AnswerPart[] = [{ label: 'Connection', answer: '', points: 1 }];
 const defaultAudioAnswerParts: AnswerPart[] = [{ label: 'Answer 1', answer: '', points: 1 }];
 const MUSIC_AI_PARSE_LIMIT = 60;
@@ -66,7 +71,7 @@ const parseAnswerPartsJson = (answerPartsJson: string | null, item?: EditionItem
             const label = typeof entry.label === 'string' ? entry.label : '';
             const answer = typeof entry.answer === 'string' ? entry.answer : '';
             const pointsRaw = (entry as { points?: unknown }).points;
-            const points = typeof pointsRaw === 'number' && Number.isFinite(pointsRaw) ? Math.max(0, Math.trunc(pointsRaw)) : 1;
+            const points = normalizeAnswerPartPoints(pointsRaw, 1);
             if (!label || !answer) return null;
             return { label, answer, points } as AnswerPart;
           })
@@ -98,7 +103,7 @@ const sanitizeAnswerParts = (parts: AnswerPart[]) =>
     .map((part) => ({
       label: safeTrim(part.label),
       answer: safeTrim(part.answer),
-      points: Number.isFinite(part.points) ? Math.max(0, Math.trunc(part.points)) : 1
+      points: normalizeAnswerPartPoints(part.points, 1)
     }))
     .filter((part) => part.label.length > 0 && part.answer.length > 0);
 
@@ -373,9 +378,14 @@ export function EditionDetailPage() {
 
   const musicSubtype = gameSubtype || 'standard';
   const allowAudioClip = gameTypeId !== 'audio' && gameTypeId !== 'music' && gameTypeId !== 'visual';
+  const isPubTriviaAudioRound = gameTypeId === 'music' && musicSubtype === 'pub_trivia_audio';
   const isMusicSpeedRound = gameTypeId === 'music' && musicSubtype === 'speed_round';
   const isMusicMashup = gameTypeId === 'music' && musicSubtype === 'mashup';
   const isMusicCovers = gameTypeId === 'music' && musicSubtype === 'covers';
+  const defaultMusicAnswerParts = useMemo(
+    () => cloneAnswerParts(defaultMusicAnswerPartsForSubtype(musicSubtype)),
+    [musicSubtype]
+  );
   const hasMusicTemplate = isMusicSpeedRound || isMusicMashup || isMusicCovers;
 
   const orderedItems = useMemo(() => {
@@ -450,8 +460,8 @@ export function EditionDetailPage() {
     answer_b: safeString(draft.answer_b),
     answer_a_label: safeString(draft.answer_a_label),
     answer_b_label: safeString(draft.answer_b_label),
-    answer_a_points: Number.isFinite(draft.answer_a_points) ? Math.max(0, Math.trunc(draft.answer_a_points)) : 1,
-    answer_b_points: Number.isFinite(draft.answer_b_points) ? Math.max(0, Math.trunc(draft.answer_b_points)) : 1,
+    answer_a_points: normalizeAnswerPartPoints(draft.answer_a_points, 1),
+    answer_b_points: normalizeAnswerPartPoints(draft.answer_b_points, 1),
     fun_fact: safeString(draft.fun_fact),
     media_type: safeString(draft.media_type),
     media_key: safeString(draft.media_key),
@@ -460,7 +470,7 @@ export function EditionDetailPage() {
     answer_parts: draft.answer_parts.map((part) => ({
       label: safeString(part.label),
       answer: safeString(part.answer),
-      points: Number.isFinite(part.points) ? Math.max(0, Math.trunc(part.points)) : 1
+      points: normalizeAnswerPartPoints(part.points, 1)
     }))
   });
 
@@ -485,7 +495,7 @@ export function EditionDetailPage() {
   const activeItemDraft = useMemo(() => {
     if (!activeItem || activeItemId === 'new') return null;
     return buildItemDraftFromItem(activeItem);
-  }, [activeItem, activeItemId, gameTypeId]);
+  }, [activeItem, activeItemId, gameTypeId, defaultMusicAnswerParts]);
 
   const itemEditDirty = useMemo(() => {
     if (!activeItem || activeItemId === 'new' || !activeItemDraft) return false;
@@ -1275,7 +1285,7 @@ export function EditionDetailPage() {
       media_type: gameTypeId === 'music' ? 'audio' : '',
       answer_parts:
         gameTypeId === 'audio'
-          ? defaultAudioAnswerParts
+          ? cloneAnswerParts(defaultAudioAnswerParts)
           : gameTypeId === 'music'
             ? defaultMusicAnswerParts
             : []
@@ -1877,8 +1887,7 @@ export function EditionDetailPage() {
             const answer =
               typeof (part as { answer?: unknown }).answer === 'string' ? (part as { answer: string }).answer : '';
             const rawPoints = (part as { points?: unknown }).points;
-            const points =
-              typeof rawPoints === 'number' && Number.isFinite(rawPoints) ? Math.max(0, Math.trunc(rawPoints)) : 1;
+            const points = normalizeAnswerPartPoints(rawPoints, 1);
             if (label && answer) return { label, answer, points };
             const entries = Object.entries(part as Record<string, unknown>).filter(([, value]) => typeof value === 'string');
             if (entries.length === 1) {
@@ -1938,6 +1947,18 @@ export function EditionDetailPage() {
     return { isAnswer, ordinal, title };
   };
 
+  const parsePubTriviaAudioTitle = (title: string) => {
+    const segments = title
+      .split(/\s*-\s*/)
+      .map((segment) => segment.trim())
+      .filter(Boolean);
+    if (segments.length < 2) return null;
+    const artist = segments[segments.length - 1] ?? '';
+    const song = segments.slice(0, -1).join(' - ');
+    if (!song || !artist) return null;
+    return { song, artist };
+  };
+
   const parseVisualFilename = (file: File) => {
     const name = file.name.replace(/\.[^/.]+$/, '').trim();
     const match = /^(\d{1,3})\s*[-_ ]?\s*(.*)$/.exec(name);
@@ -1970,6 +1991,45 @@ export function EditionDetailPage() {
     const song = match[3]?.trim() ?? '';
     if (!artist1 || !artist2) return null;
     return { artist1, artist2, song };
+  };
+
+  const parseMusicBulkHeuristic = (title: string) => {
+    if (isPubTriviaAudioRound) {
+      const parsed = parsePubTriviaAudioTitle(title);
+      if (!parsed) return null;
+      return {
+        parts: sanitizeAnswerParts([
+          { label: 'Song', answer: parsed.song, points: 0.5 },
+          { label: 'Artist', answer: parsed.artist, points: 0.5 }
+        ]),
+        factoid: null
+      };
+    }
+    if (isMusicMashup) {
+      const parsed = parseArtistPairTitle(title);
+      if (!parsed) return null;
+      return {
+        parts: sanitizeAnswerParts([
+          { label: 'Artist 1', answer: parsed.artist1, points: 1 },
+          { label: 'Artist 2', answer: parsed.artist2, points: 1 },
+          { label: 'Song', answer: parsed.song, points: 1 }
+        ]),
+        factoid: null
+      };
+    }
+    if (isMusicCovers) {
+      const match = /^(.*?)\s*-\s*(.*?)\s*-\s*(.+)$/.exec(title.trim());
+      if (!match) return null;
+      return {
+        parts: sanitizeAnswerParts([
+          { label: 'Song', answer: match[1]?.trim() ?? '', points: 1 },
+          { label: 'Cover artist', answer: match[2]?.trim() ?? '', points: 1 },
+          { label: 'Original artist', answer: match[3]?.trim() ?? '', points: 1 }
+        ]),
+        factoid: null
+      };
+    }
+    return null;
   };
 
   const normalizeSpeedRoundEntry = (entry: Record<string, unknown>) => {
@@ -2283,6 +2343,10 @@ export function EditionDetailPage() {
         errors.push(`Unrecognized filename: ${file.name}`);
         continue;
       }
+      if (isPubTriviaAudioRound && parsed.isAnswer) {
+        errors.push(`Answer clips are not used for pub trivia audio rounds: ${file.name}`);
+        continue;
+      }
       const isMp3 = file.type === 'audio/mpeg' || file.name.toLowerCase().endsWith('.mp3');
       if (!isMp3) {
         errors.push(`Not an MP3: ${file.name}`);
@@ -2320,15 +2384,9 @@ export function EditionDetailPage() {
     const totalGroups = sorted.length;
     const heuristicMatches = sorted.reduce((count, [, entry]) => {
       if (!entry.title) return count;
-      if (isMusicMashup) {
-        return parseArtistPairTitle(entry.title) ? count + 1 : count;
-      }
-      if (isMusicCovers) {
-        return /^(.*?)\s*-\s*(.*?)\s*-\s*(.+)$/.exec(entry.title) ? count + 1 : count;
-      }
-      return /^(.*?)\s*-\s*(.+)$/.exec(entry.title) ? count + 1 : count;
+      return parseMusicBulkHeuristic(entry.title)?.parts.length ? count + 1 : count;
     }, 0);
-    const instructionsRaw = musicBulkInstructions.trim();
+    const instructionsRaw = isPubTriviaAudioRound ? '' : musicBulkInstructions.trim();
     const instructions = instructionsRaw.slice(0, MUSIC_AI_INSTRUCTION_LIMIT);
     const validOrdinals = new Set(sorted.map(([ordinal]) => ordinal));
     let aiAnswerPartsByOrdinal = new Map<number, AnswerPart[]>();
@@ -2407,7 +2465,11 @@ export function EditionDetailPage() {
 
         const existing = itemsByOrdinal.get(ordinal);
         const aiParts = aiAnswerPartsByOrdinal.get(ordinal);
-        const heuristic = parseArtistPairTitle(entry.title);
+        const heuristic = parseMusicBulkHeuristic(entry.title);
+        if (isPubTriviaAudioRound && !heuristic) {
+          errors.push(`Filename must look like "01 - Song - Artist.mp3": ${entry.question.name}`);
+          continue;
+        }
         const answerParts =
           aiParts && aiParts.length > 0
             ? aiParts
@@ -2723,7 +2785,7 @@ export function EditionDetailPage() {
                           className="h-10 px-3"
                           type="number"
                           min={0}
-                          step={1}
+                          step={0.5}
                           value={part.points}
                           onChange={(event) =>
                             setItemDraft((draft) => {
@@ -2811,7 +2873,7 @@ export function EditionDetailPage() {
                         className="h-10 px-3"
                         type="number"
                         min={0}
-                        step={1}
+                        step={0.5}
                         value={itemDraft.answer_a_points}
                         onChange={(event) =>
                           setItemDraft((draft) => ({ ...draft, answer_a_points: Number(event.target.value) }))
@@ -2887,7 +2949,7 @@ export function EditionDetailPage() {
                       className="h-10 px-3"
                       type="number"
                       min={0}
-                      step={1}
+                      step={0.5}
                       value={part.points}
                       onChange={(event) =>
                         setItemDraft((draft) => {
@@ -3018,7 +3080,7 @@ export function EditionDetailPage() {
                       className="h-10 px-3"
                       type="number"
                       min={0}
-                      step={1}
+                      step={0.5}
                       value={part.points}
                       onChange={(event) =>
                         setItemDraft((draft) => {
@@ -3452,7 +3514,7 @@ export function EditionDetailPage() {
                           className="h-10 px-3"
                           type="number"
                           min={0}
-                          step={1}
+                          step={0.5}
                           value={part.points}
                           onChange={(event) =>
                             setItemDraft((draft) => {
@@ -3540,7 +3602,7 @@ export function EditionDetailPage() {
                         className="h-10 px-3"
                         type="number"
                         min={0}
-                        step={1}
+                        step={0.5}
                         value={itemDraft.answer_a_points}
                         onChange={(event) =>
                           setItemDraft((draft) => ({ ...draft, answer_a_points: Number(event.target.value) }))
@@ -3616,7 +3678,7 @@ export function EditionDetailPage() {
                       className="h-10 px-3"
                       type="number"
                       min={0}
-                      step={1}
+                      step={0.5}
                       value={part.points}
                       onChange={(event) =>
                         setItemDraft((draft) => {
@@ -3747,7 +3809,7 @@ export function EditionDetailPage() {
                       className="h-10 px-3"
                       type="number"
                       min={0}
-                      step={1}
+                      step={0.5}
                       value={part.points}
                       onChange={(event) =>
                         setItemDraft((draft) => {
@@ -4259,7 +4321,7 @@ export function EditionDetailPage() {
             <div className="mb-4 border-2 border-border bg-panel2 p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">
-                  {hasMusicTemplate ? 'Music Template Setup' : 'Music Bulk Upload'}
+                  {hasMusicTemplate ? 'Music Template Setup' : isPubTriviaAudioRound ? 'Pub Trivia Audio Bulk Upload' : 'Music Bulk Upload'}
                 </div>
                 <SecondaryButton className="px-3 py-2 text-xs" onClick={downloadAllAudio}>
                   Download all MP3s
@@ -4383,20 +4445,24 @@ export function EditionDetailPage() {
               ) : (
                 <>
                   <div className="mt-2 text-[10px] uppercase tracking-[0.2em] text-muted">
-                    Upload MP3s named like “01 - Song Name.mp3” and “A01 - Song Name.mp3”.
+                    {isPubTriviaAudioRound
+                      ? 'Upload MP3s named like “01 - Song Name - Artist Name.mp3”. Each item gets Song and Artist parts worth 0.5 each.'
+                      : 'Upload MP3s named like “01 - Song Name.mp3” and “A01 - Song Name.mp3”.'}
                   </div>
-                  <label className="mt-3 flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
-                    Parse instructions (optional)
-                    <textarea
-                      className="min-h-[84px] px-3 py-2"
-                      value={musicBulkInstructions}
-                      onChange={(event) => setMusicBulkInstructions(event.target.value)}
-                      placeholder="Example: Titles look like 'Song - Artist - Movie'. Create answer parts Song, Artist, Movie."
-                    />
-                    <span className="text-[10px] normal-case tracking-[0.2em] text-muted">
-                      If provided, AI will parse answer parts before processing uploads.
-                    </span>
-                  </label>
+                  {!isPubTriviaAudioRound && (
+                    <label className="mt-3 flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+                      Parse instructions (optional)
+                      <textarea
+                        className="min-h-[84px] px-3 py-2"
+                        value={musicBulkInstructions}
+                        onChange={(event) => setMusicBulkInstructions(event.target.value)}
+                        placeholder="Example: Titles look like 'Song - Artist - Movie'. Create answer parts Song, Artist, Movie."
+                      />
+                      <span className="text-[10px] normal-case tracking-[0.2em] text-muted">
+                        If provided, AI will parse answer parts before processing uploads.
+                      </span>
+                    </label>
+                  )}
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     <input
                       ref={musicUploadRef}

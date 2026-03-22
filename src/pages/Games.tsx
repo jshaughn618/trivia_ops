@@ -18,6 +18,7 @@ export function GamesPage() {
   const location = useLocation();
   const musicSubtypeOptions = [
     { value: '', label: 'Standard' },
+    { value: 'pub_trivia_audio', label: 'Pub Trivia Audio' },
     { value: 'stop', label: 'Stop!' },
     { value: 'speed_round', label: 'Speed Round' },
     { value: 'mashup', label: 'Mashup' },
