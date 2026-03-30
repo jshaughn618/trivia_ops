@@ -2622,6 +2622,7 @@ export function EditionDetailPage() {
         const hasResolvedAnswer = answer.length > 0;
         if (!hasResolvedAnswer) missingAnswerOrdinals.push(ordinal);
 
+        const existing = itemsByOrdinal.get(ordinal);
         const payload: Parameters<typeof api.createEditionItem>[1] = {
           prompt: sharedPrompt,
           answer,
@@ -2629,14 +2630,17 @@ export function EditionDetailPage() {
           answer_b: null,
           answer_a_label: hasResolvedAnswer ? 'Answer' : null,
           answer_b_label: null,
-          answer_parts_json: hasResolvedAnswer ? [{ label: 'Answer', answer, points: 1 }] : null,
+          answer_parts_json: hasResolvedAnswer
+            ? [{ label: 'Answer', answer, points: 1 }]
+            : existing
+              ? null
+              : undefined,
           media_type: 'image',
           media_key: uploadRes.data.key,
           media_caption: entry.title || null,
           ordinal
         };
 
-        const existing = itemsByOrdinal.get(ordinal);
         if (existing) {
           const res = await api.updateEditionItem(existing.id, payload);
           if (res.ok) updated += 1;
