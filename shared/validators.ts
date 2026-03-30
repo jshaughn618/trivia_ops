@@ -1,5 +1,11 @@
 import { z } from 'zod';
 
+const answerPartSchema = z.object({
+  label: z.string().min(1),
+  answer: z.string().min(1),
+  points: z.number().min(0).optional().default(1)
+});
+
 export const idSchema = z.string().min(1);
 
 export const emailSchema = z.string().email();
@@ -75,20 +81,12 @@ const editionItemBaseSchema = z.object({
   prompt: z.string(),
   question_type: z.enum(['text', 'multiple_choice']).optional(),
   choices_json: z.array(z.string().min(1)).optional(),
-  answer: z.string().min(1).optional(),
+  answer: z.string().optional(),
   answer_a: z.string().min(1).nullable().optional(),
   answer_b: z.string().min(1).nullable().optional(),
   answer_a_label: z.string().min(1).nullable().optional(),
   answer_b_label: z.string().min(1).nullable().optional(),
-  answer_parts_json: z
-    .array(
-      z.object({
-        label: z.string().min(1),
-        answer: z.string().min(1),
-        points: z.number().min(0).optional().default(1)
-      })
-    )
-    .optional(),
+  answer_parts_json: z.array(answerPartSchema).optional(),
   fun_fact: z.string().nullable().optional(),
   ordinal: z.number().int().min(0),
   media_type: z.enum(['image', 'audio']).nullable().optional(),
@@ -106,16 +104,7 @@ const gameExampleItemBaseSchema = z.object({
   answer_b: z.string().min(1).nullable().optional(),
   answer_a_label: z.string().min(1).nullable().optional(),
   answer_b_label: z.string().min(1).nullable().optional(),
-  answer_parts_json: z
-    .array(
-      z.object({
-        label: z.string().min(1),
-        answer: z.string().min(1),
-        points: z.number().min(0).optional().default(1)
-      })
-    )
-    .nullable()
-    .optional(),
+  answer_parts_json: z.array(answerPartSchema).nullable().optional(),
   fun_fact: z.string().nullable().optional(),
   media_type: z.enum(['image', 'audio']).nullable().optional(),
   media_key: z.string().nullable().optional(),
@@ -184,7 +173,7 @@ export const editionItemCreateSchema = editionItemBaseSchema
   .refine((data) => {
     const hasAnswerParts = Boolean(data.answer_parts_json && data.answer_parts_json.length > 0);
     if (data.media_type === 'image') {
-      return Boolean(data.answer) || hasAnswerParts;
+      return true;
     }
     return hasAnswerParts || Boolean(data.answer) || (Boolean(data.answer_a) && Boolean(data.answer_b));
   }, {
@@ -200,6 +189,9 @@ export const editionItemCreateSchema = editionItemBaseSchema
   });
 
 export const editionItemUpdateSchema = editionItemBaseSchema
+  .extend({
+    answer_parts_json: z.array(answerPartSchema).nullable().optional()
+  })
   .partial()
   .refine(
     (data) =>

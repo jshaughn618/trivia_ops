@@ -21,12 +21,14 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
 
   const merged = { ...existing, ...parsed.data };
   const questionType = merged.question_type ?? 'text';
-  const choicesJson = parsed.data.choices_json
-    ? JSON.stringify(parsed.data.choices_json)
-    : merged.choices_json ?? null;
-  const answerPartsJson = parsed.data.answer_parts_json
-    ? JSON.stringify(parsed.data.answer_parts_json)
-    : merged.answer_parts_json ?? null;
+  const choicesJson =
+    parsed.data.choices_json !== undefined ? JSON.stringify(parsed.data.choices_json) : merged.choices_json ?? null;
+  const answerPartsJson =
+    parsed.data.answer_parts_json !== undefined
+      ? parsed.data.answer_parts_json === null
+        ? null
+        : JSON.stringify(parsed.data.answer_parts_json)
+      : merged.answer_parts_json ?? null;
   await execute(
     env,
     `UPDATE edition_items

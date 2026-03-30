@@ -19,7 +19,7 @@ import type {
 import { createRequestId, logError, logInfo, logWarn } from './lib/log';
 
 type AnswerPartPayload = { label: string; answer: string; points?: number };
-type EditionItemPayload = Partial<EditionItem> & { answer_parts_json?: AnswerPartPayload[] };
+type EditionItemPayload = Partial<EditionItem> & { answer_parts_json?: AnswerPartPayload[] | null };
 type GameMutationPayload = Partial<Omit<Game, 'show_theme' | 'allow_participant_audio_stop' | 'example_item_json'>> & {
   show_theme?: boolean | number | null;
   allow_participant_audio_stop?: boolean | number | null;
@@ -192,7 +192,10 @@ export const api = {
   aiGenerate: (payload: { prompt: string; model?: string; max_output_tokens?: number }) =>
     apiFetch<{ text: string }>('/api/ai/generate', { method: 'POST', body: JSON.stringify(payload) }),
   aiImageAnswer: (payload: { media_key: string; prompt?: string }) =>
-    apiFetch<{ answer: string }>('/api/ai/image-answer', { method: 'POST', body: JSON.stringify(payload) }),
+    apiFetch<{ answer: string; resolved: boolean; reason?: string }>('/api/ai/image-answer', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    }),
 
   createInvites: (payload: { emails: string[]; role?: 'admin' | 'host' | 'player' }) =>
     apiFetch<{ results: { email: string; status: 'sent' | 'skipped' | 'failed'; reason?: string }[] }>(

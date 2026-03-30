@@ -15,6 +15,43 @@ function toBase64(bytes: Uint8Array) {
   return btoa(binary);
 }
 
+function normalizeImageAnswer(raw: string) {
+  const answer = raw.trim().replace(/^["'`]+|["'`]+$/g, '').trim();
+  if (!answer) {
+    return { answer: '', resolved: false as const, reason: 'empty_response' };
+  }
+
+  const normalized = answer.toLowerCase();
+  const unresolvedPatterns = [
+    /^unknown$/,
+    /^unsure$/,
+    /^not sure$/,
+    /^unclear$/,
+    /^cannot determine\b/,
+    /^can't determine\b/,
+    /^unable to determine\b/,
+    /^cannot identify\b/,
+    /^can't identify\b/,
+    /^unable to identify\b/,
+    /^cannot tell\b/,
+    /^can't tell\b/,
+    /^unable to tell\b/,
+    /^i cannot\b/,
+    /^i can't\b/,
+    /^i am unable\b/,
+    /^i'm unable\b/,
+    /^no visible\b/,
+    /^not visible\b/,
+    /^image is too\b/
+  ];
+
+  if (unresolvedPatterns.some((pattern) => pattern.test(normalized))) {
+    return { answer: '', resolved: false as const, reason: 'unresolved' };
+  }
+
+  return { answer, resolved: true as const };
+}
+
 export const onRequestPost: PagesFunction<Env> = async ({ request, env, data }) => {
   if (!data.user) {
     return jsonError({ code: 'unauthorized', message: 'Authentication required' }, 401);
@@ -56,7 +93,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, data }) 
       imageDataUrl: dataUrl,
       prompt
     });
-    return jsonOk({ answer: result.text.trim() });
+    return jsonOk(normalizeImageAnswer(result.text));
   } catch (error) {
     return jsonError(
       { code: 'openai_error', message: error instanceof Error ? error.message : 'OpenAI request failed' },

@@ -646,6 +646,7 @@ export function EditionDetailPage() {
   const handleCreateItem = async () => {
     if (!editionId) return;
     const isMusic = gameTypeId === 'music';
+    const allowBlankVisualAnswer = gameTypeId === 'visual';
     const isMusicAudio = isMusic && itemDraft.item_mode === 'audio';
     const isMusicLabeled = isMusic && itemDraft.item_mode === 'labeled';
     const isMusicPartBased = isMusicAudio || isMusicLabeled;
@@ -698,15 +699,18 @@ export function EditionDetailPage() {
         : [{ label: 'Answer', answer: itemDraft.answer, points: itemDraft.answer_a_points }];
       const partsClean = sanitizeAnswerParts(partsSource);
       if (partsClean.length === 0) {
-        setItemValidationError('Answer is required.');
-        return;
+        if (!allowBlankVisualAnswer) {
+          setItemValidationError('Answer is required.');
+          return;
+        }
+      } else {
+        answerPartsPayload = partsClean;
+        answerValue = partsClean.length === 1 ? partsClean[0].answer : partsClean.map((part) => part.answer).join(' / ');
+        standardAnswerA = partsClean[0]?.answer ?? null;
+        standardAnswerALabel = partsClean[0]?.label ?? null;
+        standardAnswerB = partsClean[1]?.answer ?? null;
+        standardAnswerBLabel = partsClean[1]?.label ?? null;
       }
-      answerPartsPayload = partsClean;
-      answerValue = partsClean.length === 1 ? partsClean[0].answer : partsClean.map((part) => part.answer).join(' / ');
-      standardAnswerA = partsClean[0]?.answer ?? null;
-      standardAnswerALabel = partsClean[0]?.label ?? null;
-      standardAnswerB = partsClean[1]?.answer ?? null;
-      standardAnswerBLabel = partsClean[1]?.label ?? null;
     } else if (!isMultipleChoice && !itemDraft.answer.trim()) {
       setItemValidationError('Answer is required.');
       return;
@@ -770,7 +774,7 @@ export function EditionDetailPage() {
             : isStandardPartBased
               ? standardAnswerBLabel
             : itemDraft.answer_b_label || null,
-      answer_parts_json: answerPartsPayload,
+      answer_parts_json: allowBlankVisualAnswer && !answerValue ? null : answerPartsPayload,
       fun_fact: itemDraft.fun_fact || null,
       media_type: isMusicAudio ? 'audio' : isMusicLabeled ? null : itemDraft.media_type || null,
       media_key: itemDraft.media_key || null,
@@ -814,6 +818,7 @@ export function EditionDetailPage() {
     const closeAfterSave = options?.closeAfterSave ?? false;
     const source = options?.source ?? 'manual';
     const isMusic = gameTypeId === 'music';
+    const allowBlankVisualAnswer = gameTypeId === 'visual';
     const isMusicAudio = isMusic && itemDraft.item_mode === 'audio';
     const isMusicLabeled = isMusic && itemDraft.item_mode === 'labeled';
     const isMusicPartBased = isMusicAudio || isMusicLabeled;
@@ -886,20 +891,23 @@ export function EditionDetailPage() {
         : [{ label: 'Answer', answer: itemDraft.answer, points: itemDraft.answer_a_points }];
       const partsClean = sanitizeAnswerParts(partsSource);
       if (partsClean.length === 0) {
-        const message = 'Answer is required.';
-        setItemValidationError(message);
-        if (source === 'auto') {
-          setItemSaveState('error');
-          setItemSaveError(message);
+        if (!allowBlankVisualAnswer) {
+          const message = 'Answer is required.';
+          setItemValidationError(message);
+          if (source === 'auto') {
+            setItemSaveState('error');
+            setItemSaveError(message);
+          }
+          return false;
         }
-        return false;
+      } else {
+        answerPartsPayload = partsClean;
+        answerValue = partsClean.length === 1 ? partsClean[0].answer : partsClean.map((part) => part.answer).join(' / ');
+        standardAnswerA = partsClean[0]?.answer ?? null;
+        standardAnswerALabel = partsClean[0]?.label ?? null;
+        standardAnswerB = partsClean[1]?.answer ?? null;
+        standardAnswerBLabel = partsClean[1]?.label ?? null;
       }
-      answerPartsPayload = partsClean;
-      answerValue = partsClean.length === 1 ? partsClean[0].answer : partsClean.map((part) => part.answer).join(' / ');
-      standardAnswerA = partsClean[0]?.answer ?? null;
-      standardAnswerALabel = partsClean[0]?.label ?? null;
-      standardAnswerB = partsClean[1]?.answer ?? null;
-      standardAnswerBLabel = partsClean[1]?.label ?? null;
     } else if (!isMultipleChoice && !itemDraft.answer.trim()) {
       const message = 'Answer is required.';
       setItemValidationError(message);
@@ -985,7 +993,7 @@ export function EditionDetailPage() {
             : isStandardPartBased
               ? standardAnswerBLabel
             : itemDraft.answer_b_label || null,
-      answer_parts_json: answerPartsPayload,
+      answer_parts_json: allowBlankVisualAnswer && !answerValue ? null : answerPartsPayload,
       fun_fact: itemDraft.fun_fact || null,
       media_type: isMusicAudio ? 'audio' : isMusicLabeled ? null : itemDraft.media_type || null,
       media_key: itemDraft.media_key || null,
@@ -1057,10 +1065,10 @@ export function EditionDetailPage() {
         setImageAnswerError(null);
         const aiRes = await api.aiImageAnswer({ media_key: uploadRes.data.key });
         setImageAnswerLoading(false);
-        if (aiRes.ok) {
+        if (aiRes.ok && aiRes.data.resolved && aiRes.data.answer.trim()) {
           setItemDraft((draft) => updateDraftPrimaryAnswer(draft, aiRes.data.answer));
         } else {
-          setImageAnswerError(aiRes.error.message ?? 'Failed to auto-fill answer.');
+          setImageAnswerError(aiRes.ok ? 'Could not auto-fill answer.' : aiRes.error.message ?? 'Failed to auto-fill answer.');
         }
       }
       load();
@@ -1123,10 +1131,10 @@ export function EditionDetailPage() {
         setImageAnswerError(null);
         const aiRes = await api.aiImageAnswer({ media_key: uploadRes.data.key });
         setImageAnswerLoading(false);
-        if (aiRes.ok) {
+        if (aiRes.ok && aiRes.data.resolved && aiRes.data.answer.trim()) {
           setItemDraft((draft) => updateDraftPrimaryAnswer(draft, aiRes.data.answer));
         } else {
-          setImageAnswerError(aiRes.error.message ?? 'Failed to auto-fill answer.');
+          setImageAnswerError(aiRes.ok ? 'Could not auto-fill answer.' : aiRes.error.message ?? 'Failed to auto-fill answer.');
         }
       }
     } else {
@@ -1982,6 +1990,8 @@ export function EditionDetailPage() {
       'Do not include explanation, punctuation-only wrappers, or extra commentary.'
     ].join('\n');
 
+  const formatOrdinalList = (ordinals: number[]) => ordinals.join(', ');
+
   const parseArtistPairTitle = (title: string) => {
     // Heuristic fallback for "Artist 1 & Artist 2 - Song".
     const match = /^(.*?)\s*&\s*(.*?)\s*-\s*(.+)$/.exec(title.trim());
@@ -2580,6 +2590,7 @@ export function EditionDetailPage() {
     let created = 0;
     let updated = 0;
     let processedCount = 0;
+    const missingAnswerOrdinals: number[] = [];
 
     setVisualBulkStatus(`Processing ${processedCount} of ${sorted.length}`);
 
@@ -2607,21 +2618,18 @@ export function EditionDetailPage() {
           media_key: uploadRes.data.key,
           prompt: buildVisualAnswerPrompt(sharedPrompt)
         });
-        if (!aiRes.ok) {
-          errors.push(`AI answer failed for ${entry.file.name}: ${aiRes.error.message}`);
-          continue;
-        }
-
-        const answer = aiRes.data.answer.trim();
-        if (!answer) {
-          errors.push(`AI returned an empty answer for ${entry.file.name}`);
-          continue;
-        }
+        const answer = aiRes.ok && aiRes.data.resolved ? aiRes.data.answer.trim() : '';
+        const hasResolvedAnswer = answer.length > 0;
+        if (!hasResolvedAnswer) missingAnswerOrdinals.push(ordinal);
 
         const payload: Parameters<typeof api.createEditionItem>[1] = {
           prompt: sharedPrompt,
           answer,
-          answer_parts_json: [{ label: 'Answer', answer, points: 1 }],
+          answer_a: hasResolvedAnswer ? answer : null,
+          answer_b: null,
+          answer_a_label: hasResolvedAnswer ? 'Answer' : null,
+          answer_b_label: null,
+          answer_parts_json: hasResolvedAnswer ? [{ label: 'Answer', answer, points: 1 }] : null,
           media_type: 'image',
           media_key: uploadRes.data.key,
           media_caption: entry.title || null,
@@ -2651,12 +2659,15 @@ export function EditionDetailPage() {
     }
 
     const warningText = warnings.length > 0 ? warnings.join(' • ') : '';
+    const missingAnswerText = missingAnswerOrdinals.length > 0
+      ? `No answers for ${formatOrdinalList(missingAnswerOrdinals)}`
+      : '';
     if (created || updated) {
       const baseResult = `Created ${created} • Updated ${updated}`;
-      setVisualBulkResult(warningText ? `${baseResult} • ${warningText}` : baseResult);
+      setVisualBulkResult([baseResult, missingAnswerText, warningText].filter(Boolean).join(' • '));
       load();
-    } else if (warningText) {
-      setVisualBulkResult(warningText);
+    } else if (missingAnswerText || warningText) {
+      setVisualBulkResult([missingAnswerText, warningText].filter(Boolean).join(' • '));
     }
 
     setVisualBulkStatus(null);
