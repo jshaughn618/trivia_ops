@@ -1579,6 +1579,9 @@ export function EventRunPage() {
                       })()}
                       {item.audio_answer_key && (
                         <div className="mt-3">
+                          <div className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-muted">
+                            Answer clip
+                          </div>
                           <audio
                             className="w-full"
                             controls

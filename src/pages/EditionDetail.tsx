@@ -1985,7 +1985,7 @@ export function EditionDetailPage() {
     if (!parsed) return null;
     const parts = sanitizeAnswerParts([
       { label: 'Song', answer: parsed.song, points: 1 },
-      { label: 'Artists', answer: parsed.artist, points: 1 }
+      { label: 'Artist', answer: parsed.artist, points: 1 }
     ]);
     return parts.length > 0 ? parts : null;
   };
@@ -4702,7 +4702,7 @@ export function EditionDetailPage() {
               )}
               <div className="mt-2 text-[10px] uppercase tracking-[0.2em] text-muted">
                 Upload MP3s named like “01 - Song Name - Artist Name.mp3”. Optional answer clips can be named
-                “A01 - Song Name - Artist Name.mp3”. Each item gets Song and Artists answer parts.
+                “A01 - Song Name - Artist Name.mp3”. Each item gets Song and Artist answer parts.
               </div>
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <input
