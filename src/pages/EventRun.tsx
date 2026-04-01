@@ -26,6 +26,8 @@ type EventRoundResponseRow = {
   submitted_at: string | null;
   response_parts: Array<{ label: string; answer: string }> | null;
 };
+const hasExpectedPoints = (part: AnswerPart | ExpectedAnswerPart): part is ExpectedAnswerPart =>
+  typeof (part as ExpectedAnswerPart).points === 'number';
 
 const parseAnswerParts = (value?: string | null): AnswerPart[] => {
   if (!value) return [];
@@ -1431,7 +1433,7 @@ export function EventRunPage() {
                                   <div className="text-muted">{part.label}</div>
                                   <div className="font-medium text-text">{submittedPart?.answer?.trim() || '—'}</div>
                                 </div>
-                                {'points' in part && part.points > 0 && (
+                                {hasExpectedPoints(part) && part.points > 0 && (
                                   <div className="text-xs text-muted">
                                     {approvedPart?.awarded_points ?? 0} / {part.points} pt
                                   </div>

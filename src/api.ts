@@ -19,7 +19,13 @@ import type {
 import { createRequestId, logError, logInfo, logWarn } from './lib/log';
 
 type AnswerPartPayload = { label: string; answer: string; points?: number };
-type EditionItemPayload = Partial<EditionItem> & { answer_parts_json?: AnswerPartPayload[] | null };
+type EditionItemPayload = Partial<
+  Omit<EditionItem, 'id' | 'edition_id' | 'choices_json' | 'answer_parts_json' | 'created_at'>
+> & {
+  choices_json?: string[] | null;
+  answer_parts_json?: AnswerPartPayload[] | null;
+  media_type?: EditionItem['media_type'];
+};
 type GameMutationPayload = Partial<Omit<Game, 'show_theme' | 'allow_participant_audio_stop' | 'example_item_json'>> & {
   show_theme?: boolean | number | null;
   allow_participant_audio_stop?: boolean | number | null;
@@ -28,6 +34,17 @@ type GameMutationPayload = Partial<Omit<Game, 'show_theme' | 'allow_participant_
 type EventMutationPayload = Partial<
   Omit<
     Event,
+    | 'id'
+    | 'public_code'
+    | 'status'
+    | 'event_type'
+    | 'scoresheet_key'
+    | 'scoresheet_name'
+    | 'answersheet_key'
+    | 'answersheet_name'
+    | 'imagesheet_key'
+    | 'imagesheet_name'
+    | 'created_at'
     | 'allow_participant_web_submissions'
     | 'include_scoresheet_event_name'
     | 'include_scoresheet_date'
@@ -38,6 +55,8 @@ type EventMutationPayload = Partial<
     | 'include_scoresheet_upcoming_events'
   >
 > & {
+  status?: Event['status'];
+  event_type?: Event['event_type'];
   allow_participant_web_submissions?: boolean | number | null;
   include_scoresheet_event_name?: boolean | number | null;
   include_scoresheet_date?: boolean | number | null;

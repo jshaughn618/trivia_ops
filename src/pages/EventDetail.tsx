@@ -15,7 +15,7 @@ import { AccordionSection } from '../components/AccordionSection';
 import { IconButton } from '../components/IconButton';
 import { logError } from '../lib/log';
 import { useAuth } from '../auth';
-import type { Event, EventRound, GameEdition, Game, GameType, Team, Location, User, EditionItem } from '../types';
+import type { EditionItem, Event, EventRound, EventStatus, EventType, GameEdition, Game, GameType, Team, Location, User } from '../types';
 
 const PAGE_WIDTH = 612;
 const PAGE_HEIGHT = 792;
@@ -1335,8 +1335,8 @@ export function EventDetailPage() {
   const [editions, setEditions] = useState<GameEdition[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [hosts, setHosts] = useState<User[]>([]);
-  const [status, setStatus] = useState('planned');
-  const [eventType, setEventType] = useState<'Pub Trivia' | 'Music Trivia'>('Pub Trivia');
+  const [status, setStatus] = useState<EventStatus>('planned');
+  const [eventType, setEventType] = useState<EventType>('Pub Trivia');
   const [allowParticipantWebSubmissions, setAllowParticipantWebSubmissions] = useState(false);
   const [notes, setNotes] = useState('');
   const [tiebreakerQuestion, setTiebreakerQuestion] = useState('');
@@ -1791,7 +1791,7 @@ export function EventDetailPage() {
     setQrLoading(true);
     setQrError(null);
     QRCode.toDataURL(publicUrl, { margin: 2, width: 320 })
-      .then((url) => {
+      .then((url: string) => {
         setQrUrl(url);
         setQrLoading(false);
       })
@@ -3631,7 +3631,11 @@ export function EventDetailPage() {
         </label>
         <label className="flex min-w-0 flex-col gap-2 text-sm text-muted">
           <span>Status</span>
-          <select className="h-10 w-full min-w-0 px-3" value={status} onChange={(event) => setStatus(event.target.value)}>
+          <select
+            className="h-10 w-full min-w-0 px-3"
+            value={status}
+            onChange={(event) => setStatus(event.currentTarget.value as EventStatus)}
+          >
             <option value="planned">Planned</option>
             <option value="live">Live</option>
             <option value="completed">Completed</option>
@@ -3643,7 +3647,7 @@ export function EventDetailPage() {
           <select
             className="h-10 w-full min-w-0 px-3"
             value={eventType}
-            onChange={(event) => setEventType(event.target.value as 'Pub Trivia' | 'Music Trivia')}
+            onChange={(event) => setEventType(event.currentTarget.value as EventType)}
           >
             <option value="Pub Trivia">Pub Trivia</option>
             <option value="Music Trivia">Music Trivia</option>
@@ -3709,13 +3713,13 @@ export function EventDetailPage() {
                 <div className="flex flex-wrap items-center gap-2">
                   <h1 className="text-2xl font-display tracking-tight">{event.title}</h1>
                   {isAdmin && (
-                    <IconButton
-                      label="Edit event title"
-                      onClick={() => {
-                        setTitleDraft(event.title);
-                        setTitleError(null);
-                        setEditingTitle(true);
-                      }}
+	                  <IconButton
+	                    label="Edit event title"
+	                    onClick={() => {
+	                        setTitleDraft(event.title);
+	                        setTitleError(null);
+	                        setEditingTitle(true);
+	                      }}
                     >
                       ✎
                     </IconButton>
@@ -3727,28 +3731,28 @@ export function EventDetailPage() {
                   <label className="sr-only" htmlFor="event-title-input">
                     Event title
                   </label>
-                  <input
-                    id="event-title-input"
-                    className="h-10 w-full px-3"
-                    value={titleDraft}
-                    onChange={(event) => setTitleDraft(event.target.value)}
-                    onBlur={() => {
-                      if (titleDraft.trim() && titleDraft.trim() !== event.title) {
-                        saveEventTitle();
-                      }
-                    }}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter') {
-                        event.preventDefault();
-                        saveEventTitle();
-                      }
-                      if (event.key === 'Escape') {
-                        event.preventDefault();
-                        setEditingTitle(false);
-                        setTitleError(null);
-                        setTitleDraft(event.title);
-                      }
-                    }}
+	                  <input
+	                    id="event-title-input"
+	                    className="h-10 w-full px-3"
+	                    value={titleDraft}
+	                    onChange={(inputEvent) => setTitleDraft(inputEvent.currentTarget.value)}
+	                    onBlur={() => {
+	                      if (titleDraft.trim() && titleDraft.trim() !== event.title) {
+	                        saveEventTitle();
+	                      }
+	                    }}
+	                    onKeyDown={(keyboardEvent) => {
+	                      if (keyboardEvent.key === 'Enter') {
+	                        keyboardEvent.preventDefault();
+	                        saveEventTitle();
+	                      }
+	                      if (keyboardEvent.key === 'Escape') {
+	                        keyboardEvent.preventDefault();
+	                        setEditingTitle(false);
+	                        setTitleError(null);
+	                        setTitleDraft(event.title);
+	                      }
+	                    }}
                     autoFocus
                   />
                   <div className="flex flex-wrap items-center gap-2">

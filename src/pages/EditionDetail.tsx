@@ -5,9 +5,12 @@ import { AI_ICON, QUESTION_AI_MODEL } from '../lib/ai';
 import { AppShell } from '../components/AppShell';
 import { Panel } from '../components/Panel';
 import { PrimaryButton, SecondaryButton, DangerButton } from '../components/Buttons';
-import type { EditionItem, Game, GameEdition } from '../types';
+import type { EditionItem, EditionStatus, Game, GameEdition, MediaType } from '../types';
 
 type AnswerPart = { label: string; answer: string; points: number };
+type DraftMediaType = MediaType | '';
+type EditionItemWritePayload = Parameters<typeof api.updateEditionItem>[1];
+type EditionAnswerPartPayload = NonNullable<EditionItemWritePayload['answer_parts_json']>;
 
 const emptyItem = {
   question_type: 'text' as 'text' | 'multiple_choice',
@@ -23,7 +26,7 @@ const emptyItem = {
   answer_b_points: 1,
   fun_fact: '',
   media_key: '',
-  media_type: '',
+  media_type: '' as DraftMediaType,
   audio_answer_key: '',
   media_filename: '',
   answer_parts: [] as AnswerPart[]
@@ -97,6 +100,8 @@ const parseAnswerPartsJson = (answerPartsJson: string | null, item?: EditionItem
 
 const safeTrim = (value: unknown) => (typeof value === 'string' ? value.trim() : '');
 const safeString = (value: unknown) => (typeof value === 'string' ? value : value == null ? '' : String(value));
+const toDraftMediaType = (value: unknown): DraftMediaType => (value === 'audio' || value === 'image' ? value : '');
+const toPayloadMediaType = (value: DraftMediaType): MediaType | null => (value === 'audio' || value === 'image' ? value : null);
 
 const sanitizeAnswerParts = (parts: AnswerPart[]) =>
   parts
@@ -107,8 +112,7 @@ const sanitizeAnswerParts = (parts: AnswerPart[]) =>
     }))
     .filter((part) => part.label.length > 0 && part.answer.length > 0);
 
-const toEditionAnswerPartsPayload = (parts: AnswerPart[]) =>
-  parts as unknown as NonNullable<Parameters<typeof api.updateEditionItem>[1]['answer_parts_json']>;
+const toEditionAnswerPartsPayload = (parts: AnswerPart[]): EditionAnswerPartPayload => sanitizeAnswerParts(parts);
 
 const answerSummary = (item: EditionItem) => {
   const parts = parseAnswerPartsJson(item.answer_parts_json ?? null, item);
@@ -258,7 +262,7 @@ export function EditionDetailPage() {
   const [items, setItems] = useState<EditionItem[]>([]);
   const [games, setGames] = useState<Game[]>([]);
   const [itemDraft, setItemDraft] = useState<ItemDraft>({ ...emptyItem, item_mode: 'text' });
-  const [status, setStatus] = useState('draft');
+  const [status, setStatus] = useState<EditionStatus>('draft');
   const [tags, setTags] = useState('');
   const [theme, setTheme] = useState('');
   const [description, setDescription] = useState('');
@@ -452,7 +456,7 @@ export function EditionDetailPage() {
       answer_a_points: parsedAnswerParts[0]?.points ?? 1,
       answer_b_points: parsedAnswerParts[1]?.points ?? 1,
       fun_fact: safeString(item.fun_fact),
-      media_type: safeString(item.media_type),
+      media_type: toDraftMediaType(item.media_type),
       media_key: safeString(item.media_key),
       audio_answer_key: safeString(item.audio_answer_key),
       media_filename: '',
@@ -474,7 +478,7 @@ export function EditionDetailPage() {
     answer_a_points: normalizeAnswerPartPoints(draft.answer_a_points, 1),
     answer_b_points: normalizeAnswerPartPoints(draft.answer_b_points, 1),
     fun_fact: safeString(draft.fun_fact),
-    media_type: safeString(draft.media_type),
+    media_type: toDraftMediaType(draft.media_type),
     media_key: safeString(draft.media_key),
     audio_answer_key: safeString(draft.audio_answer_key),
     item_mode: draft.item_mode,
@@ -788,7 +792,7 @@ export function EditionDetailPage() {
             : itemDraft.answer_b_label || null,
       answer_parts_json: allowBlankVisualAnswer && !answerValue ? null : answerPartsPayload,
       fun_fact: itemDraft.fun_fact || null,
-      media_type: isMusicAudio ? 'audio' : isMusicLabeled ? null : itemDraft.media_type || null,
+      media_type: isMusicAudio ? 'audio' : isMusicLabeled ? null : toPayloadMediaType(itemDraft.media_type),
       media_key: itemDraft.media_key || null,
       audio_answer_key: itemDraft.audio_answer_key || null,
       ordinal: nextOrdinal
@@ -1008,7 +1012,7 @@ export function EditionDetailPage() {
             : itemDraft.answer_b_label || null,
       answer_parts_json: allowBlankVisualAnswer && !answerValue ? null : answerPartsPayload,
       fun_fact: itemDraft.fun_fact || null,
-      media_type: isMusicAudio ? 'audio' : isMusicLabeled ? null : itemDraft.media_type || null,
+      media_type: isMusicAudio ? 'audio' : isMusicLabeled ? null : toPayloadMediaType(itemDraft.media_type),
       media_key: itemDraft.media_key || null,
       audio_answer_key: itemDraft.audio_answer_key || null
     });
@@ -3431,6 +3435,47 @@ export function EditionDetailPage() {
             {mediaError && <span className="text-[10px] tracking-[0.2em] text-danger">{mediaError}</span>}
           </label>
         )}
+        {gameTypeId === 'audio' && (
+          <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+            Answer Audio (Optional)
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                ref={editAudioRef}
+                type="file"
+                accept="audio/mpeg,audio/mp3"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  event.target.value = '';
+                  if (file) handleAnswerAudioUpload(item, file);
+                }}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => editAudioRef.current?.click()}
+                className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
+              >
+                {mediaUploading ? 'Uploading' : 'Upload Answer MP3'}
+              </button>
+              {itemDraft.audio_answer_key && (
+                <button
+                  type="button"
+                  onClick={() => handleDeleteAnswerAudio(item)}
+                  className="border-2 border-danger px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-danger hover:border-[#9d2a24]"
+                >
+                  Remove
+                </button>
+              )}
+              {itemDraft.audio_answer_key && (
+                <span className="text-[10px] uppercase tracking-[0.2em] text-muted">Answer audio attached</span>
+              )}
+            </div>
+            {itemDraft.audio_answer_key && (
+              <audio className="w-full" controls src={api.mediaUrl(itemDraft.audio_answer_key)} />
+            )}
+            <span className="text-[10px] tracking-[0.2em] text-muted">Optional reveal clip for the answer.</span>
+          </label>
+        )}
         {gameTypeId === 'music' && itemDraft.item_mode === 'audio' && !isMusicSpeedRound && (
           <div className="grid gap-3">
             <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
@@ -4164,6 +4209,47 @@ export function EditionDetailPage() {
             {mediaError && <span className="text-[10px] tracking-[0.2em] text-danger">{mediaError}</span>}
           </label>
         )}
+        {gameTypeId === 'audio' && (
+          <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+            Answer Audio (Optional)
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                ref={newAudioRef}
+                type="file"
+                accept="audio/mpeg,audio/mp3"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  event.target.value = '';
+                  if (file) handleAnswerAudioUpload(null, file);
+                }}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => newAudioRef.current?.click()}
+                className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
+              >
+                {mediaUploading ? 'Uploading' : 'Upload Answer MP3'}
+              </button>
+              {itemDraft.audio_answer_key && (
+                <button
+                  type="button"
+                  onClick={() => handleDeleteAnswerAudio()}
+                  className="border-2 border-danger px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-danger hover:border-[#9d2a24]"
+                >
+                  Remove
+                </button>
+              )}
+              {itemDraft.audio_answer_key && (
+                <span className="text-[10px] uppercase tracking-[0.2em] text-muted">Answer audio attached</span>
+              )}
+            </div>
+            {itemDraft.audio_answer_key && (
+              <audio className="w-full" controls src={api.mediaUrl(itemDraft.audio_answer_key)} />
+            )}
+            <span className="text-[10px] tracking-[0.2em] text-muted">Optional reveal clip for the answer.</span>
+          </label>
+        )}
         {gameTypeId === 'music' && itemDraft.item_mode === 'audio' && !isMusicSpeedRound && (
           <div className="grid gap-3">
             <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
@@ -4344,7 +4430,7 @@ export function EditionDetailPage() {
             </label>
             <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
               Status
-              <select className="h-10 px-3" value={status} onChange={(event) => setStatus(event.target.value)}>
+              <select className="h-10 px-3" value={status} onChange={(event) => setStatus(event.currentTarget.value as EditionStatus)}>
                 <option value="draft">Draft</option>
                 <option value="published">Published</option>
                 <option value="archived">Archived</option>
