@@ -107,6 +107,9 @@ const sanitizeAnswerParts = (parts: AnswerPart[]) =>
     }))
     .filter((part) => part.label.length > 0 && part.answer.length > 0);
 
+const toEditionAnswerPartsPayload = (parts: AnswerPart[]) =>
+  parts as unknown as NonNullable<Parameters<typeof api.updateEditionItem>[1]['answer_parts_json']>;
+
 const answerSummary = (item: EditionItem) => {
   const parts = parseAnswerPartsJson(item.answer_parts_json ?? null, item);
   if (parts.length > 0) {
@@ -127,6 +130,7 @@ const answerSummary = (item: EditionItem) => {
 };
 
 const isSvgFile = (file: File) => file.type === 'image/svg+xml' || /\.svg$/i.test(file.name);
+const isMp3File = (file: File) => file.type === 'audio/mpeg' || file.name.toLowerCase().endsWith('.mp3');
 
 const toBase64 = (value: string) => {
   const bytes = new TextEncoder().encode(value);
@@ -294,6 +298,10 @@ export function EditionDetailPage() {
   const [musicBulkResult, setMusicBulkResult] = useState<string | null>(null);
   const [musicBulkStatus, setMusicBulkStatus] = useState<string | null>(null);
   const [musicBulkInstructions, setMusicBulkInstructions] = useState('');
+  const [audioBulkLoading, setAudioBulkLoading] = useState(false);
+  const [audioBulkError, setAudioBulkError] = useState<string | null>(null);
+  const [audioBulkResult, setAudioBulkResult] = useState<string | null>(null);
+  const [audioBulkStatus, setAudioBulkStatus] = useState<string | null>(null);
   const [visualBulkLoading, setVisualBulkLoading] = useState(false);
   const [visualBulkError, setVisualBulkError] = useState<string | null>(null);
   const [visualBulkResult, setVisualBulkResult] = useState<string | null>(null);
@@ -319,6 +327,7 @@ export function EditionDetailPage() {
   const editAudioRef = useRef<HTMLInputElement | null>(null);
   const newAudioRef = useRef<HTMLInputElement | null>(null);
   const musicUploadRef = useRef<HTMLInputElement | null>(null);
+  const audioBulkUploadRef = useRef<HTMLInputElement | null>(null);
   const visualUploadRef = useRef<HTMLInputElement | null>(null);
   const speedRoundAudioRef = useRef<HTMLInputElement | null>(null);
 
@@ -387,6 +396,8 @@ export function EditionDetailPage() {
     [musicSubtype]
   );
   const hasMusicTemplate = isMusicSpeedRound || isMusicMashup || isMusicCovers;
+  const audioPromptIsOptional =
+    gameTypeId === 'audio' && (itemDraft.media_type === 'audio' || Boolean(itemDraft.media_key) || Boolean(itemDraft.audio_answer_key));
 
   const orderedItems = useMemo(() => {
     return [...items].sort((a, b) => a.ordinal - b.ordinal);
@@ -647,6 +658,7 @@ export function EditionDetailPage() {
     if (!editionId) return;
     const isMusic = gameTypeId === 'music';
     const allowBlankVisualAnswer = gameTypeId === 'visual';
+    const hasOptionalAudioPrompt = itemDraft.media_type === 'audio' || Boolean(itemDraft.media_key) || Boolean(itemDraft.audio_answer_key);
     const isMusicAudio = isMusic && itemDraft.item_mode === 'audio';
     const isMusicLabeled = isMusic && itemDraft.item_mode === 'labeled';
     const isMusicPartBased = isMusicAudio || isMusicLabeled;
@@ -665,7 +677,7 @@ export function EditionDetailPage() {
     let standardAnswerB: string | null = null;
     let standardAnswerALabel: string | null = null;
     let standardAnswerBLabel: string | null = null;
-    if (!isMusicPartBased && !itemDraft.prompt.trim()) {
+    if (!isMusicPartBased && !hasOptionalAudioPrompt && !itemDraft.prompt.trim()) {
       setItemValidationError('Question is required.');
       return;
     }
@@ -819,6 +831,7 @@ export function EditionDetailPage() {
     const source = options?.source ?? 'manual';
     const isMusic = gameTypeId === 'music';
     const allowBlankVisualAnswer = gameTypeId === 'visual';
+    const hasOptionalAudioPrompt = itemDraft.media_type === 'audio' || Boolean(itemDraft.media_key) || Boolean(itemDraft.audio_answer_key);
     const isMusicAudio = isMusic && itemDraft.item_mode === 'audio';
     const isMusicLabeled = isMusic && itemDraft.item_mode === 'labeled';
     const isMusicPartBased = isMusicAudio || isMusicLabeled;
@@ -837,7 +850,7 @@ export function EditionDetailPage() {
     let standardAnswerB: string | null = null;
     let standardAnswerALabel: string | null = null;
     let standardAnswerBLabel: string | null = null;
-    if (!isMusicPartBased && !itemDraft.prompt.trim()) {
+    if (!isMusicPartBased && !hasOptionalAudioPrompt && !itemDraft.prompt.trim()) {
       const message = 'Question is required.';
       setItemValidationError(message);
       if (source === 'auto') {
@@ -1944,7 +1957,7 @@ export function EditionDetailPage() {
     return { partsByOrdinal, factByOrdinal };
   };
 
-  const parseMusicFilename = (file: File) => {
+  const parseBulkAudioFilename = (file: File) => {
     const name = file.name.replace(/\.[^/.]+$/, '').trim();
     const match = /^([Aa])?(\d{1,3})\s*[-_ ]?\s*(.*)$/.exec(name);
     if (!match) return null;
@@ -1965,6 +1978,16 @@ export function EditionDetailPage() {
     const song = segments.slice(0, -1).join(' - ');
     if (!song || !artist) return null;
     return { song, artist };
+  };
+
+  const buildAudioGameBulkAnswerParts = (title: string) => {
+    const parsed = parsePubTriviaAudioTitle(title);
+    if (!parsed) return null;
+    const parts = sanitizeAnswerParts([
+      { label: 'Song', answer: parsed.song, points: 1 },
+      { label: 'Artists', answer: parsed.artist, points: 1 }
+    ]);
+    return parts.length > 0 ? parts : null;
   };
 
   const parseVisualFilename = (file: File) => {
@@ -2170,6 +2193,149 @@ export function EditionDetailPage() {
       .filter((entry): entry is { ordinal: number; parts: AnswerPart[] } => Boolean(entry));
   };
 
+  const handleAudioBulkUpload = async (files: File[]) => {
+    if (!editionId) return;
+    setAudioBulkLoading(true);
+    setAudioBulkError(null);
+    setAudioBulkResult(null);
+    setAudioBulkStatus(null);
+
+    const groups = new Map<number, { question?: File; answer?: File; title?: string }>();
+    const errors: string[] = [];
+    if (files.length === 0) {
+      setAudioBulkError('No files selected.');
+      setAudioBulkLoading(false);
+      return;
+    }
+
+    for (const file of files) {
+      const parsed = parseBulkAudioFilename(file);
+      if (!parsed) {
+        errors.push(`Unrecognized filename: ${file.name}`);
+        continue;
+      }
+      if (!isMp3File(file)) {
+        errors.push(`Not an MP3: ${file.name}`);
+        continue;
+      }
+      const entry = groups.get(parsed.ordinal) ?? {};
+      if (parsed.isAnswer) {
+        if (entry.answer) {
+          errors.push(`Duplicate answer clip for ${parsed.ordinal}`);
+        } else {
+          entry.answer = file;
+        }
+      } else if (entry.question) {
+        errors.push(`Duplicate question clip for ${parsed.ordinal}`);
+      } else {
+        entry.question = file;
+      }
+      if (parsed.title && !entry.title) entry.title = parsed.title;
+      groups.set(parsed.ordinal, entry);
+    }
+
+    if (errors.length > 0) {
+      setAudioBulkError(errors.join(' • '));
+      setAudioBulkLoading(false);
+      return;
+    }
+
+    const itemsByOrdinal = new Map(items.map((item) => [item.ordinal, item]));
+    let created = 0;
+    let updated = 0;
+    const sorted = [...groups.entries()].sort((a, b) => a[0] - b[0]);
+    const totalGroups = sorted.length;
+    let processedCount = 0;
+    setAudioBulkStatus(`Processing ${processedCount} of ${totalGroups}`);
+
+    for (const [ordinal, entry] of sorted) {
+      try {
+        if (!entry.question) {
+          errors.push(`Missing question clip for ${ordinal}`);
+          continue;
+        }
+        if (!entry.title) {
+          errors.push(`Missing title in filename for ${ordinal}`);
+          continue;
+        }
+
+        const answerParts = buildAudioGameBulkAnswerParts(entry.title);
+        if (!answerParts) {
+          errors.push(`Filename must look like "01 - Song - Artist.mp3": ${entry.question.name}`);
+          continue;
+        }
+
+        const uploadQuestion = await api.uploadMedia(entry.question, 'audio');
+        if (!uploadQuestion.ok) {
+          errors.push(`Upload failed for ${entry.question.name}`);
+          continue;
+        }
+        const questionKey = uploadQuestion.data.key;
+
+        let answerKey: string | null = null;
+        if (entry.answer) {
+          const uploadAnswer = await api.uploadMedia(entry.answer, 'audio');
+          if (!uploadAnswer.ok) {
+            errors.push(`Upload failed for ${entry.answer.name}`);
+          } else {
+            answerKey = uploadAnswer.data.key;
+          }
+        }
+
+        const answerValue = answerParts.map((part) => part.answer).join(' / ');
+        const answerPartsPayload = toEditionAnswerPartsPayload(answerParts);
+        const primaryPart = answerParts[0];
+        const secondaryPart = answerParts[1];
+        const existing = itemsByOrdinal.get(ordinal);
+        if (existing) {
+          const res = await api.updateEditionItem(existing.id, {
+            prompt: existing.prompt ?? '',
+            answer: answerValue,
+            answer_a: primaryPart?.answer ?? null,
+            answer_b: secondaryPart?.answer ?? null,
+            answer_a_label: primaryPart?.label ?? null,
+            answer_b_label: secondaryPart?.label ?? null,
+            answer_parts_json: answerPartsPayload,
+            media_type: 'audio',
+            media_key: questionKey,
+            audio_answer_key: answerKey
+          });
+          if (res.ok) updated += 1;
+        } else {
+          const res = await api.createEditionItem(editionId, {
+            prompt: '',
+            answer: answerValue,
+            answer_a: primaryPart?.answer ?? null,
+            answer_b: secondaryPart?.answer ?? null,
+            answer_a_label: primaryPart?.label ?? null,
+            answer_b_label: secondaryPart?.label ?? null,
+            answer_parts_json: answerPartsPayload,
+            media_type: 'audio',
+            media_key: questionKey,
+            audio_answer_key: answerKey,
+            ordinal
+          });
+          if (res.ok) created += 1;
+        }
+      } finally {
+        processedCount += 1;
+        setAudioBulkStatus(`Processing ${processedCount} of ${totalGroups}`);
+      }
+    }
+
+    if (errors.length > 0) {
+      setAudioBulkError(errors.join(' • '));
+    } else {
+      setAudioBulkError(null);
+    }
+    if (created || updated) {
+      setAudioBulkResult(`Created ${created} • Updated ${updated}`);
+      load();
+    }
+    setAudioBulkStatus(null);
+    setAudioBulkLoading(false);
+  };
+
   const buildAudioDownloads = () => {
     const audioItems = items.filter((item) => item.media_type === 'audio' || item.audio_answer_key || item.media_key);
     const keyCounts = new Map<string, number>();
@@ -2348,7 +2514,7 @@ export function EditionDetailPage() {
     }
 
     for (const file of files) {
-      const parsed = parseMusicFilename(file);
+      const parsed = parseBulkAudioFilename(file);
       if (!parsed) {
         errors.push(`Unrecognized filename: ${file.name}`);
         continue;
@@ -2357,8 +2523,7 @@ export function EditionDetailPage() {
         errors.push(`Answer clips are not used for pub trivia audio rounds: ${file.name}`);
         continue;
       }
-      const isMp3 = file.type === 'audio/mpeg' || file.name.toLowerCase().endsWith('.mp3');
-      if (!isMp3) {
+      if (!isMp3File(file)) {
         errors.push(`Not an MP3: ${file.name}`);
         continue;
       }
@@ -2740,7 +2905,11 @@ export function EditionDetailPage() {
         )}
         <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
           <span className="flex items-center justify-between">
-            {gameTypeId === 'music' && itemDraft.item_mode !== 'text' ? 'Question (optional)' : 'Question'}
+            {gameTypeId === 'music' && itemDraft.item_mode !== 'text'
+              ? 'Question (optional)'
+              : audioPromptIsOptional
+                ? 'Question (optional)'
+                : 'Question'}
             <button
               type="button"
               onClick={startRefine}
@@ -3469,7 +3638,11 @@ export function EditionDetailPage() {
         )}
         <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
           <span className="flex items-center justify-between">
-            {gameTypeId === 'music' && itemDraft.item_mode !== 'text' ? 'Question (optional)' : 'Question'}
+            {gameTypeId === 'music' && itemDraft.item_mode !== 'text'
+              ? 'Question (optional)'
+              : audioPromptIsOptional
+                ? 'Question (optional)'
+                : 'Question'}
             <button
               type="button"
               onClick={startRefine}
@@ -4510,6 +4683,57 @@ export function EditionDetailPage() {
                     <div className="mt-2 text-xs uppercase tracking-[0.2em] text-muted">{musicBulkResult}</div>
                   )}
                 </>
+              )}
+            </div>
+          )}
+          {gameTypeId === 'audio' && (
+            <div className="mb-4 border-2 border-border bg-panel2 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">Audio Bulk Upload</div>
+                <SecondaryButton className="px-3 py-2 text-xs" onClick={downloadAllAudio}>
+                  Download all MP3s
+                </SecondaryButton>
+              </div>
+              {audioDownloadStatus && (
+                <div className="mt-2 text-xs uppercase tracking-[0.2em] text-muted">{audioDownloadStatus}</div>
+              )}
+              {audioDownloadError && (
+                <div className="mt-2 text-xs uppercase tracking-[0.2em] text-danger">{audioDownloadError}</div>
+              )}
+              <div className="mt-2 text-[10px] uppercase tracking-[0.2em] text-muted">
+                Upload MP3s named like “01 - Song Name - Artist Name.mp3”. Optional answer clips can be named
+                “A01 - Song Name - Artist Name.mp3”. Each item gets Song and Artists answer parts.
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <input
+                  ref={audioBulkUploadRef}
+                  type="file"
+                  accept="audio/mpeg,audio/mp3"
+                  multiple
+                  className="hidden"
+                  onChange={(event) => {
+                    const selection = Array.from(event.currentTarget.files ?? []);
+                    event.currentTarget.value = '';
+                    if (selection.length > 0) handleAudioBulkUpload(selection);
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => audioBulkUploadRef.current?.click()}
+                  className="border-2 border-border px-3 py-1 text-[10px] font-display uppercase tracking-[0.3em] text-muted hover:border-accent-ink hover:text-text"
+                  disabled={audioBulkLoading}
+                >
+                  {audioBulkLoading ? 'Uploading' : 'Upload MP3s'}
+                </button>
+              </div>
+              {audioBulkStatus && (
+                <div className="mt-2 text-xs uppercase tracking-[0.2em] text-muted">{audioBulkStatus}</div>
+              )}
+              {audioBulkError && (
+                <div className="mt-2 text-xs uppercase tracking-[0.2em] text-danger">{audioBulkError}</div>
+              )}
+              {audioBulkResult && (
+                <div className="mt-2 text-xs uppercase tracking-[0.2em] text-muted">{audioBulkResult}</div>
               )}
             </div>
           )}
