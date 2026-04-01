@@ -15,6 +15,7 @@ import { AccordionSection } from '../components/AccordionSection';
 import { IconButton } from '../components/IconButton';
 import { logError } from '../lib/log';
 import { useAuth } from '../auth';
+import { toOwnedArrayBuffer } from '../../shared/binary';
 import type { EditionItem, Event, EventRound, EventStatus, EventType, GameEdition, Game, GameType, Team, Location, User } from '../types';
 
 const PAGE_WIDTH = 612;
@@ -2497,10 +2498,10 @@ export function EventDetailPage() {
       });
       const baseName = buildEventDocumentBaseName(event, locationName);
       const scoresheetLabel = `${baseName}-scoresheets.pdf`;
-      const scoresheetFile = new File([scoresheetBytes], scoresheetLabel, {
+      const scoresheetFile = new File([toOwnedArrayBuffer(scoresheetBytes)], scoresheetLabel, {
         type: 'application/pdf'
       });
-      const answersheetFile = new File([answersheetBytes], `${baseName}-answersheets.pdf`, {
+      const answersheetFile = new File([toOwnedArrayBuffer(answersheetBytes)], `${baseName}-answersheets.pdf`, {
         type: 'application/pdf'
       });
 
@@ -2562,7 +2563,7 @@ export function EventDetailPage() {
       });
 
       const baseName = buildEventDocumentBaseName(event, locationName);
-      const imagesheetFile = new File([imageSheetBytes], `${baseName}-image-sheet.pdf`, {
+      const imagesheetFile = new File([toOwnedArrayBuffer(imageSheetBytes)], `${baseName}-image-sheet.pdf`, {
         type: 'application/pdf'
       });
 

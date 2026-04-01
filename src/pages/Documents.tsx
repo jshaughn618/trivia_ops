@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Download, FileText } from 'lucide-react';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+import { toOwnedArrayBuffer } from '../../shared/binary';
 import { api, formatApiError } from '../api';
 import logoLight from '../assets/trivia_ops_logo_light.png';
 import { AppShell } from '../components/AppShell';
@@ -256,7 +257,7 @@ const buildWelcomeSheetPdf = async (eventType: WelcomeEventType, locationName: s
 };
 
 const downloadBytes = (bytes: Uint8Array, filename: string) => {
-  const blob = new Blob([bytes], { type: 'application/pdf' });
+  const blob = new Blob([toOwnedArrayBuffer(bytes)], { type: 'application/pdf' });
   const url = window.URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;

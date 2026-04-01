@@ -1,9 +1,9 @@
-import type { Env } from '../../types';
+import type { AppHandler, Env } from '../../types';
 import { jsonError, jsonOk } from '../../responses';
 import { queryFirst } from '../../db';
 import { logError, logInfo, logWarn } from '../../_lib/log';
 
-export const onRequestGet: PagesFunction<Env> = async ({ env, params, data, request }) => {
+export const onRequestGet: AppHandler<'key'> = async ({ env, params, data, request }) => {
   const requestUrl = new URL(request.url);
   const requestId = requestUrl.searchParams.get('request_id') ?? data.requestId ?? request.headers.get('x-request-id') ?? 'unknown';
   const raw = params.key;
@@ -187,7 +187,7 @@ function parseByteRange(rangeHeader: string, totalSize: number): ParsedByteRange
   return { kind: 'ok', start, end };
 }
 
-export const onRequestDelete: PagesFunction<Env> = async ({ env, params, data, request }) => {
+export const onRequestDelete: AppHandler<'key'> = async ({ env, params, data, request }) => {
   const requestId = data.requestId ?? request.headers.get('x-request-id') ?? 'unknown';
   const raw = params.key;
   const key = Array.isArray(raw) ? raw.join('/') : raw;

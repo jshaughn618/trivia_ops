@@ -1,9 +1,10 @@
-import type { Env } from '../../types';
+import type { AppHandler } from '../../types';
 import { jsonError, jsonOk } from '../../responses';
 import { MAX_AUDIO_BYTES, MAX_IMAGE_BYTES, sniffMedia } from '../../media';
 import { logError, logInfo, logWarn } from '../../_lib/log';
+import { toOwnedArrayBuffer } from '../../../shared/binary';
 
-export const onRequestPost: PagesFunction<Env> = async ({ request, env, data }) => {
+export const onRequestPost: AppHandler = async ({ request, env, data }) => {
   const requestId = data.requestId ?? request.headers.get('x-request-id') ?? 'unknown';
   logInfo(env, 'media_upload_start', {
     requestId,
@@ -139,22 +140,22 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, data }) 
 
     let selectedSniff: { kind: string } | null = null;
     if (matchesKind(first) && firstBytes) {
-      buffer = firstBytes.buffer;
+      buffer = toOwnedArrayBuffer(firstBytes);
       size = firstBytes.byteLength;
       selectedSniff = first;
       logInfo(env, 'media_decode', { requestId, method: firstLabel, size });
     } else if (matchesKind(second) && secondBytes) {
-      buffer = secondBytes.buffer;
+      buffer = toOwnedArrayBuffer(secondBytes);
       size = secondBytes.byteLength;
       selectedSniff = second;
       logInfo(env, 'media_decode', { requestId, method: secondLabel, size });
     } else if (base64Bytes) {
-      buffer = base64Bytes.buffer;
+      buffer = toOwnedArrayBuffer(base64Bytes);
       size = base64Bytes.byteLength;
       selectedSniff = base64Sniff;
       logWarn(env, 'media_decode', { requestId, method: 'base64_fallback', size });
     } else {
-      buffer = rawBytes.buffer;
+      buffer = toOwnedArrayBuffer(rawBytes);
       size = rawBytes.byteLength;
       selectedSniff = rawSniff;
       logWarn(env, 'media_decode', { requestId, method: 'raw_fallback', size });

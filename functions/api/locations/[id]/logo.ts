@@ -1,4 +1,5 @@
-import type { Env } from '../../../types';
+import type { AppHandler } from '../../../types';
+import type { Location } from '../../../../shared/types';
 import { jsonError, jsonOk } from '../../../responses';
 import { execute, queryFirst } from '../../../db';
 import { requireAdmin } from '../../../access';
@@ -13,12 +14,13 @@ function sanitizeFilename(raw: string | null): string {
   return basename.slice(0, 200);
 }
 
-export const onRequestPost: PagesFunction<Env> = async ({ env, params, request, data }) => {
+export const onRequestPost: AppHandler<'id'> = async ({ env, params, request, data }) => {
   const guard = requireAdmin(data.user ?? null);
   if (guard) return guard;
+  const user = data.user!;
 
   const locationId = params.id as string;
-  const location = await queryFirst<any>(
+  const location = await queryFirst<Location>(
     env,
     'SELECT * FROM locations WHERE id = ? AND COALESCE(deleted, 0) = 0',
     [locationId]
@@ -41,7 +43,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request, 
   }
 
   const filename = sanitizeFilename(request.headers.get('x-logo-filename'));
-  const key = `user/${data.user?.id ?? 'unknown'}/locations/${locationId}/logo-${crypto.randomUUID()}.${sniff.extension}`;
+  const key = `user/${user.id}/locations/${locationId}/logo-${crypto.randomUUID()}.${sniff.extension}`;
 
   const putStart = performance.now();
   await env.BUCKET.put(key, buffer, { httpMetadata: { contentType: sniff.contentType } });
@@ -72,18 +74,18 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request, 
     }
   }
 
-  const row = await queryFirst(env, 'SELECT * FROM locations WHERE id = ? AND COALESCE(deleted, 0) = 0', [
+  const row = await queryFirst<Location>(env, 'SELECT * FROM locations WHERE id = ? AND COALESCE(deleted, 0) = 0', [
     locationId
   ]);
   return jsonOk(row);
 };
 
-export const onRequestDelete: PagesFunction<Env> = async ({ env, params, data }) => {
+export const onRequestDelete: AppHandler<'id'> = async ({ env, params, data }) => {
   const guard = requireAdmin(data.user ?? null);
   if (guard) return guard;
 
   const locationId = params.id as string;
-  const location = await queryFirst<any>(
+  const location = await queryFirst<Location>(
     env,
     'SELECT * FROM locations WHERE id = ? AND COALESCE(deleted, 0) = 0',
     [locationId]
@@ -107,7 +109,7 @@ export const onRequestDelete: PagesFunction<Env> = async ({ env, params, data })
     }
   }
 
-  const row = await queryFirst(env, 'SELECT * FROM locations WHERE id = ? AND COALESCE(deleted, 0) = 0', [
+  const row = await queryFirst<Location>(env, 'SELECT * FROM locations WHERE id = ? AND COALESCE(deleted, 0) = 0', [
     locationId
   ]);
   return jsonOk(row);

@@ -1,14 +1,32 @@
-import type { Env } from '../../../types';
+import type { AppHandler } from '../../../types';
 import { jsonError, jsonOk } from '../../../responses';
 import { parseJson } from '../../../request';
 import { eventRoundUpdateSchema } from '../../../../shared/validators';
 import { execute, nowIso, queryAll, queryFirst } from '../../../db';
 import { requireAdmin, requireHostOrAdmin, requireRoundAccess } from '../../../access';
 
+type EventRoundRow = {
+  id: string;
+  event_id: string;
+  round_number: number;
+  label: string;
+  scoresheet_title: string | null;
+  edition_id: string;
+  status: string;
+  audio_key: string | null;
+  audio_name: string | null;
+};
+
+type EventRoundResponseRow = EventRoundRow & {
+  timer_seconds: number | null;
+  edition_audio_key: string | null;
+  edition_audio_name: string | null;
+};
+
 const normalizeAnswer = (value: string | null | undefined) =>
   (value ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
 
-export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, data }) => {
+export const onRequestPut: AppHandler<'roundId'> = async ({ env, params, request, data }) => {
   const isAdmin = data.user?.user_type === 'admin';
   const guard = isAdmin ? null : requireHostOrAdmin(data.user ?? null);
   if (guard) return guard;
@@ -39,7 +57,11 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
     }
   }
 
-  const existing = await queryFirst(env, 'SELECT * FROM event_rounds WHERE id = ? AND COALESCE(deleted, 0) = 0', [params.roundId]);
+  const existing = await queryFirst<EventRoundRow>(
+    env,
+    'SELECT * FROM event_rounds WHERE id = ? AND COALESCE(deleted, 0) = 0',
+    [params.roundId]
+  );
   if (!existing) {
     return jsonError({ code: 'not_found', message: 'Round not found' }, 404);
   }
@@ -183,7 +205,7 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
     }
   }
 
-  const row = await queryFirst(
+  const row = await queryFirst<EventRoundResponseRow>(
     env,
     `SELECT er.*, ed.timer_seconds,
             ed.speed_round_audio_key AS edition_audio_key,
@@ -196,10 +218,14 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
   return jsonOk(row);
 };
 
-export const onRequestDelete: PagesFunction<Env> = async ({ env, params, data }) => {
+export const onRequestDelete: AppHandler<'roundId'> = async ({ env, params, data }) => {
   const guard = requireAdmin(data.user ?? null);
   if (guard) return guard;
-  const existing = await queryFirst(env, 'SELECT id FROM event_rounds WHERE id = ? AND COALESCE(deleted, 0) = 0', [params.roundId]);
+  const existing = await queryFirst<{ id: string }>(
+    env,
+    'SELECT id FROM event_rounds WHERE id = ? AND COALESCE(deleted, 0) = 0',
+    [params.roundId]
+  );
   if (!existing) {
     return jsonError({ code: 'not_found', message: 'Round not found' }, 404);
   }

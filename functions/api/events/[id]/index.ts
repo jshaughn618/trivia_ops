@@ -1,20 +1,21 @@
-import type { Env } from '../../../types';
+import type { AppHandler } from '../../../types';
+import type { Event } from '../../../../shared/types';
 import { jsonError, jsonOk } from '../../../responses';
 import { parseJson } from '../../../request';
 import { eventUpdateSchema } from '../../../../shared/validators';
 import { execute, nowIso, queryFirst } from '../../../db';
 import { requireAdmin, requireEventAccess, requireHostOrAdmin } from '../../../access';
 
-export const onRequestGet: PagesFunction<Env> = async ({ env, params, data }) => {
+export const onRequestGet: AppHandler<'id'> = async ({ env, params, data }) => {
   const guard = requireHostOrAdmin(data.user ?? null);
   if (guard) return guard;
   const { response } = await requireEventAccess(env, data.user ?? null, params.id as string);
   if (response) return response;
-  const row = await queryFirst(env, 'SELECT * FROM events WHERE id = ? AND COALESCE(deleted, 0) = 0', [params.id]);
+  const row = await queryFirst<Event>(env, 'SELECT * FROM events WHERE id = ? AND COALESCE(deleted, 0) = 0', [params.id]);
   return jsonOk(row);
 };
 
-export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, data }) => {
+export const onRequestPut: AppHandler<'id'> = async ({ env, params, request, data }) => {
   const guard = requireAdmin(data.user ?? null);
   if (guard) return guard;
   const payload = await parseJson(request);
@@ -23,7 +24,7 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
     return jsonError({ code: 'validation_error', message: 'Invalid event update', details: parsed.error.flatten() }, 400);
   }
 
-  const existing = await queryFirst(env, 'SELECT * FROM events WHERE id = ? AND COALESCE(deleted, 0) = 0', [
+  const existing = await queryFirst<Event>(env, 'SELECT * FROM events WHERE id = ? AND COALESCE(deleted, 0) = 0', [
     params.id
   ]);
   if (!existing) {
@@ -134,14 +135,14 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
     ]
   );
 
-  const row = await queryFirst(env, 'SELECT * FROM events WHERE id = ? AND COALESCE(deleted, 0) = 0', [params.id]);
+  const row = await queryFirst<Event>(env, 'SELECT * FROM events WHERE id = ? AND COALESCE(deleted, 0) = 0', [params.id]);
   return jsonOk(row);
 };
 
-export const onRequestDelete: PagesFunction<Env> = async ({ env, params, data }) => {
+export const onRequestDelete: AppHandler<'id'> = async ({ env, params, data }) => {
   const guard = requireAdmin(data.user ?? null);
   if (guard) return guard;
-  const existing = await queryFirst(env, 'SELECT id FROM events WHERE id = ? AND COALESCE(deleted, 0) = 0', [
+  const existing = await queryFirst<{ id: string }>(env, 'SELECT id FROM events WHERE id = ? AND COALESCE(deleted, 0) = 0', [
     params.id
   ]);
   if (!existing) {

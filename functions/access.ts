@@ -1,14 +1,31 @@
-import type { Env } from './types';
+import type { AuthenticatedUser, Env } from './types';
 import { jsonError } from './responses';
 import { queryFirst } from './db';
 
-type User = { id: string; user_type: string };
-
-function normalizeUser(user: unknown): User | null {
+function normalizeUser(user: unknown): AuthenticatedUser | null {
   if (!user || typeof user !== 'object') return null;
-  const candidate = user as { id?: unknown; user_type?: unknown };
+  const candidate = user as {
+    id?: unknown;
+    email?: unknown;
+    created_at?: unknown;
+    username?: unknown;
+    first_name?: unknown;
+    last_name?: unknown;
+    user_type?: unknown;
+  };
   if (typeof candidate.id !== 'string' || typeof candidate.user_type !== 'string') return null;
-  return { id: candidate.id, user_type: candidate.user_type };
+  if (candidate.user_type !== 'admin' && candidate.user_type !== 'host' && candidate.user_type !== 'player') {
+    return null;
+  }
+  return {
+    id: candidate.id,
+    email: typeof candidate.email === 'string' ? candidate.email : '',
+    created_at: typeof candidate.created_at === 'string' ? candidate.created_at : '',
+    username: typeof candidate.username === 'string' ? candidate.username : null,
+    first_name: typeof candidate.first_name === 'string' ? candidate.first_name : null,
+    last_name: typeof candidate.last_name === 'string' ? candidate.last_name : null,
+    user_type: candidate.user_type
+  };
 }
 
 export function requireAdmin(user: unknown) {

@@ -1,4 +1,5 @@
-import type { Env } from '../../../../types';
+import type { AppHandler } from '../../../../types';
+import type { Team } from '../../../../../shared/types';
 import { jsonError, jsonOk } from '../../../../responses';
 import { parseJson } from '../../../../request';
 import { execute, nowIso, queryAll, queryFirst } from '../../../../db';
@@ -9,14 +10,14 @@ const TEAM_COLUMNS = 'id, event_id, name, table_label, team_code, team_placehold
 const DEFAULT_COUNT = 20;
 const MAX_COUNT = 100;
 
-export const onRequestPost: PagesFunction<Env> = async ({ env, params, request, data }) => {
+export const onRequestPost: AppHandler<'id'> = async ({ env, params, request, data }) => {
   const guard = requireAdmin(data.user ?? null);
   if (guard) return guard;
 
   const access = await requireEventAccess(env, data.user ?? null, params.id as string);
   if (access.response) return access.response;
 
-  const payload = await parseJson(request);
+  const payload = await parseJson<{ count?: unknown }>(request);
   const countRaw = payload?.count;
   const count = Number.isFinite(Number(countRaw)) ? Number(countRaw) : DEFAULT_COUNT;
   if (!Number.isInteger(count) || count < 1 || count > MAX_COUNT) {
@@ -73,7 +74,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request, 
     return jsonOk({ created: 0, teams: [] });
   }
 
-  const teams = await queryAll(
+  const teams = await queryAll<Team>(
     env,
     `SELECT ${TEAM_COLUMNS} FROM teams WHERE id IN (${createdIds.map(() => '?').join(',')})`,
     createdIds

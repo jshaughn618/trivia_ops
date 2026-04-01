@@ -1,4 +1,5 @@
-import type { Env } from '../types';
+import type { AppHandler } from '../types';
+import type { Event } from '../../shared/types';
 import { jsonError, jsonOk } from '../responses';
 import { parseJson } from '../request';
 import { eventCreateSchema } from '../../shared/validators';
@@ -6,7 +7,7 @@ import { execute, nowIso, queryAll } from '../db';
 import { generateEventCode } from '../public';
 import { requireAdmin, requireHostOrAdmin } from '../access';
 
-export const onRequestGet: PagesFunction<Env> = async ({ env, data }) => {
+export const onRequestGet: AppHandler = async ({ env, data }) => {
   const guard = requireHostOrAdmin(data.user ?? null);
   if (guard) return guard;
   const isAdmin = data.user?.user_type === 'admin';
@@ -17,11 +18,11 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, data }) => {
     params.push(data.user?.id ?? null);
   }
   sql += ' ORDER BY starts_at DESC';
-  const rows = await queryAll(env, sql, params);
+  const rows = await queryAll<Event>(env, sql, params);
   return jsonOk(rows);
 };
 
-export const onRequestPost: PagesFunction<Env> = async ({ request, env, data }) => {
+export const onRequestPost: AppHandler = async ({ request, env, data }) => {
   const guard = requireAdmin(data.user ?? null);
   if (guard) return guard;
   const payload = await parseJson(request);
@@ -60,6 +61,6 @@ export const onRequestPost: PagesFunction<Env> = async ({ request, env, data }) 
     ]
   );
 
-  const rows = await queryAll(env, 'SELECT * FROM events WHERE id = ? AND COALESCE(deleted, 0) = 0', [id]);
+  const rows = await queryAll<Event>(env, 'SELECT * FROM events WHERE id = ? AND COALESCE(deleted, 0) = 0', [id]);
   return jsonOk(rows[0]);
 };

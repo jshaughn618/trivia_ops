@@ -1,4 +1,5 @@
-import type { Env } from '../../../types';
+import type { AppHandler } from '../../../types';
+import type { Event } from '../../../../shared/types';
 import { jsonError, jsonOk } from '../../../responses';
 import { execute, queryFirst } from '../../../db';
 import { logInfo, logWarn } from '../../../_lib/log';
@@ -8,6 +9,12 @@ import { requireAdmin } from '../../../access';
 const DOC_TYPES = new Set(['scoresheet', 'answersheet', 'imagesheet']);
 
 type DocType = 'scoresheet' | 'answersheet' | 'imagesheet';
+type EventDocumentColumns = Pick<
+  Event,
+  'id' | 'scoresheet_key' | 'scoresheet_name' | 'answersheet_key' | 'answersheet_name' | 'imagesheet_key' | 'imagesheet_name'
+>;
+type EventDocumentKeyColumn = Exclude<keyof EventDocumentColumns, 'id'>;
+type EventDocumentNameColumn = Exclude<keyof EventDocumentColumns, 'id'>;
 
 function getDocType(request: Request): DocType | null {
   const url = new URL(request.url);
@@ -28,15 +35,18 @@ function sanitizeFilename(raw: string | null): string {
 
 function columnFor(type: DocType) {
   if (type === 'scoresheet') {
-    return { keyColumn: 'scoresheet_key', nameColumn: 'scoresheet_name' };
+    return { keyColumn: 'scoresheet_key' as EventDocumentKeyColumn, nameColumn: 'scoresheet_name' as EventDocumentNameColumn };
   }
   if (type === 'answersheet') {
-    return { keyColumn: 'answersheet_key', nameColumn: 'answersheet_name' };
+    return {
+      keyColumn: 'answersheet_key' as EventDocumentKeyColumn,
+      nameColumn: 'answersheet_name' as EventDocumentNameColumn
+    };
   }
-  return { keyColumn: 'imagesheet_key', nameColumn: 'imagesheet_name' };
+  return { keyColumn: 'imagesheet_key' as EventDocumentKeyColumn, nameColumn: 'imagesheet_name' as EventDocumentNameColumn };
 }
 
-export const onRequestPost: PagesFunction<Env> = async ({ env, params, request, data }) => {
+export const onRequestPost: AppHandler<'id'> = async ({ env, params, request, data }) => {
   const requestId = data.requestId ?? request.headers.get('x-request-id') ?? 'unknown';
   const eventId = params.id as string;
   const docType = getDocType(request);
@@ -59,7 +69,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request, 
     return jsonError({ code: 'invalid_request', message: 'Invalid document type' }, 400);
   }
 
-  const event = await queryFirst<any>(env, 'SELECT * FROM events WHERE id = ? AND COALESCE(deleted, 0) = 0', [
+  const event = await queryFirst<EventDocumentColumns>(env, 'SELECT * FROM events WHERE id = ? AND COALESCE(deleted, 0) = 0', [
     eventId
   ]);
   if (!event) {
@@ -113,11 +123,11 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request, 
     }
   }
 
-  const row = await queryFirst(env, 'SELECT * FROM events WHERE id = ? AND COALESCE(deleted, 0) = 0', [eventId]);
+  const row = await queryFirst<Event>(env, 'SELECT * FROM events WHERE id = ? AND COALESCE(deleted, 0) = 0', [eventId]);
   return jsonOk(row);
 };
 
-export const onRequestDelete: PagesFunction<Env> = async ({ env, params, request, data }) => {
+export const onRequestDelete: AppHandler<'id'> = async ({ env, params, request, data }) => {
   const requestId = data.requestId ?? request.headers.get('x-request-id') ?? 'unknown';
   const eventId = params.id as string;
   const docType = getDocType(request);
@@ -140,7 +150,7 @@ export const onRequestDelete: PagesFunction<Env> = async ({ env, params, request
     return jsonError({ code: 'invalid_request', message: 'Invalid document type' }, 400);
   }
 
-  const event = await queryFirst<any>(env, 'SELECT * FROM events WHERE id = ? AND COALESCE(deleted, 0) = 0', [
+  const event = await queryFirst<EventDocumentColumns>(env, 'SELECT * FROM events WHERE id = ? AND COALESCE(deleted, 0) = 0', [
     eventId
   ]);
   if (!event) {
@@ -166,6 +176,6 @@ export const onRequestDelete: PagesFunction<Env> = async ({ env, params, request
     }
   }
 
-  const row = await queryFirst(env, 'SELECT * FROM events WHERE id = ? AND COALESCE(deleted, 0) = 0', [eventId]);
+  const row = await queryFirst<Event>(env, 'SELECT * FROM events WHERE id = ? AND COALESCE(deleted, 0) = 0', [eventId]);
   return jsonOk(row);
 };

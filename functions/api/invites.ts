@@ -1,4 +1,4 @@
-import type { Env } from '../types';
+import type { AppHandler } from '../types';
 import { jsonError, jsonOk } from '../responses';
 import { parseJson } from '../request';
 import { inviteCreateSchema } from '../../shared/validators';
@@ -12,7 +12,7 @@ type InviteResult = {
   reason?: string;
 };
 
-export const onRequestPost: PagesFunction<Env> = async ({ request, env, data }) => {
+export const onRequestPost: AppHandler = async ({ request, env, data }) => {
   const guard = requireAdmin(data.user ?? null);
   if (guard) return guard;
 

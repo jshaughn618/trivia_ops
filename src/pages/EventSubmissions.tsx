@@ -361,11 +361,13 @@ export function EventSubmissionsPage() {
       setStopResultsError((prev) => ({ ...prev, [roundId]: null }));
     } else if (!options?.silent) {
       const message = submissionsRes.ok
-        ? formatApiError(attemptsRes, 'Failed to load Stop! attempts.')
+        ? attemptsRes.ok
+          ? null
+          : formatApiError(attemptsRes, 'Failed to load Stop! attempts.')
         : formatApiError(submissionsRes, 'Failed to load Stop! results.');
       setStopResultsError((prev) => ({
         ...prev,
-        [roundId]: message
+        [roundId]: message ?? 'Failed to load Stop! results.'
       }));
     }
     if (!options?.silent) {

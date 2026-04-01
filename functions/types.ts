@@ -38,3 +38,24 @@ export type Env = {
   COOKIE_DOMAIN?: string;
   DEBUG?: string;
 };
+
+export type UserRole = 'admin' | 'host' | 'player';
+
+export type AuthenticatedUser = {
+  id: string;
+  email: string;
+  created_at: string;
+  username: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  user_type: UserRole;
+};
+
+export type RequestContextData = {
+  user?: AuthenticatedUser;
+  requestId?: string;
+};
+
+export type AppHandler<Params extends string = any> = PagesFunction<Env, Params, RequestContextData>;
+export type AppContext<Params extends string = any> = Parameters<AppHandler<Params>>[0];
+export type EnvWithRequestId = Env & { __requestId?: string };

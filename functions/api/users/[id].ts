@@ -1,4 +1,5 @@
-import type { Env } from '../../types';
+import type { AppHandler } from '../../types';
+import type { User } from '../../../shared/types';
 import { jsonError, jsonOk } from '../../responses';
 import { parseJson } from '../../request';
 import { userUpdateSchema } from '../../../shared/validators';
@@ -6,11 +7,13 @@ import { execute, nowIso, queryFirst } from '../../db';
 import { hashPassword } from '../../auth';
 import { requireAdmin } from '../../access';
 
-export const onRequestGet: PagesFunction<Env> = async ({ env, params, data }) => {
+type UserRow = User & { password_hash: string | null };
+
+export const onRequestGet: AppHandler<'id'> = async ({ env, params, data }) => {
   const guard = requireAdmin(data.user ?? null);
   if (guard) return guard;
 
-  const row = await queryFirst(
+  const row = await queryFirst<User>(
     env,
     'SELECT id, email, username, first_name, last_name, user_type, created_at FROM users WHERE id = ? AND COALESCE(deleted, 0) = 0',
     [params.id]
@@ -21,7 +24,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params, data }) =>
   return jsonOk(row);
 };
 
-export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, data }) => {
+export const onRequestPut: AppHandler<'id'> = async ({ env, params, request, data }) => {
   const guard = requireAdmin(data.user ?? null);
   if (guard) return guard;
 
@@ -31,7 +34,7 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
     return jsonError({ code: 'validation_error', message: 'Invalid user update', details: parsed.error.flatten() }, 400);
   }
 
-  const existing = await queryFirst(env, 'SELECT * FROM users WHERE id = ? AND COALESCE(deleted, 0) = 0', [params.id]);
+  const existing = await queryFirst<UserRow>(env, 'SELECT * FROM users WHERE id = ? AND COALESCE(deleted, 0) = 0', [params.id]);
   if (!existing) {
     return jsonError({ code: 'not_found', message: 'User not found' }, 404);
   }
@@ -55,7 +58,7 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
     ]
   );
 
-  const row = await queryFirst(
+  const row = await queryFirst<User>(
     env,
     'SELECT id, email, username, first_name, last_name, user_type, created_at FROM users WHERE id = ? AND COALESCE(deleted, 0) = 0',
     [params.id]
@@ -63,11 +66,15 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
   return jsonOk(row);
 };
 
-export const onRequestDelete: PagesFunction<Env> = async ({ env, params, data }) => {
+export const onRequestDelete: AppHandler<'id'> = async ({ env, params, data }) => {
   const guard = requireAdmin(data.user ?? null);
   if (guard) return guard;
 
-  const existing = await queryFirst(env, 'SELECT id FROM users WHERE id = ? AND COALESCE(deleted, 0) = 0', [params.id]);
+  const existing = await queryFirst<{ id: string }>(
+    env,
+    'SELECT id FROM users WHERE id = ? AND COALESCE(deleted, 0) = 0',
+    [params.id]
+  );
   if (!existing) {
     return jsonError({ code: 'not_found', message: 'User not found' }, 404);
   }

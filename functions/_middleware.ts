@@ -1,16 +1,16 @@
-import type { Env } from './types';
+import type { AppHandler, AuthenticatedUser, Env, EnvWithRequestId } from './types';
 import { jsonError } from './responses';
 import { buildCsrfCookie, getSession, parseCookies, verifySessionCookie } from './auth';
 import { queryFirst } from './db';
 import { getRequestId, logError, logInfo } from './_lib/log';
 
-export const onRequest: PagesFunction<Env> = async (context) => {
+export const onRequest: AppHandler = async (context) => {
   const { request, env } = context;
   const url = new URL(request.url);
   const path = url.pathname;
   const method = request.method.toUpperCase();
   const requestId = getRequestId(request);
-  (env as { __requestId?: string }).__requestId = requestId;
+  (env as EnvWithRequestId).__requestId = requestId;
   context.data.requestId = requestId;
 
   const publicRoutes = ['/login', '/api/login', '/api/health'];
@@ -70,15 +70,7 @@ export const onRequest: PagesFunction<Env> = async (context) => {
       return withRequestId(unauthorized(path, requestId), requestId);
     }
 
-    const user = await queryFirst<{
-      id: string;
-      email: string;
-      created_at: string;
-      username: string | null;
-      first_name: string | null;
-      last_name: string | null;
-      user_type: string;
-    }>(
+    const user = await queryFirst<AuthenticatedUser>(
       env,
       'SELECT id, email, created_at, username, first_name, last_name, user_type FROM users WHERE id = ?',
       [session.user_id]

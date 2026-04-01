@@ -1,4 +1,5 @@
-import type { Env } from '../../types';
+import type { AppHandler, Env } from '../../types';
+import type { Team } from '../../../shared/types';
 import { jsonError, jsonOk } from '../../responses';
 import { parseJson } from '../../request';
 import { teamUpdateSchema } from '../../../shared/validators';
@@ -7,6 +8,7 @@ import { requireAdmin } from '../../access';
 import { generateTeamCode } from '../../public';
 
 const TEAM_COLUMNS = 'id, event_id, name, table_label, team_code, team_placeholder, created_at';
+type TeamRow = Pick<Team, 'id' | 'event_id' | 'name' | 'table_label' | 'team_code' | 'team_placeholder'>;
 
 const assignTeamCode = async (env: Env, eventId: string, teamId: string) => {
   for (let attempt = 0; attempt < 10; attempt += 1) {
@@ -23,7 +25,7 @@ const assignTeamCode = async (env: Env, eventId: string, teamId: string) => {
   throw new Error('Unable to assign team code');
 };
 
-export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, data }) => {
+export const onRequestPut: AppHandler<'teamId'> = async ({ env, params, request, data }) => {
   const guard = requireAdmin(data.user ?? null);
   if (guard) return guard;
   const payload = await parseJson(request);
@@ -32,7 +34,7 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
     return jsonError({ code: 'validation_error', message: 'Invalid team update', details: parsed.error.flatten() }, 400);
   }
 
-  const existing = await queryFirst(
+  const existing = await queryFirst<TeamRow>(
     env,
     'SELECT id, event_id, name, table_label, team_code, team_placeholder FROM teams WHERE id = ? AND COALESCE(deleted, 0) = 0',
     [params.teamId]
@@ -63,14 +65,18 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
   if (!existing.team_code) {
     await assignTeamCode(env, existing.event_id, params.teamId as string);
   }
-  const row = await queryFirst(env, `SELECT ${TEAM_COLUMNS} FROM teams WHERE id = ? AND COALESCE(deleted, 0) = 0`, [params.teamId]);
+  const row = await queryFirst<Team>(env, `SELECT ${TEAM_COLUMNS} FROM teams WHERE id = ? AND COALESCE(deleted, 0) = 0`, [params.teamId]);
   return jsonOk(row);
 };
 
-export const onRequestDelete: PagesFunction<Env> = async ({ env, params, data }) => {
+export const onRequestDelete: AppHandler<'teamId'> = async ({ env, params, data }) => {
   const guard = requireAdmin(data.user ?? null);
   if (guard) return guard;
-  const existing = await queryFirst(env, 'SELECT id FROM teams WHERE id = ? AND COALESCE(deleted, 0) = 0', [params.teamId]);
+  const existing = await queryFirst<{ id: string }>(
+    env,
+    'SELECT id FROM teams WHERE id = ? AND COALESCE(deleted, 0) = 0',
+    [params.teamId]
+  );
   if (!existing) {
     return jsonError({ code: 'not_found', message: 'Team not found' }, 404);
   }

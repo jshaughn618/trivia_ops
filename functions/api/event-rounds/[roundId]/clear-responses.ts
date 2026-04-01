@@ -1,9 +1,9 @@
-import type { Env } from '../../../types';
+import type { AppHandler } from '../../../types';
 import { jsonOk } from '../../../responses';
 import { execute, nowIso } from '../../../db';
 import { requireHostOrAdmin, requireRoundAccess } from '../../../access';
 
-export const onRequestPost: PagesFunction<Env> = async ({ env, params, data, request }) => {
+export const onRequestPost: AppHandler<'roundId'> = async ({ env, params, data, request }) => {
   const guard = requireHostOrAdmin(data.user ?? null);
   if (guard) return guard;
   const access = await requireRoundAccess(env, data.user ?? null, params.roundId as string);
