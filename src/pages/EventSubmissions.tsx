@@ -118,6 +118,16 @@ function parseApprovedParts(value: string | null) {
   }
 }
 
+function formatStopAttemptTime(value: string) {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return '—';
+  const hours = parsed.getHours() % 12 || 12;
+  const minutes = String(parsed.getMinutes()).padStart(2, '0');
+  const seconds = String(parsed.getSeconds()).padStart(2, '0');
+  const milliseconds = String(parsed.getMilliseconds()).padStart(3, '0');
+  return `${hours}:${minutes}:${seconds}.${milliseconds}`;
+}
+
 function formatPoints(value: number | null) {
   if (value === null) return '—';
   return Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/\.?0+$/, '');
@@ -551,7 +561,7 @@ export function EventSubmissionsPage() {
                                       <div key={attempt.id} className="flex flex-wrap items-center gap-2 text-xs">
                                         <span className="font-medium text-text">{attempt.team_name.trim() || 'Unknown team'}</span>
                                         <span className="text-muted">
-                                          {new Date(attempt.attempted_at).toLocaleTimeString()}
+                                          {formatStopAttemptTime(attempt.attempted_at)}
                                         </span>
                                         <span
                                           className={`inline-flex items-center rounded-full border px-2 py-0.5 font-semibold ${

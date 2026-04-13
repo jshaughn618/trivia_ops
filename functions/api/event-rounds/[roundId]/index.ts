@@ -19,6 +19,8 @@ type EventRoundRow = {
 
 type EventRoundResponseRow = EventRoundRow & {
   timer_seconds: number | null;
+  edition_theme: string | null;
+  edition_title: string | null;
   edition_audio_key: string | null;
   edition_audio_name: string | null;
 };
@@ -208,6 +210,8 @@ export const onRequestPut: AppHandler<'roundId'> = async ({ env, params, request
   const row = await queryFirst<EventRoundResponseRow>(
     env,
     `SELECT er.*, ed.timer_seconds,
+            ed.theme AS edition_theme,
+            ed.title AS edition_title,
             ed.speed_round_audio_key AS edition_audio_key,
             ed.speed_round_audio_name AS edition_audio_name
      FROM event_rounds er

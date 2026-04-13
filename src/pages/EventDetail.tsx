@@ -33,6 +33,11 @@ type RoundBundle = {
   round: EventRound;
   items: EditionItem[];
 };
+type RunbookRoundBundle = {
+  round: EventRound;
+  theme: string;
+  items: EditionItem[];
+};
 type ParsedAnswerPart = { label: string; answer: string; points: number };
 type ImageRoundBundle = {
   round: EventRound;
@@ -92,6 +97,18 @@ const buildEventDocumentBaseName = (event: Event, locationName?: string | null) 
   const datePart = eventDateForFile(event.starts_at);
   const locationPart = locationName?.trim() || 'location';
   return safeFileName(`${datePart} - ${locationPart}`, `event-${event.id.slice(0, 8)}`);
+};
+
+const downloadPdfBytes = (bytes: Uint8Array, filename: string) => {
+  const blob = new Blob([toOwnedArrayBuffer(bytes)], { type: 'application/pdf' });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.URL.revokeObjectURL(url);
 };
 
 const chunkArray = <T,>(items: T[], size: number) => {
@@ -293,6 +310,187 @@ const buildImageSheetsPdf = async (
   return pdfDoc.save();
 };
 
+const resolveRunbookTheme = (round: EventRound, edition?: GameEdition | null) => {
+  return (
+    edition?.theme?.trim() ||
+    round.edition_theme?.trim() ||
+    edition?.title?.trim() ||
+    round.edition_title?.trim() ||
+    'Untitled Theme'
+  );
+};
+
+const buildRunbookPrompt = (item: EditionItem) => {
+  const prompt = item.prompt?.trim();
+  const mediaPrefix = item.media_type === 'image' ? '[Image] ' : item.media_type === 'audio' ? '[Audio] ' : '';
+  if (prompt) return `${mediaPrefix}${prompt}`;
+  if (item.media_caption?.trim()) return `${mediaPrefix}${item.media_caption.trim()}`;
+  if (item.media_type === 'image') return '[Image] Refer to the image sheet for this question.';
+  if (item.media_type === 'audio') return '[Audio] Play the audio clue for this question.';
+  return 'Prompt unavailable.';
+};
+
+const buildRunbookPdf = async (event: Event, locationName: string, roundBundles: RunbookRoundBundle[]) => {
+  const pdfDoc = await PDFDocument.create();
+  const fonts = {
+    regular: await pdfDoc.embedFont(StandardFonts.Helvetica),
+    bold: await pdfDoc.embedFont(StandardFonts.HelveticaBold)
+  };
+  const contentWidth = PAGE_WIDTH - PAGE_MARGIN * 2;
+  const bottomMargin = PAGE_MARGIN;
+  const lineColor = rgb(0.75, 0.75, 0.75);
+
+  const titleSize = 16;
+  const labelSize = 9;
+  const metaSize = 9;
+  const roundSize = 13;
+  const themeSize = 10;
+  const questionSize = 10;
+  const choiceSize = 9;
+  const lineGap = 3;
+
+  let page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
+  let cursorY = 0;
+
+  const drawHeader = () => {
+    const headerTop = PAGE_HEIGHT - PAGE_MARGIN;
+    const runbookLabel = 'Printable Runbook';
+    const labelWidth = measurePdfText(fonts.regular, runbookLabel, labelSize);
+
+    drawPdfText(page, event.title, {
+      x: PAGE_MARGIN,
+      y: headerTop - titleSize,
+      size: titleSize,
+      font: fonts.bold
+    });
+    drawPdfText(page, runbookLabel, {
+      x: PAGE_WIDTH - PAGE_MARGIN - labelWidth,
+      y: headerTop - labelSize,
+      size: labelSize,
+      font: fonts.regular
+    });
+
+    const metaParts = [formatEventDateOnly(event.starts_at), locationName.trim()].filter(Boolean);
+    if (metaParts.length > 0) {
+      drawPdfText(page, metaParts.join(' • '), {
+        x: PAGE_MARGIN,
+        y: headerTop - titleSize - metaSize - 6,
+        size: metaSize,
+        font: fonts.regular
+      });
+    }
+
+    const dividerY = headerTop - titleSize - metaSize - 16;
+    page.drawLine({
+      start: { x: PAGE_MARGIN, y: dividerY },
+      end: { x: PAGE_WIDTH - PAGE_MARGIN, y: dividerY },
+      thickness: 0.8,
+      color: lineColor
+    });
+    cursorY = dividerY - 14;
+  };
+
+  const addPage = () => {
+    page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
+    drawHeader();
+  };
+
+  const ensureSpace = (requiredHeight: number) => {
+    if (cursorY - requiredHeight < bottomMargin) {
+      addPage();
+    }
+  };
+
+  drawHeader();
+
+  roundBundles.forEach((bundle, roundIndex) => {
+    const themeText = `Theme: ${bundle.theme}`;
+    const roundHeight = roundSize + themeSize + 18;
+    ensureSpace(roundHeight);
+
+    if (roundIndex > 0) {
+      cursorY -= 4;
+    }
+
+    drawPdfText(page, `Round ${bundle.round.round_number}`, {
+      x: PAGE_MARGIN,
+      y: cursorY - roundSize,
+      size: roundSize,
+      font: fonts.bold
+    });
+    cursorY -= roundSize + 6;
+
+    drawPdfText(page, themeText, {
+      x: PAGE_MARGIN,
+      y: cursorY - themeSize,
+      size: themeSize,
+      font: fonts.regular
+    });
+    cursorY -= themeSize + 10;
+
+    if (bundle.items.length === 0) {
+      ensureSpace(questionSize + 6);
+      drawPdfText(page, 'No questions in this round.', {
+        x: PAGE_MARGIN,
+        y: cursorY - questionSize,
+        size: questionSize,
+        font: fonts.regular
+      });
+      cursorY -= questionSize + 14;
+      return;
+    }
+
+    bundle.items.forEach((item, itemIndex) => {
+      const promptLines = wrapPdfText(fonts.regular, `${itemIndex + 1}. ${buildRunbookPrompt(item)}`, contentWidth, questionSize);
+      const choiceLines =
+        item.question_type === 'multiple_choice'
+          ? parseChoicesJson(item.choices_json).flatMap((choice, choiceIndex) =>
+              wrapPdfText(
+                fonts.regular,
+                `${String.fromCharCode(65 + choiceIndex)}. ${choice}`,
+                contentWidth - 18,
+                choiceSize
+              )
+            )
+          : [];
+      const promptHeight = promptLines.length * (questionSize + lineGap);
+      const choicesHeight = choiceLines.length > 0 ? 4 + choiceLines.length * (choiceSize + lineGap) : 0;
+      ensureSpace(promptHeight + choicesHeight + 10);
+
+      promptLines.forEach((line) => {
+        ensureSpace(questionSize + lineGap + 2);
+        drawPdfText(page, line, {
+          x: PAGE_MARGIN,
+          y: cursorY - questionSize,
+          size: questionSize,
+          font: fonts.regular
+        });
+        cursorY -= questionSize + lineGap;
+      });
+
+      if (choiceLines.length > 0) {
+        cursorY -= 1;
+        choiceLines.forEach((line) => {
+          ensureSpace(choiceSize + lineGap + 2);
+          drawPdfText(page, line, {
+            x: PAGE_MARGIN + 18,
+            y: cursorY - choiceSize,
+            size: choiceSize,
+            font: fonts.regular
+          });
+          cursorY -= choiceSize + lineGap;
+        });
+      }
+
+      cursorY -= 7;
+    });
+
+    cursorY -= 6;
+  });
+
+  return pdfDoc.save();
+};
+
 const formatEditionCode = (gameCode?: string | null, editionNumber?: number | null) => {
   const code = (gameCode ?? '').trim().toUpperCase();
   if (!code || editionNumber == null || !Number.isFinite(editionNumber)) return '';
@@ -377,6 +575,20 @@ const parseAnswerPartsJson = (value?: string | null): ParsedAnswerPart[] => {
       .filter((entry): entry is ParsedAnswerPart => Boolean(entry));
   } catch {
     return [];
+  }
+};
+
+const parseChoicesJson = (value?: string | null) => {
+  if (!value) return [] as string[];
+  try {
+    const parsed = JSON.parse(value);
+    if (!Array.isArray(parsed)) return [] as string[];
+    return parsed
+      .filter((entry): entry is string => typeof entry === 'string')
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+  } catch {
+    return [] as string[];
   }
 };
 
@@ -507,6 +719,53 @@ const truncateText = (font: any, text: string, maxWidth: number, size: number) =
     truncated = truncated.slice(0, -1);
   }
   return `${truncated}...`;
+};
+
+const wrapPdfText = (font: any, text: string, maxWidth: number, size: number) => {
+  const normalized = sanitizePdfText(text);
+  const paragraphs = normalized.split(/\r?\n/);
+  const lines: string[] = [];
+
+  paragraphs.forEach((paragraph, paragraphIndex) => {
+    const trimmed = paragraph.trim();
+    if (!trimmed) {
+      if (paragraphIndex < paragraphs.length - 1) lines.push('');
+      return;
+    }
+
+    const words = trimmed.split(/\s+/);
+    let current = '';
+    for (const word of words) {
+      const candidate = current ? `${current} ${word}` : word;
+      if (measurePdfText(font, candidate, size) <= maxWidth) {
+        current = candidate;
+        continue;
+      }
+      if (current) {
+        lines.push(current);
+        current = '';
+      }
+      if (measurePdfText(font, word, size) <= maxWidth) {
+        current = word;
+        continue;
+      }
+
+      let segment = '';
+      for (const char of word) {
+        const next = `${segment}${char}`;
+        if (segment && measurePdfText(font, next, size) > maxWidth) {
+          lines.push(segment);
+          segment = char;
+        } else {
+          segment = next;
+        }
+      }
+      current = segment;
+    }
+    if (current) lines.push(current);
+  });
+
+  return lines.length > 0 ? lines : [''];
 };
 
 const drawPageHeader = (
@@ -1403,6 +1662,8 @@ export function EventDetailPage() {
   const [imagesheetError, setImagesheetError] = useState<string | null>(null);
   const [scoresheetGenerating, setScoresheetGenerating] = useState(false);
   const [scoresheetGenerateError, setScoresheetGenerateError] = useState<string | null>(null);
+  const [runbookGenerating, setRunbookGenerating] = useState(false);
+  const [runbookError, setRunbookError] = useState<string | null>(null);
   const [imagesheetGenerating, setImagesheetGenerating] = useState(false);
   const [imagesheetGenerateError, setImagesheetGenerateError] = useState<string | null>(null);
   const [openDocumentMenu, setOpenDocumentMenu] = useState<'scoresheet' | 'answersheet' | 'imagesheet' | null>(null);
@@ -2580,6 +2841,41 @@ export function EventDetailPage() {
     }
   };
 
+  const downloadRunbook = async () => {
+    if (!eventId || !event) return;
+    setRunbookGenerating(true);
+    setRunbookError(null);
+    try {
+      if (rounds.length === 0) {
+        throw new Error('Add at least one round before exporting the runbook.');
+      }
+
+      const itemResponses = await Promise.all(rounds.map((round) => api.listEventRoundItems(round.id)));
+      const bundles: RunbookRoundBundle[] = [];
+
+      for (let index = 0; index < rounds.length; index += 1) {
+        const response = itemResponses[index];
+        const round = rounds[index];
+        if (!response.ok) {
+          throw new Error(response.error.message ?? `Failed to load items for round ${round.round_number}.`);
+        }
+        bundles.push({
+          round,
+          theme: resolveRunbookTheme(round, editionById[round.edition_id]),
+          items: [...response.data].sort((a, b) => a.ordinal - b.ordinal)
+        });
+      }
+
+      const bytes = await buildRunbookPdf(event, locationName, bundles);
+      const baseName = buildEventDocumentBaseName(event, locationName);
+      downloadPdfBytes(bytes, `${baseName}-runbook.pdf`);
+    } catch (error) {
+      setRunbookError(error instanceof Error ? error.message : 'Failed to export runbook.');
+    } finally {
+      setRunbookGenerating(false);
+    }
+  };
+
   if (!event) {
     return (
       <AppShell title="Event Detail">
@@ -2595,9 +2891,17 @@ export function EventDetailPage() {
           <Section
             title={event.title}
             actions={
-              <ButtonLink to={`/events/${event.id}/run`} variant="primary">
-                Present
-              </ButtonLink>
+              <div className="flex flex-col items-end gap-2">
+                <div className="flex flex-wrap justify-end gap-2">
+                  <SecondaryButton className="h-10 px-3 text-sm" onClick={downloadRunbook} disabled={runbookGenerating}>
+                    {runbookGenerating ? 'Preparing runbook…' : 'Download runbook'}
+                  </SecondaryButton>
+                  <ButtonLink to={`/events/${event.id}/run`} variant="primary">
+                    Present
+                  </ButtonLink>
+                </div>
+                {runbookError && <div className="text-right text-xs text-danger-ink">{runbookError}</div>}
+              </div>
             }
           >
             <div className="flex flex-wrap items-center gap-3 text-xs text-muted">
@@ -3790,16 +4094,22 @@ export function EventDetailPage() {
                 </div>
               )}
             </div>
-            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-end">
-              <ButtonLink to={`/events/${event.id}/submissions`} variant="outline" className="w-full sm:w-auto">
-                Submissions
-              </ButtonLink>
-              <ButtonLink to={`/events/${event.id}/leaderboard`} variant="outline" className="w-full sm:w-auto">
-                Leaderboard
-              </ButtonLink>
-              <ButtonLink to={`/events/${event.id}/run`} variant="primary" className="w-full sm:w-auto">
-                Run event
-              </ButtonLink>
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:items-end">
+              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center sm:justify-end">
+                <ButtonLink to={`/events/${event.id}/submissions`} variant="outline" className="w-full sm:w-auto">
+                  Submissions
+                </ButtonLink>
+                <ButtonLink to={`/events/${event.id}/leaderboard`} variant="outline" className="w-full sm:w-auto">
+                  Leaderboard
+                </ButtonLink>
+                <SecondaryButton className="w-full sm:w-auto" onClick={downloadRunbook} disabled={runbookGenerating}>
+                  {runbookGenerating ? 'Preparing runbook…' : 'Download runbook'}
+                </SecondaryButton>
+                <ButtonLink to={`/events/${event.id}/run`} variant="primary" className="w-full sm:w-auto">
+                  Run event
+                </ButtonLink>
+              </div>
+              {runbookError && <div className="text-xs text-danger-ink">{runbookError}</div>}
             </div>
           </div>
         </div>

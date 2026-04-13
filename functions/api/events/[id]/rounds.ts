@@ -13,6 +13,8 @@ export const onRequestGet: PagesFunction<Env> = async ({ env, params, data }) =>
   const rows = await queryAll(
     env,
     `SELECT er.*, ed.timer_seconds,
+            ed.theme AS edition_theme,
+            ed.title AS edition_title,
             ed.speed_round_audio_key AS edition_audio_key,
             ed.speed_round_audio_name AS edition_audio_name
      FROM event_rounds er
@@ -77,6 +79,8 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request, 
   const rows = await queryAll(
     env,
     `SELECT er.*, ed.timer_seconds,
+            ed.theme AS edition_theme,
+            ed.title AS edition_title,
             ed.speed_round_audio_key AS edition_audio_key,
             ed.speed_round_audio_name AS edition_audio_name
      FROM event_rounds er

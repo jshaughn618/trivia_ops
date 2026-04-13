@@ -56,6 +56,16 @@ const parseAnswerParts = (value?: string | null): AnswerPart[] => {
   }
 };
 
+const formatStopAttemptTime = (value: string) => {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return '—';
+  const hours = parsed.getHours() % 12 || 12;
+  const minutes = String(parsed.getMinutes()).padStart(2, '0');
+  const seconds = String(parsed.getSeconds()).padStart(2, '0');
+  const milliseconds = String(parsed.getMilliseconds()).padStart(3, '0');
+  return `${hours}:${minutes}:${seconds}.${milliseconds}`;
+};
+
 type PublicEventResponse = {
   server_now?: string;
   stop_attempts?: Array<{
@@ -1366,7 +1376,7 @@ export function PlayEventPage() {
                                     <div>
                                       <div className="text-sm font-medium text-text">{attempt.team_name}</div>
                                       <div className="text-[11px] text-muted">
-                                        {new Date(attempt.attempted_at).toLocaleTimeString()}
+                                        {formatStopAttemptTime(attempt.attempted_at)}
                                       </div>
                                     </div>
                                   </div>

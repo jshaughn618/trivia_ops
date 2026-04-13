@@ -150,6 +150,8 @@ export type EventRound = {
   round_number: number;
   label: string;
   scoresheet_title: string | null;
+  edition_theme?: string | null;
+  edition_title?: string | null;
   audio_key: string | null;
   audio_name: string | null;
   timer_seconds: number | null;
