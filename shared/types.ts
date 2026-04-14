@@ -147,6 +147,7 @@ export type Event = {
   include_scoresheet_qr_code: number | null;
   include_scoresheet_upcoming_events: number | null;
   include_scoresheet_logo: number | null;
+  include_scoresheet_location_logo: number | null;
   scoresheet_special_checkboxes_json: string | null;
   created_at: string;
 };

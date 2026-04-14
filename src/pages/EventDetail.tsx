@@ -69,6 +69,7 @@ type ScoresheetIncludeOptions = {
   qrCode: boolean;
   upcomingEvents: boolean;
   logo: boolean;
+  locationLogo: boolean;
 };
 
 const DEFAULT_SCORESHEET_INCLUDE_OPTIONS: ScoresheetIncludeOptions = {
@@ -79,7 +80,8 @@ const DEFAULT_SCORESHEET_INCLUDE_OPTIONS: ScoresheetIncludeOptions = {
   teamCode: true,
   qrCode: true,
   upcomingEvents: true,
-  logo: true
+  logo: true,
+  locationLogo: false
 };
 
 const resolveScoresheetIncludeOptions = (event?: Event | null): ScoresheetIncludeOptions => ({
@@ -90,7 +92,8 @@ const resolveScoresheetIncludeOptions = (event?: Event | null): ScoresheetInclud
   teamCode: Number(event?.include_scoresheet_team_code ?? 1) === 1,
   qrCode: Number(event?.include_scoresheet_qr_code ?? 1) === 1,
   upcomingEvents: Number(event?.include_scoresheet_upcoming_events ?? 1) === 1,
-  logo: Number(event?.include_scoresheet_logo ?? 1) === 1
+  logo: Number(event?.include_scoresheet_logo ?? 1) === 1,
+  locationLogo: Number(event?.include_scoresheet_location_logo ?? 0) === 1
 });
 
 const parseScoresheetSpecialCheckboxes = (value?: string | null): ScoresheetSpecialCheckbox[] => {
@@ -807,17 +810,36 @@ const drawPageHeader = (
   event: Event,
   locationName: string,
   fonts: { regular: any; bold: any },
-  options?: { showEventCode?: boolean; includeOptions?: ScoresheetIncludeOptions }
+  options?: { showEventCode?: boolean; includeOptions?: ScoresheetIncludeOptions; locationLogoImage?: any }
 ) => {
   const titleSize = 14;
   const metaSize = 9;
   const headerTop = PAGE_HEIGHT - PAGE_MARGIN;
   const includeOptions = options?.includeOptions ?? DEFAULT_SCORESHEET_INCLUDE_OPTIONS;
+  let locationLogoWidth = 0;
+  if (includeOptions.locationLogo && options?.locationLogoImage) {
+    const maxLogoWidth = 120;
+    const maxLogoHeight = 40;
+    const scale = Math.min(
+      maxLogoWidth / options.locationLogoImage.width,
+      maxLogoHeight / options.locationLogoImage.height,
+      1
+    );
+    locationLogoWidth = options.locationLogoImage.width * scale;
+    const locationLogoHeight = options.locationLogoImage.height * scale;
+    page.drawImage(options.locationLogoImage, {
+      x: PAGE_WIDTH - PAGE_MARGIN - locationLogoWidth,
+      y: headerTop - locationLogoHeight,
+      width: locationLogoWidth,
+      height: locationLogoHeight
+    });
+  }
+  const headerTextMaxWidth = PAGE_WIDTH - PAGE_MARGIN * 2 - (locationLogoWidth > 0 ? locationLogoWidth + 16 : 0);
   let cursorY = headerTop - titleSize;
   const metaLine = formatHeaderMetaLine(event, locationName, includeOptions);
 
   if (includeOptions.eventName) {
-    drawPdfText(page, event.title, {
+    drawPdfText(page, truncateText(fonts.bold, event.title, headerTextMaxWidth, titleSize), {
       x: PAGE_MARGIN,
       y: cursorY,
       size: titleSize,
@@ -827,7 +849,7 @@ const drawPageHeader = (
   }
 
   if (metaLine) {
-    drawPdfText(page, metaLine, {
+    drawPdfText(page, truncateText(fonts.regular, metaLine, headerTextMaxWidth, metaSize), {
       x: PAGE_MARGIN,
       y: cursorY,
       size: metaSize,
@@ -838,7 +860,7 @@ const drawPageHeader = (
 
   if ((options?.showEventCode ?? false) && includeOptions.eventCode && event.public_code) {
     const codeText = `Event Code: ${event.public_code}`;
-    drawPdfText(page, codeText, {
+    drawPdfText(page, truncateText(fonts.regular, codeText, headerTextMaxWidth, metaSize), {
       x: PAGE_MARGIN,
       y: cursorY,
       size: metaSize,
@@ -854,12 +876,14 @@ const drawMusicScoresheetHeader = (
   extras?: {
     qrImage?: any;
     logoImage?: any;
+    locationLogoImage?: any;
     eventCode?: string;
     locationName?: string;
     teamCode?: string;
     teamName?: string;
     teamPlaceholder?: boolean;
     showTeamInfo?: boolean;
+    showLocationLogo?: boolean;
     includeOptions?: ScoresheetIncludeOptions;
   }
 ) => {
@@ -868,10 +892,30 @@ const drawMusicScoresheetHeader = (
   const metaSize = 9.5;
   const leftColumnWidth = 210;
   const showTeamInfo = extras?.showTeamInfo ?? true;
+  const showLocationLogo = extras?.showLocationLogo ?? false;
   const includeOptions = extras?.includeOptions ?? DEFAULT_SCORESHEET_INCLUDE_OPTIONS;
   const rightColumnWidth = showTeamInfo ? 210 : 0;
   const rightX = PAGE_WIDTH - PAGE_MARGIN - rightColumnWidth;
+  let locationLogoHeight = 0;
+  if (showLocationLogo && includeOptions.locationLogo && extras?.locationLogoImage) {
+    const maxLogoWidth = Math.min(110, rightColumnWidth || 110);
+    const maxLogoHeight = 34;
+    const scale = Math.min(
+      maxLogoWidth / extras.locationLogoImage.width,
+      maxLogoHeight / extras.locationLogoImage.height,
+      1
+    );
+    const locationLogoWidth = extras.locationLogoImage.width * scale;
+    locationLogoHeight = extras.locationLogoImage.height * scale;
+    page.drawImage(extras.locationLogoImage, {
+      x: PAGE_WIDTH - PAGE_MARGIN - locationLogoWidth,
+      y: headerTop - locationLogoHeight,
+      width: locationLogoWidth,
+      height: locationLogoHeight
+    });
+  }
   const titleY = headerTop - titleSize;
+  const teamTitleY = titleY - (locationLogoHeight > 0 ? locationLogoHeight + 6 : 0);
   const eventCode = includeOptions.eventCode ? extras?.eventCode ?? event.public_code ?? '' : '';
   const metaLine = formatHeaderMetaLine(event, extras?.locationName ?? '', includeOptions);
   let leftCursorY = titleY;
@@ -946,7 +990,7 @@ const drawMusicScoresheetHeader = (
 
   if (extras?.qrImage && qrImageSize > 0) {
     const qrX = rightX;
-    const qrAnchorY = includeOptions.eventName ? titleY : titleY + titleSize - 2;
+    const qrAnchorY = includeOptions.eventName ? teamTitleY : teamTitleY + titleSize - 2;
     const qrY = qrAnchorY - metaSize - 3 - qrImageSize - 6;
     page.drawImage(extras.qrImage, {
       x: qrX,
@@ -963,7 +1007,7 @@ const drawMusicScoresheetHeader = (
     const teamLabelWidth = measurePdfText(fonts.bold, teamLabel, teamLabelSize);
     drawPdfText(page, teamLabel, {
       x: rightX,
-      y: titleY,
+      y: teamTitleY,
       size: teamLabelSize,
       font: fonts.bold
     });
@@ -976,15 +1020,15 @@ const drawMusicScoresheetHeader = (
       );
       drawPdfText(page, nameText, {
         x: rightX + teamLabelWidth + 6,
-        y: titleY,
+        y: teamTitleY,
         size: teamLabelSize,
         font: fonts.regular
       });
     } else {
       const lineStartX = rightX + teamLabelWidth + 6;
       page.drawLine({
-        start: { x: lineStartX, y: titleY + 1 },
-        end: { x: rightX + rightColumnWidth, y: titleY + 1 },
+        start: { x: lineStartX, y: teamTitleY + 1 },
+        end: { x: rightX + rightColumnWidth, y: teamTitleY + 1 },
         thickness: 1,
         color: rgb(0, 0, 0)
       });
@@ -1000,7 +1044,7 @@ const drawMusicScoresheetHeader = (
 
       drawPdfText(page, teamCodeLine, {
         x: rightX,
-        y: titleY - metaSize - 3,
+        y: teamTitleY - metaSize - 3,
         size: metaSize,
         font: fonts.regular
       });
@@ -1501,6 +1545,7 @@ const buildPdf = async (
     upcomingLines?: string[];
     locationName?: string;
     logoBytes?: Uint8Array;
+    locationLogoBytes?: Uint8Array;
     includeOptions?: ScoresheetIncludeOptions;
   }
 ) => {
@@ -1512,6 +1557,7 @@ const buildPdf = async (
   const includeOptions = extras?.includeOptions ?? DEFAULT_SCORESHEET_INCLUDE_OPTIONS;
   let qrImage: any | null = null;
   let logoImage: any | null = null;
+  let locationLogoImage: any | null = null;
   let calendarImage: any | null = null;
   if (mode === 'scoresheet' && includeOptions.qrCode && extras?.qrDataUrl) {
     const qrBytes = dataUrlToBytes(extras.qrDataUrl);
@@ -1528,6 +1574,13 @@ const buildPdf = async (
       logoImage = await pdfDoc.embedPng(extras.logoBytes);
     } catch {
       logoImage = null;
+    }
+  }
+  if (extras?.locationLogoBytes) {
+    try {
+      locationLogoImage = await pdfDoc.embedPng(extras.locationLogoBytes);
+    } catch {
+      locationLogoImage = null;
     }
   }
   if (mode === 'scoresheet') {
@@ -1549,11 +1602,16 @@ const buildPdf = async (
   const createPage = (
     showEventCode = false,
     layout: 'quad' | 'two-up' = 'quad',
-    drawHeader = true
+    drawHeader = true,
+    showLocationLogo = false
   ) => {
     const page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
     if (drawHeader) {
-      drawPageHeader(page, event, locationName, fonts, { showEventCode, includeOptions });
+      drawPageHeader(page, event, locationName, fonts, {
+        showEventCode,
+        includeOptions,
+        locationLogoImage: showLocationLogo ? locationLogoImage ?? undefined : undefined
+      });
     }
     drawGridLines(page, layout);
     return page;
@@ -1584,12 +1642,14 @@ const buildPdf = async (
       drawMusicScoresheetHeader(page, event, fonts, {
         qrImage: mode === 'scoresheet' ? qrImage ?? undefined : undefined,
         logoImage: logoImage ?? undefined,
+        locationLogoImage: locationLogoImage ?? undefined,
         eventCode: extras?.eventCode,
         locationName,
         teamCode: mode === 'scoresheet' ? extras?.teamCode : undefined,
         teamName: mode === 'scoresheet' ? extras?.teamName : undefined,
         teamPlaceholder: mode === 'scoresheet' ? extras?.teamPlaceholder : undefined,
         showTeamInfo: mode === 'scoresheet',
+        showLocationLogo: mode === 'scoresheet' && pageCount() === 1,
         includeOptions
       });
 
@@ -1608,7 +1668,7 @@ const buildPdf = async (
     }
   } else if (mode === 'scoresheet') {
     let pageIndex = -1;
-    let page = createPage(true);
+    let page = createPage(true, 'quad', true, includeOptions.locationLogo);
     pageIndex = 0;
     let positionIndex = 0;
     const positionsForPage = (index: number) => {
@@ -1630,7 +1690,7 @@ const buildPdf = async (
       renderRoundBlock(page, rounds[index], getCell(cellIndex), fonts, mode, { showPointsColumn: false });
     }
 
-    const firstPage = pdfDoc.getPages()[0] ?? createPage(true);
+    const firstPage = pdfDoc.getPages()[0] ?? createPage(true, 'quad', true, includeOptions.locationLogo);
       renderTeamBlock(firstPage, getCell(0), fonts, {
         qrImage: qrImage ?? undefined,
         logoImage: logoImage ?? undefined,
@@ -1912,6 +1972,7 @@ export function EventDetailPage() {
       include_scoresheet_qr_code: scoresheetIncludeOptions.qrCode,
       include_scoresheet_upcoming_events: scoresheetIncludeOptions.upcomingEvents,
       include_scoresheet_logo: scoresheetIncludeOptions.logo,
+      include_scoresheet_location_logo: scoresheetIncludeOptions.locationLogo,
       scoresheet_special_checkboxes: scoresheetSpecialCheckboxes.length > 0 ? scoresheetSpecialCheckboxes : null,
       starts_at: parsedStartsAt.iso || event?.starts_at || '',
       location_id: locationId || null,
@@ -1951,6 +2012,7 @@ export function EventDetailPage() {
             include_scoresheet_qr_code: Number(event.include_scoresheet_qr_code ?? 1) === 1,
             include_scoresheet_upcoming_events: Number(event.include_scoresheet_upcoming_events ?? 1) === 1,
             include_scoresheet_logo: Number(event.include_scoresheet_logo ?? 1) === 1,
+            include_scoresheet_location_logo: Number(event.include_scoresheet_location_logo ?? 0) === 1,
             scoresheet_special_checkboxes: parseScoresheetSpecialCheckboxes(event.scoresheet_special_checkboxes_json),
             starts_at: event.starts_at,
             location_id: event.location_id ?? null,
@@ -2037,6 +2099,11 @@ export function EventDetailPage() {
     if (!event?.location_id) return '';
     return locations.find((location) => location.id === event.location_id)?.name ?? '';
   }, [event?.location_id, locations]);
+
+  const location = useMemo(
+    () => (event?.location_id ? locations.find((item) => item.id === event.location_id) ?? null : null),
+    [event?.location_id, locations]
+  );
 
   const promptForScoresheetSpecialCheckbox = (
     initial?: ScoresheetSpecialCheckbox
@@ -2829,6 +2896,19 @@ export function EventDetailPage() {
       } catch {
         logoBytes = undefined;
       }
+      let locationLogoBytes: Uint8Array | undefined;
+      if (scoresheetIncludeOptions.locationLogo && location?.logo_key) {
+        try {
+          const locationLogoRes = await fetch(api.mediaUrl(location.logo_key));
+          if (locationLogoRes.ok) {
+            const locationLogoBlob = await locationLogoRes.blob();
+            const pngBytes = await blobToPngArrayBuffer(locationLogoBlob);
+            locationLogoBytes = new Uint8Array(pngBytes);
+          }
+        } catch {
+          locationLogoBytes = undefined;
+        }
+      }
       const scoresheetDoc = await PDFDocument.create();
       const teamsForSheets = teams.length > 0 ? teams : [null];
       const specialCheckboxes = scoresheetSpecialCheckboxes;
@@ -2855,6 +2935,7 @@ export function EventDetailPage() {
           upcomingLines,
           locationName,
           logoBytes,
+          locationLogoBytes,
           includeOptions: scoresheetIncludeOptions
         });
         const teamDoc = await PDFDocument.load(teamScoresheet);
@@ -2866,6 +2947,7 @@ export function EventDetailPage() {
         eventCode: event.public_code ?? undefined,
         locationName,
         logoBytes,
+        locationLogoBytes,
         includeOptions: scoresheetIncludeOptions
       });
       const baseName = buildEventDocumentBaseName(event, locationName);
@@ -3718,6 +3800,16 @@ export function EventDetailPage() {
               }
             />
             Trivia Ops logo
+          </label>
+          <label className="flex items-center gap-2 text-sm text-muted">
+            <input
+              type="checkbox"
+              checked={scoresheetIncludeOptions.locationLogo}
+              onChange={(event) =>
+                setScoresheetIncludeOptions((prev) => ({ ...prev, locationLogo: event.target.checked }))
+              }
+            />
+            Location logo
           </label>
           <label className="flex items-center gap-2 text-sm text-muted sm:col-span-2">
             <input

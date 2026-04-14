@@ -86,6 +86,12 @@ export const onRequestPut: AppHandler<'id'> = async ({ env, params, request, dat
       : parsed.data.include_scoresheet_logo
         ? 1
         : 0;
+  const includeScoresheetLocationLogo =
+    parsed.data.include_scoresheet_location_logo === undefined
+      ? Number(existing.include_scoresheet_location_logo ?? 0)
+      : parsed.data.include_scoresheet_location_logo
+        ? 1
+        : 0;
   await execute(
     env,
     `UPDATE events
@@ -113,6 +119,7 @@ export const onRequestPut: AppHandler<'id'> = async ({ env, params, request, dat
          include_scoresheet_qr_code = ?,
          include_scoresheet_upcoming_events = ?,
          include_scoresheet_logo = ?,
+         include_scoresheet_location_logo = ?,
          scoresheet_special_checkboxes_json = ?
      WHERE id = ?`,
     [
@@ -140,6 +147,7 @@ export const onRequestPut: AppHandler<'id'> = async ({ env, params, request, dat
       includeScoresheetQrCode,
       includeScoresheetUpcomingEvents,
       includeScoresheetLogo,
+      includeScoresheetLocationLogo,
       parsed.data.scoresheet_special_checkboxes === undefined
         ? existing.scoresheet_special_checkboxes_json ?? null
         : parsed.data.scoresheet_special_checkboxes && parsed.data.scoresheet_special_checkboxes.length > 0

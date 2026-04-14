@@ -55,6 +55,7 @@ type EventMutationPayload = Partial<
     | 'include_scoresheet_qr_code'
     | 'include_scoresheet_upcoming_events'
     | 'include_scoresheet_logo'
+    | 'include_scoresheet_location_logo'
     | 'scoresheet_special_checkboxes_json'
   >
 > & {
@@ -69,6 +70,7 @@ type EventMutationPayload = Partial<
   include_scoresheet_qr_code?: boolean | number | null;
   include_scoresheet_upcoming_events?: boolean | number | null;
   include_scoresheet_logo?: boolean | number | null;
+  include_scoresheet_location_logo?: boolean | number | null;
   scoresheet_special_checkboxes?: ScoresheetSpecialCheckbox[] | null;
 };
 type EventSubmissionExpectedPart = { label: string; answer: string; points: number };

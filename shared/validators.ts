@@ -256,6 +256,7 @@ export const eventUpdateSchema = z.object({
   include_scoresheet_qr_code: z.boolean().optional(),
   include_scoresheet_upcoming_events: z.boolean().optional(),
   include_scoresheet_logo: z.boolean().optional(),
+  include_scoresheet_location_logo: z.boolean().optional(),
   scoresheet_special_checkboxes: z.array(scoresheetSpecialCheckboxSchema).nullable().optional()
 });
 
