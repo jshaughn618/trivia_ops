@@ -115,6 +115,11 @@ export type GameExampleItem = {
   audio_answer_key: string | null;
 };
 
+export type ScoresheetSpecialCheckbox = {
+  header: string;
+  detail: string | null;
+};
+
 export type Event = {
   id: Id;
   title: string;
@@ -141,7 +146,8 @@ export type Event = {
   include_scoresheet_team_code: number | null;
   include_scoresheet_qr_code: number | null;
   include_scoresheet_upcoming_events: number | null;
-  scoresheet_special_checkbox_text: string | null;
+  include_scoresheet_logo: number | null;
+  scoresheet_special_checkboxes_json: string | null;
   created_at: string;
 };
 

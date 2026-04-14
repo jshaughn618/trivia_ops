@@ -13,6 +13,7 @@ import type {
   GameEdition,
   GameType,
   Location,
+  ScoresheetSpecialCheckbox,
   Team,
   User
 } from './types';
@@ -53,6 +54,8 @@ type EventMutationPayload = Partial<
     | 'include_scoresheet_team_code'
     | 'include_scoresheet_qr_code'
     | 'include_scoresheet_upcoming_events'
+    | 'include_scoresheet_logo'
+    | 'scoresheet_special_checkboxes_json'
   >
 > & {
   status?: Event['status'];
@@ -65,6 +68,8 @@ type EventMutationPayload = Partial<
   include_scoresheet_team_code?: boolean | number | null;
   include_scoresheet_qr_code?: boolean | number | null;
   include_scoresheet_upcoming_events?: boolean | number | null;
+  include_scoresheet_logo?: boolean | number | null;
+  scoresheet_special_checkboxes?: ScoresheetSpecialCheckbox[] | null;
 };
 type EventSubmissionExpectedPart = { label: string; answer: string; points: number };
 type EventSubmissionResponsePart = { label: string; answer: string };

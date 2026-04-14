@@ -50,6 +50,10 @@ const eventStatusSchema = z.enum(['planned', 'live', 'completed', 'canceled']);
 const eventRoundStatusSchema = z.enum(['planned', 'live', 'locked', 'completed']);
 const eventTypeSchema = z.enum(['Pub Trivia', 'Music Trivia']);
 const userTypeSchema = z.enum(['admin', 'host', 'player']);
+const scoresheetSpecialCheckboxSchema = z.object({
+  header: z.string().trim().min(1),
+  detail: z.string().trim().min(1).nullable().optional()
+});
 
 export const editionCreateSchema = z.object({
   game_id: idSchema,
@@ -251,7 +255,8 @@ export const eventUpdateSchema = z.object({
   include_scoresheet_team_code: z.boolean().optional(),
   include_scoresheet_qr_code: z.boolean().optional(),
   include_scoresheet_upcoming_events: z.boolean().optional(),
-  scoresheet_special_checkbox_text: z.string().trim().min(1).nullable().optional()
+  include_scoresheet_logo: z.boolean().optional(),
+  scoresheet_special_checkboxes: z.array(scoresheetSpecialCheckboxSchema).nullable().optional()
 });
 
 export const eventRoundCreateSchema = z.object({

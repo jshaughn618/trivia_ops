@@ -80,6 +80,12 @@ export const onRequestPut: AppHandler<'id'> = async ({ env, params, request, dat
       : parsed.data.include_scoresheet_upcoming_events
         ? 1
         : 0;
+  const includeScoresheetLogo =
+    parsed.data.include_scoresheet_logo === undefined
+      ? Number(existing.include_scoresheet_logo ?? 1)
+      : parsed.data.include_scoresheet_logo
+        ? 1
+        : 0;
   await execute(
     env,
     `UPDATE events
@@ -106,7 +112,8 @@ export const onRequestPut: AppHandler<'id'> = async ({ env, params, request, dat
          include_scoresheet_team_code = ?,
          include_scoresheet_qr_code = ?,
          include_scoresheet_upcoming_events = ?,
-         scoresheet_special_checkbox_text = ?
+         include_scoresheet_logo = ?,
+         scoresheet_special_checkboxes_json = ?
      WHERE id = ?`,
     [
       merged.title,
@@ -132,9 +139,17 @@ export const onRequestPut: AppHandler<'id'> = async ({ env, params, request, dat
       includeScoresheetTeamCode,
       includeScoresheetQrCode,
       includeScoresheetUpcomingEvents,
-      parsed.data.scoresheet_special_checkbox_text === undefined
-        ? existing.scoresheet_special_checkbox_text ?? null
-        : parsed.data.scoresheet_special_checkbox_text ?? null,
+      includeScoresheetLogo,
+      parsed.data.scoresheet_special_checkboxes === undefined
+        ? existing.scoresheet_special_checkboxes_json ?? null
+        : parsed.data.scoresheet_special_checkboxes && parsed.data.scoresheet_special_checkboxes.length > 0
+          ? JSON.stringify(
+              parsed.data.scoresheet_special_checkboxes.map((item) => ({
+                header: item.header.trim(),
+                detail: item.detail?.trim() || null
+              }))
+            )
+          : null,
       params.id
     ]
   );

@@ -16,7 +16,20 @@ import { IconButton } from '../components/IconButton';
 import { logError } from '../lib/log';
 import { useAuth } from '../auth';
 import { toOwnedArrayBuffer } from '../../shared/binary';
-import type { EditionItem, Event, EventRound, EventStatus, EventType, GameEdition, Game, GameType, Team, Location, User } from '../types';
+import type {
+  EditionItem,
+  Event,
+  EventRound,
+  EventStatus,
+  EventType,
+  GameEdition,
+  Game,
+  GameType,
+  Team,
+  Location,
+  ScoresheetSpecialCheckbox,
+  User
+} from '../types';
 
 const PAGE_WIDTH = 612;
 const PAGE_HEIGHT = 792;
@@ -55,6 +68,7 @@ type ScoresheetIncludeOptions = {
   teamCode: boolean;
   qrCode: boolean;
   upcomingEvents: boolean;
+  logo: boolean;
 };
 
 const DEFAULT_SCORESHEET_INCLUDE_OPTIONS: ScoresheetIncludeOptions = {
@@ -64,7 +78,8 @@ const DEFAULT_SCORESHEET_INCLUDE_OPTIONS: ScoresheetIncludeOptions = {
   eventCode: true,
   teamCode: true,
   qrCode: true,
-  upcomingEvents: true
+  upcomingEvents: true,
+  logo: true
 };
 
 const resolveScoresheetIncludeOptions = (event?: Event | null): ScoresheetIncludeOptions => ({
@@ -74,8 +89,27 @@ const resolveScoresheetIncludeOptions = (event?: Event | null): ScoresheetInclud
   eventCode: Number(event?.include_scoresheet_event_code ?? 1) === 1,
   teamCode: Number(event?.include_scoresheet_team_code ?? 1) === 1,
   qrCode: Number(event?.include_scoresheet_qr_code ?? 1) === 1,
-  upcomingEvents: Number(event?.include_scoresheet_upcoming_events ?? 1) === 1
+  upcomingEvents: Number(event?.include_scoresheet_upcoming_events ?? 1) === 1,
+  logo: Number(event?.include_scoresheet_logo ?? 1) === 1
 });
+
+const parseScoresheetSpecialCheckboxes = (value?: string | null): ScoresheetSpecialCheckbox[] => {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map((item) => {
+        const header = typeof item?.header === 'string' ? item.header.trim() : '';
+        const detail = typeof item?.detail === 'string' ? item.detail.trim() : '';
+        if (!header) return null;
+        return { header, detail: detail || null };
+      })
+      .filter((item): item is ScoresheetSpecialCheckbox => Boolean(item));
+  } catch {
+    return [];
+  }
+};
 
 const safeFileName = (value: string, fallback: string) => {
   const trimmed = value.trim().toLowerCase();
@@ -882,7 +916,7 @@ const drawMusicScoresheetHeader = (
 
   let logoWidth = 0;
   let logoHeight = 0;
-  if (extras?.logoImage) {
+  if (includeOptions.logo && extras?.logoImage) {
     const maxLogoWidth = Math.min(120, centerLaneWidth);
     const maxLogoHeight = 30;
     const scale = Math.min(
@@ -899,7 +933,7 @@ const drawMusicScoresheetHeader = (
   const centerTopY = headerTop - 2;
   const centerBlockHeight = logoHeight;
 
-  if (extras?.logoImage && logoWidth > 0 && logoHeight > 0) {
+  if (includeOptions.logo && extras?.logoImage && logoWidth > 0 && logoHeight > 0) {
     const logoX = centerStartX + (centerWidth - logoWidth) / 2;
     const logoY = centerTopY - logoHeight;
     page.drawImage(extras.logoImage, {
@@ -1252,7 +1286,7 @@ const renderTeamBlock = (
     teamCode?: string;
     teamName?: string;
     teamPlaceholder?: boolean;
-    specialCheckboxText?: string;
+    specialCheckboxes?: ScoresheetSpecialCheckbox[];
     includeOptions?: ScoresheetIncludeOptions;
   }
 ) => {
@@ -1291,7 +1325,7 @@ const renderTeamBlock = (
     cursorY -= textSize + 36;
   }
 
-  if (extras.logoImage) {
+  if (includeOptions.logo && extras.logoImage) {
     const maxLogoWidth = 150;
     const maxLogoHeight = 44;
     const scale = Math.min(
@@ -1323,29 +1357,51 @@ const renderTeamBlock = (
     cursorY -= textSize + 8;
   }
 
-  const specialCheckboxText = extras.specialCheckboxText?.trim() ?? '';
-  if (specialCheckboxText) {
+  const specialCheckboxes = extras.specialCheckboxes ?? [];
+  if (specialCheckboxes.length > 0) {
     const boxSize = 14;
     const gap = 10;
     const textX = cell.x + padding + boxSize + gap;
     const textWidth = cell.width - padding * 2 - boxSize - gap;
-    const lines = wrapPdfText(fonts.bold, specialCheckboxText, textWidth, textSize);
-    const boxY = cursorY - boxSize;
-    page.drawRectangle({
-      x: cell.x + padding,
-      y: boxY,
-      width: boxSize,
-      height: boxSize,
-      borderWidth: 1,
-      borderColor: rgb(0, 0, 0)
-    });
-    lines.forEach((line, index) => {
-      drawPdfText(page, line, {
-        x: textX,
-        y: cursorY - textSize - index * (textSize + 3),
-        size: textSize,
-        font: fonts.bold
+    const detailSize = 9;
+    const sectionGap = 10;
+
+    specialCheckboxes.forEach((item) => {
+      if (cursorY <= cell.y + padding + boxSize) return;
+      const headerLines = wrapPdfText(fonts.bold, item.header, textWidth, textSize);
+      const detailLines = item.detail ? wrapPdfText(fonts.regular, item.detail, textWidth, detailSize) : [];
+      const boxY = cursorY - boxSize;
+
+      page.drawRectangle({
+        x: cell.x + padding,
+        y: boxY,
+        width: boxSize,
+        height: boxSize,
+        borderWidth: 1,
+        borderColor: rgb(0, 0, 0)
       });
+      headerLines.forEach((line, index) => {
+        drawPdfText(page, line, {
+          x: textX,
+          y: cursorY - textSize - index * (textSize + 3),
+          size: textSize,
+          font: fonts.bold
+        });
+      });
+      const detailStartY = cursorY - headerLines.length * (textSize + 3) - 2;
+      detailLines.forEach((line, index) => {
+        drawPdfText(page, line, {
+          x: textX,
+          y: detailStartY - detailSize - index * (detailSize + 2),
+          size: detailSize,
+          font: fonts.regular
+        });
+      });
+      const blockHeight = Math.max(
+        boxSize,
+        headerLines.length * (textSize + 3) + detailLines.length * (detailSize + 2)
+      );
+      cursorY -= blockHeight + sectionGap;
     });
     return;
   }
@@ -1441,7 +1497,7 @@ const buildPdf = async (
     teamCode?: string;
     teamName?: string;
     teamPlaceholder?: boolean;
-    specialCheckboxText?: string;
+    specialCheckboxes?: ScoresheetSpecialCheckbox[];
     upcomingLines?: string[];
     locationName?: string;
     logoBytes?: Uint8Array;
@@ -1582,7 +1638,7 @@ const buildPdf = async (
         teamCode: extras?.teamCode,
         teamName: extras?.teamName,
         teamPlaceholder: extras?.teamPlaceholder,
-        specialCheckboxText: extras?.specialCheckboxText,
+        specialCheckboxes: extras?.specialCheckboxes,
         includeOptions
       });
 
@@ -1634,7 +1690,7 @@ export function EventDetailPage() {
   const [scoresheetIncludeOptions, setScoresheetIncludeOptions] = useState<ScoresheetIncludeOptions>(
     DEFAULT_SCORESHEET_INCLUDE_OPTIONS
   );
-  const [scoresheetSpecialCheckboxText, setScoresheetSpecialCheckboxText] = useState('');
+  const [scoresheetSpecialCheckboxes, setScoresheetSpecialCheckboxes] = useState<ScoresheetSpecialCheckbox[]>([]);
   const [locationId, setLocationId] = useState('');
   const [hostUserId, setHostUserId] = useState('');
   const [roundGameId, setRoundGameId] = useState('');
@@ -1734,7 +1790,7 @@ export function EventDetailPage() {
       setTiebreakerQuestion(eventRes.data.tiebreaker_question ?? '');
       setTiebreakerAnswer(eventRes.data.tiebreaker_answer ?? '');
       setScoresheetIncludeOptions(resolveScoresheetIncludeOptions(eventRes.data));
-      setScoresheetSpecialCheckboxText(eventRes.data.scoresheet_special_checkbox_text ?? '');
+      setScoresheetSpecialCheckboxes(parseScoresheetSpecialCheckboxes(eventRes.data.scoresheet_special_checkboxes_json));
       setLocationId(eventRes.data.location_id ?? '');
       setHostUserId(eventRes.data.host_user_id ?? '');
     }
@@ -1755,7 +1811,7 @@ export function EventDetailPage() {
     setTiebreakerQuestion(res.data.event.tiebreaker_question ?? '');
     setTiebreakerAnswer(res.data.event.tiebreaker_answer ?? '');
     setScoresheetIncludeOptions(resolveScoresheetIncludeOptions(res.data.event));
-    setScoresheetSpecialCheckboxText(res.data.event.scoresheet_special_checkbox_text ?? '');
+    setScoresheetSpecialCheckboxes(parseScoresheetSpecialCheckboxes(res.data.event.scoresheet_special_checkboxes_json));
     setLocationId(res.data.event.location_id ?? '');
     setHostUserId(res.data.event.host_user_id ?? '');
     setRounds(res.data.rounds.sort((a, b) => a.round_number - b.round_number));
@@ -1855,7 +1911,8 @@ export function EventDetailPage() {
       include_scoresheet_team_code: scoresheetIncludeOptions.teamCode,
       include_scoresheet_qr_code: scoresheetIncludeOptions.qrCode,
       include_scoresheet_upcoming_events: scoresheetIncludeOptions.upcomingEvents,
-      scoresheet_special_checkbox_text: scoresheetSpecialCheckboxText.trim() || null,
+      include_scoresheet_logo: scoresheetIncludeOptions.logo,
+      scoresheet_special_checkboxes: scoresheetSpecialCheckboxes.length > 0 ? scoresheetSpecialCheckboxes : null,
       starts_at: parsedStartsAt.iso || event?.starts_at || '',
       location_id: locationId || null,
       host_user_id: hostUserId || null
@@ -1868,7 +1925,7 @@ export function EventDetailPage() {
       tiebreakerQuestion,
       tiebreakerAnswer,
       scoresheetIncludeOptions,
-      scoresheetSpecialCheckboxText,
+      scoresheetSpecialCheckboxes,
       parsedStartsAt.iso,
       locationId,
       hostUserId,
@@ -1893,7 +1950,8 @@ export function EventDetailPage() {
             include_scoresheet_team_code: Number(event.include_scoresheet_team_code ?? 1) === 1,
             include_scoresheet_qr_code: Number(event.include_scoresheet_qr_code ?? 1) === 1,
             include_scoresheet_upcoming_events: Number(event.include_scoresheet_upcoming_events ?? 1) === 1,
-            scoresheet_special_checkbox_text: event.scoresheet_special_checkbox_text ?? null,
+            include_scoresheet_logo: Number(event.include_scoresheet_logo ?? 1) === 1,
+            scoresheet_special_checkboxes: parseScoresheetSpecialCheckboxes(event.scoresheet_special_checkboxes_json),
             starts_at: event.starts_at,
             location_id: event.location_id ?? null,
             host_user_id: event.host_user_id ?? null
@@ -1979,6 +2037,21 @@ export function EventDetailPage() {
     if (!event?.location_id) return '';
     return locations.find((location) => location.id === event.location_id)?.name ?? '';
   }, [event?.location_id, locations]);
+
+  const promptForScoresheetSpecialCheckbox = (
+    initial?: ScoresheetSpecialCheckbox
+  ): ScoresheetSpecialCheckbox | null => {
+    const nextHeader = window.prompt('Enter checkbox header text', initial?.header ?? '');
+    if (nextHeader === null) return null;
+    const header = nextHeader.trim();
+    if (!header) return null;
+    const nextDetail = window.prompt('Enter detail text (optional)', initial?.detail ?? '');
+    if (nextDetail === null) return null;
+    return {
+      header,
+      detail: nextDetail.trim() || null
+    };
+  };
 
   const teamByCode = useMemo(() => {
     const map = new Map<string, Team>();
@@ -2758,10 +2831,10 @@ export function EventDetailPage() {
       }
       const scoresheetDoc = await PDFDocument.create();
       const teamsForSheets = teams.length > 0 ? teams : [null];
-      const specialCheckboxText = scoresheetSpecialCheckboxText.trim();
+      const specialCheckboxes = scoresheetSpecialCheckboxes;
       for (const team of teamsForSheets) {
         let qrDataUrl: string | undefined;
-        if (event.public_code && scoresheetIncludeOptions.qrCode && !specialCheckboxText) {
+        if (event.public_code && scoresheetIncludeOptions.qrCode && specialCheckboxes.length === 0) {
           const params = new URLSearchParams();
           params.set('event', event.public_code);
           if (team?.team_code) params.set('team', team.team_code);
@@ -2778,7 +2851,7 @@ export function EventDetailPage() {
           teamCode: team?.team_code ?? undefined,
           teamName: team?.name ?? undefined,
           teamPlaceholder: Number(team?.team_placeholder ?? 0) === 1,
-          specialCheckboxText: specialCheckboxText || undefined,
+          specialCheckboxes,
           upcomingLines,
           locationName,
           logoBytes,
@@ -3636,6 +3709,16 @@ export function EventDetailPage() {
             />
             QR code
           </label>
+          <label className="flex items-center gap-2 text-sm text-muted">
+            <input
+              type="checkbox"
+              checked={scoresheetIncludeOptions.logo}
+              onChange={(event) =>
+                setScoresheetIncludeOptions((prev) => ({ ...prev, logo: event.target.checked }))
+              }
+            />
+            Trivia Ops logo
+          </label>
           <label className="flex items-center gap-2 text-sm text-muted sm:col-span-2">
             <input
               type="checkbox"
@@ -3649,41 +3732,65 @@ export function EventDetailPage() {
           <div className="sm:col-span-2 rounded-lg border border-border bg-panel2/60 p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
-                <div className="text-sm font-medium text-text">Special checkbox</div>
+                <div className="text-sm font-medium text-text">Special checkboxes</div>
                 <div className="mt-1 text-xs text-muted">
-                  Adds an empty checkbox with custom text in the QR code area on pub trivia scoresheets.
+                  Adds one or more empty checkboxes with header and detail text in the QR code area on pub trivia scoresheets.
                 </div>
               </div>
-              <div className="flex flex-wrap gap-2">
-                <SecondaryButton
-                  className="h-8 px-3 text-xs"
-                  type="button"
-                  onClick={() => {
-                    const nextText = window.prompt(
-                      'Enter the special checkbox text',
-                      scoresheetSpecialCheckboxText
-                    );
-                    if (nextText === null) return;
-                    setScoresheetSpecialCheckboxText(nextText.trim());
-                  }}
-                >
-                  {scoresheetSpecialCheckboxText.trim() ? 'Edit text' : 'Add checkbox'}
-                </SecondaryButton>
-                {scoresheetSpecialCheckboxText.trim() && (
-                  <SecondaryButton
-                    className="h-8 px-3 text-xs"
-                    type="button"
-                    onClick={() => setScoresheetSpecialCheckboxText('')}
-                  >
-                    Remove
-                  </SecondaryButton>
-                )}
-              </div>
+              <SecondaryButton
+                className="h-8 px-3 text-xs"
+                type="button"
+                onClick={() => {
+                  const nextItem = promptForScoresheetSpecialCheckbox();
+                  if (!nextItem) return;
+                  setScoresheetSpecialCheckboxes((prev) => prev.concat(nextItem));
+                }}
+              >
+                Add checkbox
+              </SecondaryButton>
             </div>
-            <div className="mt-3 text-xs text-muted">
-              {scoresheetSpecialCheckboxText.trim()
-                ? `Current text: ${scoresheetSpecialCheckboxText.trim()}`
-                : 'No special checkbox configured.'}
+            <div className="mt-3 space-y-2">
+              {scoresheetSpecialCheckboxes.length > 0 ? (
+                scoresheetSpecialCheckboxes.map((item, index) => (
+                  <div
+                    key={`${item.header}-${index}`}
+                    className="flex flex-wrap items-start justify-between gap-3 rounded-lg border border-border/80 bg-panel/80 p-3"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-medium text-text">{item.header}</div>
+                      {item.detail && <div className="mt-1 text-xs text-muted">{item.detail}</div>}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <SecondaryButton
+                        className="h-8 px-3 text-xs"
+                        type="button"
+                        onClick={() => {
+                          const nextItem = promptForScoresheetSpecialCheckbox(item);
+                          if (!nextItem) return;
+                          setScoresheetSpecialCheckboxes((prev) =>
+                            prev.map((current, currentIndex) => (currentIndex === index ? nextItem : current))
+                          );
+                        }}
+                      >
+                        Edit
+                      </SecondaryButton>
+                      <SecondaryButton
+                        className="h-8 px-3 text-xs"
+                        type="button"
+                        onClick={() =>
+                          setScoresheetSpecialCheckboxes((prev) =>
+                            prev.filter((_, currentIndex) => currentIndex !== index)
+                          )
+                        }
+                      >
+                        Remove
+                      </SecondaryButton>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-xs text-muted">No special checkboxes configured.</div>
+              )}
             </div>
           </div>
         </div>
