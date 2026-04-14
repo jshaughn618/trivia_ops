@@ -141,6 +141,7 @@ export type Event = {
   include_scoresheet_team_code: number | null;
   include_scoresheet_qr_code: number | null;
   include_scoresheet_upcoming_events: number | null;
+  scoresheet_special_checkbox_text: string | null;
   created_at: string;
 };
 

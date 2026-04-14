@@ -250,7 +250,8 @@ export const eventUpdateSchema = z.object({
   include_scoresheet_event_code: z.boolean().optional(),
   include_scoresheet_team_code: z.boolean().optional(),
   include_scoresheet_qr_code: z.boolean().optional(),
-  include_scoresheet_upcoming_events: z.boolean().optional()
+  include_scoresheet_upcoming_events: z.boolean().optional(),
+  scoresheet_special_checkbox_text: z.string().trim().min(1).nullable().optional()
 });
 
 export const eventRoundCreateSchema = z.object({

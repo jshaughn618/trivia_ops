@@ -105,7 +105,8 @@ export const onRequestPut: AppHandler<'id'> = async ({ env, params, request, dat
          include_scoresheet_event_code = ?,
          include_scoresheet_team_code = ?,
          include_scoresheet_qr_code = ?,
-         include_scoresheet_upcoming_events = ?
+         include_scoresheet_upcoming_events = ?,
+         scoresheet_special_checkbox_text = ?
      WHERE id = ?`,
     [
       merged.title,
@@ -131,6 +132,9 @@ export const onRequestPut: AppHandler<'id'> = async ({ env, params, request, dat
       includeScoresheetTeamCode,
       includeScoresheetQrCode,
       includeScoresheetUpcomingEvents,
+      parsed.data.scoresheet_special_checkbox_text === undefined
+        ? existing.scoresheet_special_checkbox_text ?? null
+        : parsed.data.scoresheet_special_checkbox_text ?? null,
       params.id
     ]
   );
