@@ -367,6 +367,13 @@ const buildRunbookPrompt = (item: EditionItem) => {
   return 'Prompt unavailable.';
 };
 
+const isCollapsedRunbookMediaRound = (items: EditionItem[]) => {
+  if (items.length === 0) return false;
+  const mediaType = items[0]?.media_type;
+  if (mediaType !== 'image' && mediaType !== 'audio') return false;
+  return items.every((item) => item.media_type === mediaType);
+};
+
 const buildRunbookPdf = async (event: Event, locationName: string, roundBundles: RunbookRoundBundle[]) => {
   const pdfDoc = await PDFDocument.create();
   const fonts = {
@@ -383,16 +390,14 @@ const buildRunbookPdf = async (event: Event, locationName: string, roundBundles:
   const roundSize = 13;
   const themeSize = 10;
   const questionSize = 10;
+  const answerSize = 9.5;
   const choiceSize = 9;
   const lineGap = 3;
+  const headerGap = 14;
 
-  let page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
-  let cursorY = 0;
-
-  const drawHeader = () => {
+  const drawHeader = (page: any, sectionLabel: string) => {
     const headerTop = PAGE_HEIGHT - PAGE_MARGIN;
-    const runbookLabel = 'Printable Runbook';
-    const labelWidth = measurePdfText(fonts.regular, runbookLabel, labelSize);
+    const labelWidth = measurePdfText(fonts.regular, sectionLabel, labelSize);
 
     drawPdfText(page, event.title, {
       x: PAGE_MARGIN,
@@ -400,7 +405,7 @@ const buildRunbookPdf = async (event: Event, locationName: string, roundBundles:
       size: titleSize,
       font: fonts.bold
     });
-    drawPdfText(page, runbookLabel, {
+    drawPdfText(page, sectionLabel, {
       x: PAGE_WIDTH - PAGE_MARGIN - labelWidth,
       y: headerTop - labelSize,
       size: labelSize,
@@ -424,30 +429,42 @@ const buildRunbookPdf = async (event: Event, locationName: string, roundBundles:
       thickness: 0.8,
       color: lineColor
     });
-    cursorY = dividerY - 14;
+    return dividerY - headerGap;
   };
 
-  const addPage = () => {
-    page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
-    drawHeader();
+  const addPage = (sectionLabel: string) => {
+    const page = pdfDoc.addPage([PAGE_WIDTH, PAGE_HEIGHT]);
+    const cursorY = drawHeader(page, sectionLabel);
+    return { page, cursorY };
   };
 
-  const ensureSpace = (requiredHeight: number) => {
-    if (cursorY - requiredHeight < bottomMargin) {
-      addPage();
-    }
+  const drawWrappedLines = (
+    page: any,
+    lines: string[],
+    x: number,
+    startY: number,
+    size: number,
+    font: any
+  ) => {
+    let cursorY = startY;
+    lines.forEach((line) => {
+      if (cursorY - size < bottomMargin) return;
+      drawPdfText(page, line, {
+        x,
+        y: cursorY - size,
+        size,
+        font
+      });
+      cursorY -= size + lineGap;
+    });
+    return cursorY;
   };
 
-  drawHeader();
-
-  roundBundles.forEach((bundle, roundIndex) => {
+  roundBundles.forEach((bundle) => {
+    const { page, cursorY: startY } = addPage('Printable Runbook');
+    let cursorY = startY;
+    const promptItems = isCollapsedRunbookMediaRound(bundle.items) ? bundle.items.slice(0, 1) : bundle.items;
     const themeText = `Theme: ${bundle.theme}`;
-    const roundHeight = roundSize + themeSize + 18;
-    ensureSpace(roundHeight);
-
-    if (roundIndex > 0) {
-      cursorY -= 4;
-    }
 
     drawPdfText(page, `Round ${bundle.round.round_number}`, {
       x: PAGE_MARGIN,
@@ -465,19 +482,27 @@ const buildRunbookPdf = async (event: Event, locationName: string, roundBundles:
     });
     cursorY -= themeSize + 10;
 
-    if (bundle.items.length === 0) {
-      ensureSpace(questionSize + 6);
+    if (promptItems.length === 0) {
       drawPdfText(page, 'No questions in this round.', {
         x: PAGE_MARGIN,
         y: cursorY - questionSize,
         size: questionSize,
         font: fonts.regular
       });
-      cursorY -= questionSize + 14;
       return;
     }
 
-    bundle.items.forEach((item, itemIndex) => {
+    if (promptItems.length === 1 && promptItems[0]?.media_type && bundle.items.length > 1) {
+      const noteLines = wrapPdfText(
+        fonts.regular,
+        `Use this prompt for all ${bundle.items.length} questions in the round.`,
+        contentWidth,
+        choiceSize
+      );
+      cursorY = drawWrappedLines(page, noteLines, PAGE_MARGIN, cursorY, choiceSize, fonts.regular) - 8;
+    }
+
+    promptItems.forEach((item, itemIndex) => {
       const promptLines = wrapPdfText(fonts.regular, `${itemIndex + 1}. ${buildRunbookPrompt(item)}`, contentWidth, questionSize);
       const choiceLines =
         item.question_type === 'multiple_choice'
@@ -490,39 +515,58 @@ const buildRunbookPdf = async (event: Event, locationName: string, roundBundles:
               )
             )
           : [];
-      const promptHeight = promptLines.length * (questionSize + lineGap);
-      const choicesHeight = choiceLines.length > 0 ? 4 + choiceLines.length * (choiceSize + lineGap) : 0;
-      ensureSpace(promptHeight + choicesHeight + 10);
-
-      promptLines.forEach((line) => {
-        ensureSpace(questionSize + lineGap + 2);
-        drawPdfText(page, line, {
-          x: PAGE_MARGIN,
-          y: cursorY - questionSize,
-          size: questionSize,
-          font: fonts.regular
-        });
-        cursorY -= questionSize + lineGap;
-      });
+      cursorY = drawWrappedLines(page, promptLines, PAGE_MARGIN, cursorY, questionSize, fonts.regular);
 
       if (choiceLines.length > 0) {
         cursorY -= 1;
-        choiceLines.forEach((line) => {
-          ensureSpace(choiceSize + lineGap + 2);
-          drawPdfText(page, line, {
-            x: PAGE_MARGIN + 18,
-            y: cursorY - choiceSize,
-            size: choiceSize,
-            font: fonts.regular
-          });
-          cursorY -= choiceSize + lineGap;
-        });
+        cursorY = drawWrappedLines(page, choiceLines, PAGE_MARGIN + 18, cursorY, choiceSize, fonts.regular);
       }
 
       cursorY -= 7;
     });
+  });
 
-    cursorY -= 6;
+  roundBundles.forEach((bundle) => {
+    const { page, cursorY: startY } = addPage(`Round ${bundle.round.round_number} Answers`);
+    let cursorY = startY;
+    const themeText = `Theme: ${bundle.theme}`;
+
+    drawPdfText(page, `Round ${bundle.round.round_number} Answers`, {
+      x: PAGE_MARGIN,
+      y: cursorY - roundSize,
+      size: roundSize,
+      font: fonts.bold
+    });
+    cursorY -= roundSize + 6;
+
+    drawPdfText(page, themeText, {
+      x: PAGE_MARGIN,
+      y: cursorY - themeSize,
+      size: themeSize,
+      font: fonts.regular
+    });
+    cursorY -= themeSize + 10;
+
+    if (bundle.items.length === 0) {
+      drawPdfText(page, 'No answers in this round.', {
+        x: PAGE_MARGIN,
+        y: cursorY - answerSize,
+        size: answerSize,
+        font: fonts.regular
+      });
+      return;
+    }
+
+    bundle.items.forEach((item, itemIndex) => {
+      const answerLines = wrapPdfText(
+        fonts.regular,
+        `${itemIndex + 1}. ${formatAnswer(item)}`,
+        contentWidth,
+        answerSize
+      );
+      cursorY = drawWrappedLines(page, answerLines, PAGE_MARGIN, cursorY, answerSize, fonts.regular);
+      cursorY -= 6;
+    });
   });
 
   return pdfDoc.save();
