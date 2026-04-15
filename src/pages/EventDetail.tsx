@@ -1036,22 +1036,12 @@ const drawMusicScoresheetHeader = (
     const teamBlockWidth = Math.max(72, headerLaneEndX - teamBlockX);
     const qrImageSize =
       extras?.qrImage && includeOptions.qrCode ? (teamBlockWidth >= 148 ? 38 : 32) : 0;
-    const teamTextWidth = Math.max(48, teamBlockWidth - (qrImageSize > 0 ? qrImageSize + 10 : 0));
+    const teamTextWidth = teamBlockWidth;
     const teamTextX = teamBlockX;
     const teamInfoTopY = headerTop - 11;
     const teamLabel = 'Team Name:';
     const teamLabelSize = 10.5;
     const teamLabelWidth = measurePdfText(fonts.bold, teamLabel, teamLabelSize);
-
-    if (extras?.qrImage && qrImageSize > 0) {
-      const qrX = teamBlockX + teamBlockWidth - qrImageSize;
-      page.drawImage(extras.qrImage, {
-        x: qrX,
-        y: headerTop - qrImageSize,
-        width: qrImageSize,
-        height: qrImageSize
-      });
-    }
 
     drawPdfText(page, teamLabel, {
       x: teamTextX,
@@ -1095,6 +1085,16 @@ const drawMusicScoresheetHeader = (
         y: teamInfoTopY - metaSize - 4,
         size: metaSize,
         font: fonts.regular
+      });
+    }
+
+    if (extras?.qrImage && qrImageSize > 0) {
+      const qrY = teamInfoTopY - (includeOptions.teamCode ? metaSize + 10 : 8) - qrImageSize;
+      page.drawImage(extras.qrImage, {
+        x: teamTextX,
+        y: qrY,
+        width: qrImageSize,
+        height: qrImageSize
       });
     }
   }
