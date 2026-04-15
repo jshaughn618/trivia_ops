@@ -934,22 +934,23 @@ const drawMusicScoresheetHeader = (
   const headerTop = PAGE_HEIGHT - PAGE_MARGIN;
   const titleSize = 14;
   const metaSize = 9.5;
-  const leftColumnWidth = 210;
+  const leftColumnWidth = 198;
+  const headerLaneGap = 12;
   const showTeamInfo = extras?.showTeamInfo ?? true;
   const showLocationLogo = extras?.showLocationLogo ?? false;
   const includeOptions = extras?.includeOptions ?? DEFAULT_SCORESHEET_INCLUDE_OPTIONS;
-  const rightColumnWidth = showTeamInfo ? 210 : 0;
-  const rightX = PAGE_WIDTH - PAGE_MARGIN - rightColumnWidth;
+  const headerLaneStartX = PAGE_MARGIN + leftColumnWidth + headerLaneGap;
+  let locationLogoWidth = 0;
   let locationLogoHeight = 0;
   if (showLocationLogo && includeOptions.locationLogo && extras?.locationLogoImage) {
-    const maxLogoWidth = Math.min(110, rightColumnWidth || 110);
+    const maxLogoWidth = Math.min(showTeamInfo ? 82 : 110, PAGE_WIDTH - PAGE_MARGIN - headerLaneStartX);
     const maxLogoHeight = 34;
     const scale = Math.min(
       maxLogoWidth / extras.locationLogoImage.width,
       maxLogoHeight / extras.locationLogoImage.height,
       1
     );
-    const locationLogoWidth = extras.locationLogoImage.width * scale;
+    locationLogoWidth = extras.locationLogoImage.width * scale;
     locationLogoHeight = extras.locationLogoImage.height * scale;
     page.drawImage(extras.locationLogoImage, {
       x: PAGE_WIDTH - PAGE_MARGIN - locationLogoWidth,
@@ -959,7 +960,6 @@ const drawMusicScoresheetHeader = (
     });
   }
   const titleY = headerTop - titleSize;
-  const teamTitleY = titleY - (locationLogoHeight > 0 ? locationLogoHeight + 6 : 0);
   const eventCode = includeOptions.eventCode ? extras?.eventCode ?? event.public_code ?? '' : '';
   const metaLine = formatHeaderMetaLine(event, extras?.locationName ?? '', includeOptions);
   let leftCursorY = titleY;
@@ -996,16 +996,18 @@ const drawMusicScoresheetHeader = (
     });
   }
 
-  const centerLaneInset = 10;
-  const centerLaneStartX = PAGE_MARGIN + leftColumnWidth + centerLaneInset;
-  const centerLaneEndX = showTeamInfo ? rightX - centerLaneInset : PAGE_WIDTH - PAGE_MARGIN - centerLaneInset;
-  const centerLaneWidth = Math.max(68, centerLaneEndX - centerLaneStartX);
-  const qrImageSize = extras?.qrImage && includeOptions.qrCode ? 42 : 0;
+  const headerLaneEndX =
+    locationLogoWidth > 0 ? PAGE_WIDTH - PAGE_MARGIN - locationLogoWidth - headerLaneGap : PAGE_WIDTH - PAGE_MARGIN;
+  const reservedTeamWidth = showTeamInfo ? (includeOptions.teamCode ? 132 : 116) : 0;
+  const centerLaneWidth = Math.max(
+    0,
+    headerLaneEndX - headerLaneStartX - (showTeamInfo ? reservedTeamWidth + headerLaneGap : 0)
+  );
 
   let logoWidth = 0;
   let logoHeight = 0;
   if (includeOptions.logo && extras?.logoImage) {
-    const maxLogoWidth = Math.min(120, centerLaneWidth);
+    const maxLogoWidth = Math.min(showTeamInfo ? 96 : 120, centerLaneWidth);
     const maxLogoHeight = 30;
     const scale = Math.min(
       maxLogoWidth / extras.logoImage.width,
@@ -1016,42 +1018,44 @@ const drawMusicScoresheetHeader = (
     logoHeight = extras.logoImage.height * scale;
   }
 
-  const centerWidth = logoWidth;
-  const centerStartX = centerLaneStartX + Math.max(0, (centerLaneWidth - centerWidth) / 2);
+  const logoX = headerLaneStartX + (showTeamInfo ? 0 : Math.max(0, (headerLaneEndX - headerLaneStartX - logoWidth) / 2));
   const centerTopY = headerTop - 2;
-  const centerBlockHeight = logoHeight;
 
   if (includeOptions.logo && extras?.logoImage && logoWidth > 0 && logoHeight > 0) {
-    const logoX = centerStartX + (centerWidth - logoWidth) / 2;
-    const logoY = centerTopY - logoHeight;
     page.drawImage(extras.logoImage, {
       x: logoX,
-      y: logoY,
+      y: centerTopY - logoHeight,
       width: logoWidth,
       height: logoHeight
     });
   }
 
-  if (extras?.qrImage && qrImageSize > 0) {
-    const qrX = rightX;
-    const qrAnchorY = includeOptions.eventName ? teamTitleY : teamTitleY + titleSize - 2;
-    const qrY = qrAnchorY - metaSize - 3 - qrImageSize - 6;
-    page.drawImage(extras.qrImage, {
-      x: qrX,
-      y: qrY,
-      width: qrImageSize,
-      height: qrImageSize
-    });
-  }
-
   if (showTeamInfo) {
     const rawTeamName = extras?.teamName?.trim() ?? '';
+    const teamBlockX = logoX + (logoWidth > 0 ? logoWidth + headerLaneGap : 0);
+    const teamBlockWidth = Math.max(72, headerLaneEndX - teamBlockX);
+    const qrImageSize =
+      extras?.qrImage && includeOptions.qrCode ? (teamBlockWidth >= 148 ? 38 : 32) : 0;
+    const teamTextWidth = Math.max(48, teamBlockWidth - (qrImageSize > 0 ? qrImageSize + 10 : 0));
+    const teamTextX = teamBlockX;
+    const teamInfoTopY = headerTop - 11;
     const teamLabel = 'Team Name:';
     const teamLabelSize = 10.5;
     const teamLabelWidth = measurePdfText(fonts.bold, teamLabel, teamLabelSize);
+
+    if (extras?.qrImage && qrImageSize > 0) {
+      const qrX = teamBlockX + teamBlockWidth - qrImageSize;
+      page.drawImage(extras.qrImage, {
+        x: qrX,
+        y: headerTop - qrImageSize,
+        width: qrImageSize,
+        height: qrImageSize
+      });
+    }
+
     drawPdfText(page, teamLabel, {
-      x: rightX,
-      y: teamTitleY,
+      x: teamTextX,
+      y: teamInfoTopY,
       size: teamLabelSize,
       font: fonts.bold
     });
@@ -1059,20 +1063,20 @@ const drawMusicScoresheetHeader = (
       const nameText = truncateText(
         fonts.regular,
         rawTeamName,
-        Math.max(30, rightColumnWidth - teamLabelWidth - 8),
+        Math.max(24, teamTextWidth - teamLabelWidth - 8),
         teamLabelSize
       );
       drawPdfText(page, nameText, {
-        x: rightX + teamLabelWidth + 6,
-        y: teamTitleY,
+        x: teamTextX + teamLabelWidth + 6,
+        y: teamInfoTopY,
         size: teamLabelSize,
         font: fonts.regular
       });
     } else {
-      const lineStartX = rightX + teamLabelWidth + 6;
+      const lineStartX = teamTextX + teamLabelWidth + 6;
       page.drawLine({
-        start: { x: lineStartX, y: teamTitleY + 1 },
-        end: { x: rightX + rightColumnWidth, y: teamTitleY + 1 },
+        start: { x: lineStartX, y: teamInfoTopY + 1 },
+        end: { x: teamTextX + teamTextWidth, y: teamInfoTopY + 1 },
         thickness: 1,
         color: rgb(0, 0, 0)
       });
@@ -1082,13 +1086,13 @@ const drawMusicScoresheetHeader = (
       const teamCodeLine = truncateText(
         fonts.regular,
         `Team Code: ${extras?.teamCode?.trim() || '—'}`,
-        rightColumnWidth,
+        teamTextWidth,
         metaSize
       );
 
       drawPdfText(page, teamCodeLine, {
-        x: rightX,
-        y: teamTitleY - metaSize - 3,
+        x: teamTextX,
+        y: teamInfoTopY - metaSize - 4,
         size: metaSize,
         font: fonts.regular
       });
