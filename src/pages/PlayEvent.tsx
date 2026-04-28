@@ -445,6 +445,7 @@ export function PlayEventPage() {
   const visualItems = data?.visual_items ?? [];
   const visualMode = Boolean(isLive && data?.visual_round && visualItems.length > 0);
   const displayItem = visualMode ? visualItems[visualIndex] : data?.current_item ?? null;
+  const isQuestionActive = Boolean(isLive && displayItem);
   const suppressItemTimer = Boolean(data?.visual_round);
   const timerExpired = !suppressItemTimer && timerRemainingSeconds !== null && timerRemainingSeconds <= 0;
   const responseCounts = data?.response_counts ?? null;
@@ -935,7 +936,6 @@ export function PlayEventPage() {
     const ordered = [...rounds].sort((a, b) => a.round_number - b.round_number);
     return ordered.find((round) => !['completed', 'locked', 'canceled'].includes(round.status)) ?? null;
   })();
-  const isQuestionActive = Boolean(isLive && displayItem);
   const headerMeta = `${data.event.location_name ?? 'Location TBD'} • ${new Date(
     data.event.starts_at
   ).toLocaleString()}`;
