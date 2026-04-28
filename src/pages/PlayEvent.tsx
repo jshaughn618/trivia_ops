@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type React from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { X } from 'lucide-react';
 import { api, formatApiError } from '../api';
 import { PrimaryButton } from '../components/Buttons';
 import { logError } from '../lib/log';
@@ -184,6 +185,7 @@ export function PlayEventPage() {
   const [textResponseStatus, setTextResponseStatus] = useState<'idle' | 'submitting' | 'submitted' | 'error'>('idle');
   const [textResponseError, setTextResponseError] = useState<string | null>(null);
   const [visualIndex, setVisualIndex] = useState(0);
+  const [imagePreviewOpen, setImagePreviewOpen] = useState(false);
   const [selectedChoiceIndex, setSelectedChoiceIndex] = useState<number | null>(null);
   const [submittedChoiceIndex, setSubmittedChoiceIndex] = useState<number | null>(null);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'submitting' | 'submitted' | 'error'>('idle');
@@ -192,6 +194,7 @@ export function PlayEventPage() {
   const { theme, toggleTheme } = useTheme();
   const menuRef = useRef<HTMLDivElement | null>(null);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const imageTapSuppressedRef = useRef(false);
   const countdownRef = useRef<number | null>(null);
   const swipeHintRef = useRef<number | null>(null);
   const teamCodeRefs = useRef<Array<HTMLInputElement | null>>([]);
@@ -335,6 +338,7 @@ export function PlayEventPage() {
 
   useEffect(() => {
     setMediaError(null);
+    setImagePreviewOpen(false);
   }, [data?.current_item?.media_key, data?.current_item?.media_type, visualIndex, data?.visual_items?.length]);
 
   useEffect(() => {
@@ -369,6 +373,20 @@ export function PlayEventPage() {
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
   }, [teamMenuOpen]);
+
+  useEffect(() => {
+    if (!imagePreviewOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setImagePreviewOpen(false);
+    };
+    document.body.style.overflow = 'hidden';
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [imagePreviewOpen]);
 
   useEffect(() => {
     if (countdownRef.current) {
@@ -473,6 +491,9 @@ export function PlayEventPage() {
     displayItem?.id
   );
   const canSubmitTextResponse = Boolean(canShowTextResponsePanel);
+  const imagePreviewUrl = displayItem?.media_type === 'image' && displayItem.media_key && data
+    ? api.publicMediaUrl(data.event.public_code, displayItem.media_key)
+    : null;
 
   useEffect(() => {
     if (!canRenderAudioStop) return;
@@ -569,11 +590,20 @@ export function PlayEventPage() {
     const dx = touch.clientX - start.x;
     const dy = touch.clientY - start.y;
     if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy)) return;
+    imageTapSuppressedRef.current = true;
     if (dx < 0) {
       setVisualIndex((prev) => Math.min(prev + 1, visualItems.length - 1));
     } else {
       setVisualIndex((prev) => Math.max(prev - 1, 0));
     }
+  };
+
+  const handleImageClick = () => {
+    if (imageTapSuppressedRef.current) {
+      imageTapSuppressedRef.current = false;
+      return;
+    }
+    setImagePreviewOpen(true);
   };
 
   const handleJoin = async () => {
@@ -1174,10 +1204,17 @@ export function PlayEventPage() {
                   <div className="flex w-full flex-col gap-3 landscape:flex-row landscape:items-start">
                     <div className="order-2 w-full landscape:order-1 landscape:w-[58%]">
                       <MediaFrame>
-                        <div onTouchStart={handleSwipeStart} onTouchEnd={handleSwipeEnd} onClick={triggerSwipeHint}>
+                        <button
+                          type="button"
+                          className="block w-full cursor-zoom-in rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-panel"
+                          aria-label="Open image fullscreen"
+                          onTouchStart={handleSwipeStart}
+                          onTouchEnd={handleSwipeEnd}
+                          onClick={handleImageClick}
+                        >
                           <img
                             className="max-h-[44vh] w-full object-contain landscape:max-h-[42vh]"
-                            src={api.publicMediaUrl(data.event.public_code, displayItem.media_key)}
+                            src={imagePreviewUrl ?? ''}
                             alt="Media"
                             onError={() => {
                               setMediaError('Media unavailable.');
@@ -1187,7 +1224,7 @@ export function PlayEventPage() {
                               });
                             }}
                           />
-                        </div>
+                        </button>
                       </MediaFrame>
                       {mediaError && (
                         <div className="play-panel mt-3 rounded-sm border-danger px-3 py-2 text-xs text-danger-ink">
@@ -1229,7 +1266,7 @@ export function PlayEventPage() {
                       {promptText && (
                         <PromptHero
                           align="left"
-                          className="text-[clamp(1.5rem,6.8vw,2.8rem)] leading-[1.1] landscape:text-[clamp(1.2rem,3.4vw,2.2rem)]"
+                          className="text-base leading-snug sm:text-lg landscape:text-base"
                         >
                           {promptText}
                         </PromptHero>
@@ -1616,6 +1653,30 @@ export function PlayEventPage() {
           </div>
         )}
       </PlayStage>
+      {imagePreviewOpen && imagePreviewUrl && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 px-3 py-14"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Fullscreen image preview"
+          onClick={() => setImagePreviewOpen(false)}
+        >
+          <button
+            type="button"
+            className="play-touch absolute right-3 top-3 inline-flex h-11 w-11 items-center justify-center rounded-md border border-white/15 bg-black/70 text-white transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+            aria-label="Close fullscreen image"
+            onClick={() => setImagePreviewOpen(false)}
+          >
+            <X className="h-5 w-5" aria-hidden="true" />
+          </button>
+          <img
+            className="max-h-full max-w-full object-contain"
+            src={imagePreviewUrl}
+            alt="Media fullscreen preview"
+            onClick={(event) => event.stopPropagation()}
+          />
+        </div>
+      )}
     </PlayShell>
   );
 }
