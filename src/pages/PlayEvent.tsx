@@ -1232,7 +1232,7 @@ export function PlayEventPage() {
                         </div>
                       )}
                       {visualMode && (
-                        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
+                        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-muted">
                           <div className="flex items-center gap-2">
                             <button
                               type="button"
@@ -1251,9 +1251,10 @@ export function PlayEventPage() {
                               ›
                             </button>
                           </div>
-                          <span>
+                          <span className="flex-1 text-center text-base font-semibold text-text sm:text-lg">
                             Image {visualIndex + 1} / {visualItems.length}
                           </span>
+                          <div className="w-[104px]" aria-hidden="true" />
                         </div>
                       )}
                       {visualMode && (
