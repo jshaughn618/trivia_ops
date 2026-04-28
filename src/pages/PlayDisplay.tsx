@@ -343,6 +343,33 @@ export function PlayDisplayPage() {
   const suppressItemTimer = Boolean(data?.visual_round);
   const timerExpired = !suppressItemTimer && timerRemainingSeconds !== null && timerRemainingSeconds <= 0;
   const responseCounts = data?.response_counts ?? null;
+  const showingFullLeaderboard = Boolean(data?.live?.show_full_leaderboard);
+  const isQuestionActive = Boolean(isLive && displayItem);
+  const imagePreviewUrl = displayItem?.media_type === 'image' && displayItem.media_key && data
+    ? api.publicMediaUrl(data.event.public_code, displayItem.media_key)
+    : null;
+  const imagePromptNeedsScroll = (displayItem?.prompt?.trim().length ?? 0) > 160;
+  const imageViewerLocked = Boolean(
+    isQuestionActive &&
+    imagePreviewUrl &&
+    !showingFullLeaderboard &&
+    displayItem?.question_type !== 'multiple_choice' &&
+    !imagePromptNeedsScroll &&
+    !data?.live?.reveal_answer &&
+    !data?.live?.reveal_fun_fact
+  );
+
+  useEffect(() => {
+    if (!imageViewerLocked) return;
+    const previousOverflow = document.body.style.overflow;
+    const previousOverscrollBehavior = document.body.style.overscrollBehavior;
+    document.body.style.overflow = 'hidden';
+    document.body.style.overscrollBehavior = 'none';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.body.style.overscrollBehavior = previousOverscrollBehavior;
+    };
+  }, [imageViewerLocked]);
 
   const triggerSwipeHint = () => {
     if (!visualMode) return;
@@ -421,7 +448,6 @@ export function PlayDisplayPage() {
   const waitingMessage = data.live?.waiting_message?.trim() ?? '';
   const waitingShowLeaderboard = data.live?.waiting_show_leaderboard ?? false;
   const waitingShowNextRound = data.live?.waiting_show_next_round ?? true;
-  const showingFullLeaderboard = Boolean(data.live?.show_full_leaderboard);
   const questionLabel = visualMode
     ? `Round ${activeRound?.round_number ?? ''} • Image ${visualIndex + 1} of ${visualItems.length}`.trim()
     : speedRoundMode
@@ -460,7 +486,6 @@ export function PlayDisplayPage() {
     const ordered = [...rounds].sort((a, b) => a.round_number - b.round_number);
     return ordered.find((round) => !['completed', 'locked', 'canceled'].includes(round.status)) ?? null;
   })();
-  const isQuestionActive = Boolean(isLive && displayItem);
   const headerMeta = `${data.event.location_name ?? 'Location TBD'} • ${new Date(data.event.starts_at).toLocaleString()}`;
   const showHeader = !isQuestionActive;
 
@@ -536,7 +561,11 @@ export function PlayDisplayPage() {
           menu={headerMenu}
         />
       )}
-      <PlayStage fullBleed={isQuestionActive} scrollable>
+      <PlayStage
+        fullBleed={isQuestionActive}
+        scrollable={!imageViewerLocked}
+        className={imageViewerLocked ? 'overflow-hidden overscroll-none' : undefined}
+      >
         {showingFullLeaderboard ? (
           <div className="w-full max-w-2xl space-y-3 text-left">
             <div className="play-chip">Leaderboard</div>
@@ -600,20 +629,20 @@ export function PlayDisplayPage() {
           </div>
         ) : isLive ? (
           displayItem ? (
-            <div className="flex w-full flex-col items-center gap-3 text-center sm:gap-4">
+            <div className={`flex w-full flex-col items-center text-center ${imageViewerLocked ? 'gap-2' : 'gap-3 sm:gap-4'}`}>
               <div className="flex flex-wrap items-center justify-center gap-2">
                 {activeRound?.label && <div className="play-chip">{activeRound.label}</div>}
                 <div className="play-chip">{questionLabel}</div>
               </div>
               {displayItem.media_type === 'image' && displayItem.media_key ? (
                 <div className="w-full">
-                  <div className="flex w-full flex-col gap-3 landscape:flex-row landscape:items-start">
+                  <div className={`flex w-full flex-col landscape:flex-row landscape:items-start ${imageViewerLocked ? 'gap-2' : 'gap-3'}`}>
                     <div className="order-2 w-full landscape:order-1 landscape:w-[58%]">
                       <MediaFrame>
                         <div onTouchStart={handleSwipeStart} onTouchEnd={handleSwipeEnd} onClick={triggerSwipeHint}>
                           <img
-                            className="max-h-[44vh] w-full object-contain landscape:max-h-[42vh]"
-                            src={api.publicMediaUrl(data.event.public_code, displayItem.media_key)}
+                            className="max-h-[52dvh] w-full object-contain landscape:max-h-[48dvh]"
+                            src={imagePreviewUrl ?? ''}
                             alt="Media"
                             onError={() => {
                               setMediaError('Media unavailable.');
@@ -631,7 +660,7 @@ export function PlayDisplayPage() {
                         </div>
                       )}
                       {visualMode && (
-                        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
+                        <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-muted">
                           <div className="flex items-center gap-2">
                             <button
                               type="button"
@@ -650,9 +679,10 @@ export function PlayDisplayPage() {
                               ›
                             </button>
                           </div>
-                          <span>
+                          <span className="flex-1 text-center text-base font-semibold text-text sm:text-lg">
                             Image {visualIndex + 1} / {visualItems.length}
                           </span>
+                          <div className="w-[104px]" aria-hidden="true" />
                         </div>
                       )}
                       {visualMode && (
@@ -665,7 +695,7 @@ export function PlayDisplayPage() {
                       {promptText && (
                         <PromptHero
                           align="left"
-                          className="text-[clamp(1.5rem,6.8vw,2.8rem)] leading-[1.1] landscape:text-[clamp(1.2rem,3.4vw,2.2rem)]"
+                          className="text-base leading-snug sm:text-lg landscape:text-base"
                         >
                           {promptText}
                         </PromptHero>

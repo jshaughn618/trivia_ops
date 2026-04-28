@@ -494,6 +494,28 @@ export function PlayEventPage() {
   const imagePreviewUrl = displayItem?.media_type === 'image' && displayItem.media_key && data
     ? api.publicMediaUrl(data.event.public_code, displayItem.media_key)
     : null;
+  const imagePromptNeedsScroll = (displayItem?.prompt?.trim().length ?? 0) > 160;
+  const imageViewerLocked = Boolean(
+    isQuestionActive &&
+    imagePreviewUrl &&
+    !canShowTextResponsePanel &&
+    displayItem?.question_type !== 'multiple_choice' &&
+    !imagePromptNeedsScroll &&
+    !data?.live?.reveal_answer &&
+    !data?.live?.reveal_fun_fact
+  );
+
+  useEffect(() => {
+    if (!imageViewerLocked) return;
+    const previousOverflow = document.body.style.overflow;
+    const previousOverscrollBehavior = document.body.style.overscrollBehavior;
+    document.body.style.overflow = 'hidden';
+    document.body.style.overscrollBehavior = 'none';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.body.style.overscrollBehavior = previousOverscrollBehavior;
+    };
+  }, [imageViewerLocked]);
 
   useEffect(() => {
     if (!canRenderAudioStop) return;
@@ -1089,7 +1111,11 @@ export function PlayEventPage() {
           menu={headerMenu}
         />
       )}
-      <PlayStage fullBleed={isQuestionActive} scrollable>
+      <PlayStage
+        fullBleed={isQuestionActive}
+        scrollable={!imageViewerLocked}
+        className={imageViewerLocked ? 'overflow-hidden overscroll-none' : undefined}
+      >
         {!teamId ? (
           <div className="flex w-full max-w-lg flex-col items-center gap-6 text-center">
             <div className="play-chip">Join your team</div>
@@ -1194,14 +1220,14 @@ export function PlayEventPage() {
           </div>
         ) : isLive ? (
           displayItem ? (
-            <div className="flex w-full flex-col items-center gap-3 text-center sm:gap-4">
+            <div className={`flex w-full flex-col items-center text-center ${imageViewerLocked ? 'gap-2' : 'gap-3 sm:gap-4'}`}>
               <div className="flex flex-wrap items-center justify-center gap-2">
                 {activeRound?.label && <div className="play-chip">{activeRound.label}</div>}
                 <div className="play-chip">{questionLabel}</div>
               </div>
               {displayItem.media_type === 'image' && displayItem.media_key ? (
                 <div className="w-full">
-                  <div className="flex w-full flex-col gap-3 landscape:flex-row landscape:items-start">
+                  <div className={`flex w-full flex-col landscape:flex-row landscape:items-start ${imageViewerLocked ? 'gap-2' : 'gap-3'}`}>
                     <div className="order-2 w-full landscape:order-1 landscape:w-[58%]">
                       <MediaFrame>
                         <button
@@ -1213,7 +1239,7 @@ export function PlayEventPage() {
                           onClick={handleImageClick}
                         >
                           <img
-                            className="max-h-[44vh] w-full object-contain landscape:max-h-[42vh]"
+                            className="max-h-[52dvh] w-full object-contain landscape:max-h-[48dvh]"
                             src={imagePreviewUrl ?? ''}
                             alt="Media"
                             onError={() => {
@@ -1232,7 +1258,7 @@ export function PlayEventPage() {
                         </div>
                       )}
                       {visualMode && (
-                        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-muted">
+                        <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-muted">
                           <div className="flex items-center gap-2">
                             <button
                               type="button"
