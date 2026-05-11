@@ -41,8 +41,24 @@ const buildSongArtistAnswerParts = (points: number): AnswerPart[] => [
   { label: 'Song', answer: '', points },
   { label: 'Artist', answer: '', points }
 ];
-const defaultMusicAnswerPartsForSubtype = (subtype: string) =>
-  subtype === 'pub_trivia_audio' ? buildSongArtistAnswerParts(0.5) : buildSongArtistAnswerParts(1);
+const defaultMusicAnswerPartsForSubtype = (subtype: string): AnswerPart[] => {
+  if (subtype === 'pub_trivia_audio') return buildSongArtistAnswerParts(0.5);
+  if (subtype === 'mashup') {
+    return [
+      { label: 'Artist 1', answer: '', points: 1 },
+      { label: 'Artist 2', answer: '', points: 1 },
+      { label: 'Song', answer: '', points: 1 }
+    ];
+  }
+  if (subtype === 'covers') {
+    return [
+      { label: 'Song', answer: '', points: 1 },
+      { label: 'Cover artist', answer: '', points: 1 },
+      { label: 'Original artist', answer: '', points: 1 }
+    ];
+  }
+  return buildSongArtistAnswerParts(1);
+};
 const defaultMusicConnectionPart: AnswerPart[] = [{ label: 'Connection', answer: '', points: 1 }];
 const defaultAudioAnswerParts: AnswerPart[] = [{ label: 'Answer 1', answer: '', points: 1 }];
 const MUSIC_AI_PARSE_LIMIT = 60;
@@ -406,7 +422,7 @@ export function EditionDetailPage() {
     () => cloneAnswerParts(defaultMusicAnswerPartsForSubtype(musicSubtype)),
     [musicSubtype]
   );
-  const hasMusicTemplate = isMusicSpeedRound || isMusicMashup || isMusicCovers;
+  const usesSpeedRoundSetup = isMusicSpeedRound;
   const audioPromptIsOptional =
     gameTypeId === 'audio' && (itemDraft.media_type === 'audio' || Boolean(itemDraft.media_key) || Boolean(itemDraft.audio_answer_key));
 
@@ -4639,7 +4655,7 @@ export function EditionDetailPage() {
             <div className="mb-4 border-2 border-border bg-panel2 p-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="text-xs font-display uppercase tracking-[0.3em] text-muted">
-                  {hasMusicTemplate ? 'Music Template Setup' : isPubTriviaAudioRound ? 'Pub Trivia Audio Bulk Upload' : 'Music Bulk Upload'}
+                  {usesSpeedRoundSetup ? 'Speed Round Setup' : isPubTriviaAudioRound ? 'Pub Trivia Audio Bulk Upload' : 'Music Bulk Upload'}
                 </div>
                 <SecondaryButton className="px-3 py-2 text-xs" onClick={downloadAllAudio}>
                   Download all MP3s
@@ -4651,7 +4667,7 @@ export function EditionDetailPage() {
               {audioDownloadError && (
                 <div className="mt-2 text-xs uppercase tracking-[0.2em] text-danger">{audioDownloadError}</div>
               )}
-              {hasMusicTemplate ? (
+              {usesSpeedRoundSetup ? (
                 <div className="mt-3 flex flex-col gap-3">
                   <div className="text-[10px] uppercase tracking-[0.2em] text-muted">
                     Speed rounds use one MP3 per edition. Event rounds pull this audio automatically.
@@ -4765,7 +4781,11 @@ export function EditionDetailPage() {
                   <div className="mt-2 text-[10px] uppercase tracking-[0.2em] text-muted">
                     {isPubTriviaAudioRound
                       ? 'Upload MP3s named like “01 - Song Name - Artist Name.mp3”. Each item gets Song and Artist parts worth 0.5 each.'
-                      : 'Upload MP3s named like “01 - Song Name.mp3” and “A01 - Song Name.mp3”.'}
+                      : isMusicMashup
+                        ? 'Upload question MP3s named like “01 - Artist 1 & Artist 2 - Song Name.mp3”. Optional answer clips can use “A01 - …”.'
+                        : isMusicCovers
+                          ? 'Upload question MP3s named like “01 - Song Name - Cover Artist - Original Artist.mp3”. Optional answer clips can use “A01 - …”.'
+                          : 'Upload MP3s named like “01 - Song Name.mp3” and “A01 - Song Name.mp3”.'}
                   </div>
                   {!isPubTriviaAudioRound && (
                     <label className="mt-3 flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
@@ -4774,7 +4794,13 @@ export function EditionDetailPage() {
                         className="min-h-[84px] px-3 py-2"
                         value={musicBulkInstructions}
                         onChange={(event) => setMusicBulkInstructions(event.target.value)}
-                        placeholder="Example: Titles look like 'Song - Artist - Movie'. Create answer parts Song, Artist, Movie."
+                        placeholder={
+                          isMusicMashup
+                            ? "Example: Titles look like 'Artist 1 & Artist 2 - Song'. Create parts Artist 1, Artist 2, Song."
+                            : isMusicCovers
+                              ? "Example: Titles look like 'Song - Cover Artist - Original Artist'. Create parts Song, Cover artist, Original artist."
+                              : "Example: Titles look like 'Song - Artist - Movie'. Create answer parts Song, Artist, Movie."
+                        }
                       />
                       <span className="text-[10px] normal-case tracking-[0.2em] text-muted">
                         If provided, AI will parse answer parts before processing uploads.
