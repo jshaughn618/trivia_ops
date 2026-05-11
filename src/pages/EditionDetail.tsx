@@ -112,6 +112,13 @@ const sanitizeAnswerParts = (parts: AnswerPart[]) =>
     }))
     .filter((part) => part.label.length > 0 && part.answer.length > 0);
 
+const hasIncompleteAnswerParts = (parts: AnswerPart[]) =>
+  parts.some((part) => {
+    const hasLabel = safeTrim(part.label).length > 0;
+    const hasAnswer = safeTrim(part.answer).length > 0;
+    return hasLabel !== hasAnswer;
+  });
+
 const toEditionAnswerPartsPayload = (parts: AnswerPart[]): EditionAnswerPartPayload => sanitizeAnswerParts(parts);
 
 const answerSummary = (item: EditionItem) => {
@@ -640,6 +647,7 @@ export function EditionDetailPage() {
   useEffect(() => {
     if (!activeItem || activeItemId === 'new') return;
     if (!itemEditDirty) return;
+    if (hasIncompleteAnswerParts(itemDraft.answer_parts)) return;
     const timeout = window.setTimeout(() => {
       void saveEdit(activeItem, { source: 'auto' });
     }, 700);
@@ -690,6 +698,10 @@ export function EditionDetailPage() {
       return;
     }
     if (gameTypeId === 'audio') {
+      if (hasIncompleteAnswerParts(itemDraft.answer_parts)) {
+        setItemValidationError('Complete each answer part or remove the incomplete row.');
+        return;
+      }
       const partsClean = sanitizeAnswerParts(itemDraft.answer_parts);
       if (partsClean.length === 0) {
         setItemValidationError('At least one answer part is required for audio items.');
@@ -698,6 +710,10 @@ export function EditionDetailPage() {
       answerPartsPayload = partsClean;
       answerValue = partsClean.map((part) => part.answer).join(' / ');
     } else if (isMusicPartBased) {
+      if (hasIncompleteAnswerParts(itemDraft.answer_parts)) {
+        setItemValidationError('Complete each answer part or remove the incomplete row.');
+        return;
+      }
       const partsClean = sanitizeAnswerParts(itemDraft.answer_parts);
       if (partsClean.length === 0) {
         setItemValidationError('At least one answer part is required.');
@@ -713,6 +729,10 @@ export function EditionDetailPage() {
       const partsSource = itemDraft.answer_parts.length > 0
         ? itemDraft.answer_parts
         : [{ label: 'Answer', answer: itemDraft.answer, points: itemDraft.answer_a_points }];
+      if (hasIncompleteAnswerParts(partsSource)) {
+        setItemValidationError('Complete each answer part or remove the incomplete row.');
+        return;
+      }
       const partsClean = sanitizeAnswerParts(partsSource);
       if (partsClean.length === 0) {
         if (!allowBlankVisualAnswer) {
@@ -873,6 +893,14 @@ export function EditionDetailPage() {
       return false;
     }
     if (gameTypeId === 'audio') {
+      if (hasIncompleteAnswerParts(itemDraft.answer_parts)) {
+        const message = 'Complete each answer part or remove the incomplete row.';
+        setItemValidationError(message);
+        if (source === 'auto') {
+          return false;
+        }
+        return false;
+      }
       const partsClean = sanitizeAnswerParts(itemDraft.answer_parts);
       if (partsClean.length === 0) {
         const message = 'At least one answer part is required for audio items.';
@@ -886,6 +914,14 @@ export function EditionDetailPage() {
       answerPartsPayload = partsClean;
       answerValue = partsClean.map((part) => part.answer).join(' / ');
     } else if (isMusicPartBased) {
+      if (hasIncompleteAnswerParts(itemDraft.answer_parts)) {
+        const message = 'Complete each answer part or remove the incomplete row.';
+        setItemValidationError(message);
+        if (source === 'auto') {
+          return false;
+        }
+        return false;
+      }
       const partsClean = sanitizeAnswerParts(itemDraft.answer_parts);
       if (partsClean.length === 0) {
         const message = 'At least one answer part is required.';
@@ -906,6 +942,14 @@ export function EditionDetailPage() {
       const partsSource = itemDraft.answer_parts.length > 0
         ? itemDraft.answer_parts
         : [{ label: 'Answer', answer: itemDraft.answer, points: itemDraft.answer_a_points }];
+      if (hasIncompleteAnswerParts(partsSource)) {
+        const message = 'Complete each answer part or remove the incomplete row.';
+        setItemValidationError(message);
+        if (source === 'auto') {
+          return false;
+        }
+        return false;
+      }
       const partsClean = sanitizeAnswerParts(partsSource);
       if (partsClean.length === 0) {
         if (!allowBlankVisualAnswer) {
