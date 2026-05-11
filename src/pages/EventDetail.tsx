@@ -649,7 +649,9 @@ const parseAnswerPartsJson = (value?: string | null): ParsedAnswerPart[] => {
         const answer = typeof entry.answer === 'string' ? entry.answer.trim() : '';
         const rawPoints = (entry as { points?: unknown }).points;
         const points =
-          typeof rawPoints === 'number' && Number.isFinite(rawPoints) ? Math.max(0, Math.trunc(rawPoints)) : 1;
+          typeof rawPoints === 'number' && Number.isFinite(rawPoints)
+            ? Math.max(0, Math.round(rawPoints * 100) / 100)
+            : 1;
         if (!label) return null;
         return { label, answer, points } as ParsedAnswerPart;
       })
@@ -673,7 +675,17 @@ const parseChoicesJson = (value?: string | null) => {
   }
 };
 
-const formatPointsLabel = (points: number) => `${points} ${points === 1 ? 'point' : 'points'}`;
+const formatPointsValue = (points: number) => {
+  const normalized = Math.max(0, Math.round(points * 100) / 100);
+  if (normalized === 0.5) return '1/2';
+  if (Number.isInteger(normalized)) return String(normalized);
+  return String(normalized);
+};
+
+const formatPointsLabel = (points: number) => {
+  const value = formatPointsValue(points);
+  return `${value} ${value === '1' || value === '1/2' ? 'point' : 'points'}`;
+};
 
 const deriveAnswerTypeLabels = (item: EditionItem): Array<{ label: string; points: number }> => {
   const parts = parseAnswerPartsJson(item.answer_parts_json);
@@ -691,22 +703,19 @@ const deriveAnswerTypeLabels = (item: EditionItem): Array<{ label: string; point
 };
 
 const resolveScoresheetAnswerColumns = (items: EditionItem[]) => {
-  for (const item of items) {
-    const labels = deriveAnswerTypeLabels(item);
-    if (labels.length >= 2) {
-      return [
-        `${labels[0].label} (${formatPointsLabel(labels[0].points)})`,
-        `${labels[1].label} (${formatPointsLabel(labels[1].points)})`
-      ];
-    }
-  }
-  return [] as string[];
+  const labels = items
+    .map((item) => deriveAnswerTypeLabels(item))
+    .reduce<Array<{ label: string; points: number }>>((best, current) => (current.length > best.length ? current : best), []);
+  if (labels.length < 2) return [] as string[];
+  return labels.map((label) => `${label.label} (${formatPointsLabel(label.points)})`);
 };
 
 const resolveInlineResponseLabel = (item: EditionItem) => {
   if (item.media_type === 'audio') return null;
   const labels = deriveAnswerTypeLabels(item);
   if (labels.length !== 1) return null;
+  const prompt = item.prompt?.trim();
+  if (prompt) return `${prompt} (${formatPointsLabel(labels[0].points)})`;
   const label = labels[0].label.trim();
   if (!label) return null;
   if (/^answer(?:\s+[ab])?$/i.test(label)) return null;
@@ -1169,7 +1178,7 @@ const renderRoundBlock = (
     const totalGap = gap * Math.max(0, colCount - 1);
     const colWidth = (responseWidth - totalGap) / colCount;
     answerColumns.forEach((columnLabel, index) => {
-      drawPdfText(page, columnLabel, {
+      drawPdfText(page, truncateText(fonts.regular, columnLabel, colWidth, labelSize), {
         x: textStartX + index * (colWidth + gap),
         y: labelY,
         size: labelSize,
@@ -1221,7 +1230,7 @@ const renderRoundBlock = (
           size: numberSize,
           font: fonts.regular
         });
-        const labelText = `${inlineLabel}:`;
+        const labelText = truncateText(fonts.regular, `${inlineLabel}:`, Math.max(24, responseWidth - 24), textSize);
         drawPdfText(page, labelText, {
           x: textStartX,
           y: rowY,
@@ -1343,7 +1352,7 @@ const renderRoundBlock = (
         });
       }
       if (showPointsColumn) {
-        const pointsText = String(resolveTotalPossiblePoints(item));
+        const pointsText = formatPointsValue(resolveTotalPossiblePoints(item));
         const pointsWidth = measurePdfText(fonts.bold, pointsText, textSize);
         drawPdfText(page, pointsText, {
           x: pointsX + Math.max(0, (pointsLineWidth - pointsWidth) / 2),
