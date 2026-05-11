@@ -710,9 +710,27 @@ const resolveScoresheetAnswerColumns = (items: EditionItem[]) => {
   return labels.map((label) => `${label.label} (${formatPointsLabel(label.points)})`);
 };
 
-const resolveInlineResponseLabel = (item: EditionItem) => {
+const isPlainPromptResponseItem = (item: EditionItem) =>
+  item.media_type !== 'audio' &&
+  Boolean(item.prompt?.trim()) &&
+  parseAnswerPartsJson(item.answer_parts_json).length === 0 &&
+  !(item.answer_a?.trim() ?? '') &&
+  !(item.answer_b?.trim() ?? '');
+
+const resolvePlainPromptResponsePoints = (item: EditionItem, bundle: RoundBundle) => {
+  const prompt = item.prompt?.trim() ?? '';
+  const roundText = `${bundle.round.label} ${bundle.round.scoresheet_title ?? ''}`;
+  if (/connection/i.test(prompt) || /missed connection/i.test(roundText)) return 5;
+  return 1;
+};
+
+const resolveInlineResponseLabel = (item: EditionItem, bundle: RoundBundle) => {
   if (item.media_type === 'audio') return null;
   const labels = deriveAnswerTypeLabels(item);
+  if (labels.length === 0 && isPlainPromptResponseItem(item)) {
+    const prompt = item.prompt?.trim();
+    if (prompt) return `${prompt} (${formatPointsLabel(resolvePlainPromptResponsePoints(item, bundle))})`;
+  }
   if (labels.length !== 1) return null;
   const prompt = item.prompt?.trim();
   if (prompt) return `${prompt} (${formatPointsLabel(labels[0].points)})`;
@@ -766,7 +784,7 @@ const resolveAnswerColumnValues = (item: EditionItem, columnCount: number) => {
   return Array.from({ length: columnCount }, (_, index) => (index === 0 ? single : '—'));
 };
 
-const resolveTotalPossiblePoints = (item: EditionItem) => {
+const resolveTotalPossiblePoints = (item: EditionItem, bundle?: RoundBundle) => {
   const parts = parseAnswerPartsJson(item.answer_parts_json);
   if (parts.length > 0) {
     const total = parts.reduce((sum, part) => sum + Math.max(0, part.points), 0);
@@ -777,6 +795,7 @@ const resolveTotalPossiblePoints = (item: EditionItem) => {
     const total = labels.reduce((sum, label) => sum + Math.max(0, label.points), 0);
     return total > 0 ? total : 1;
   }
+  if (bundle && isPlainPromptResponseItem(item)) return resolvePlainPromptResponsePoints(item, bundle);
   return 1;
 };
 
@@ -1220,7 +1239,7 @@ const renderRoundBlock = (
   for (let index = 0; index < itemCount; index += 1) {
     const item = items[index];
     const rowY = baseY - lineSpacing * index;
-    const inlineLabel = mode === 'scoresheet' ? resolveInlineResponseLabel(item) : null;
+    const inlineLabel = mode === 'scoresheet' ? resolveInlineResponseLabel(item, bundle) : null;
     if (mode === 'scoresheet') {
       if (inlineLabel) {
         numberedRow += 1;
@@ -1318,7 +1337,16 @@ const renderRoundBlock = (
       if (hasSplitAnswerColumns) {
         const answerTypeLabels = deriveAnswerTypeLabels(item);
         const isSingleLabeledResponse = answerTypeLabels.length === 1;
-        if (isSingleLabeledResponse) {
+        if (isPlainPromptResponseItem(item)) {
+          const prompt = item.prompt?.trim() ?? '';
+          const answer = truncateText(fonts.regular, `${prompt}: ${formatAnswer(item)}`, responseWidth, textSize);
+          drawPdfText(page, answer, {
+            x: textStartX,
+            y: rowY,
+            size: textSize,
+            font: fonts.regular
+          });
+        } else if (isSingleLabeledResponse) {
           const answer = truncateText(fonts.regular, formatAnswer(item), responseWidth, textSize);
           drawPdfText(page, answer, {
             x: textStartX,
@@ -1352,7 +1380,7 @@ const renderRoundBlock = (
         });
       }
       if (showPointsColumn) {
-        const pointsText = formatPointsValue(resolveTotalPossiblePoints(item));
+        const pointsText = formatPointsValue(resolveTotalPossiblePoints(item, bundle));
         const pointsWidth = measurePdfText(fonts.bold, pointsText, textSize);
         drawPdfText(page, pointsText, {
           x: pointsX + Math.max(0, (pointsLineWidth - pointsWidth) / 2),
