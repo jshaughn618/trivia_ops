@@ -724,16 +724,10 @@ const resolvePlainPromptResponsePoints = (item: EditionItem, bundle: RoundBundle
   return 1;
 };
 
-const resolveInlineResponseLabel = (item: EditionItem, bundle: RoundBundle) => {
+const resolveInlineResponseLabel = (item: EditionItem) => {
   if (item.media_type === 'audio') return null;
   const labels = deriveAnswerTypeLabels(item);
-  if (labels.length === 0 && isPlainPromptResponseItem(item)) {
-    const prompt = item.prompt?.trim();
-    if (prompt) return `${prompt} (${formatPointsLabel(resolvePlainPromptResponsePoints(item, bundle))})`;
-  }
   if (labels.length !== 1) return null;
-  const prompt = item.prompt?.trim();
-  if (prompt) return `${prompt} (${formatPointsLabel(labels[0].points)})`;
   const label = labels[0].label.trim();
   if (!label) return null;
   if (/^answer(?:\s+[ab])?$/i.test(label)) return null;
@@ -1239,7 +1233,7 @@ const renderRoundBlock = (
   for (let index = 0; index < itemCount; index += 1) {
     const item = items[index];
     const rowY = baseY - lineSpacing * index;
-    const inlineLabel = mode === 'scoresheet' ? resolveInlineResponseLabel(item, bundle) : null;
+    const inlineLabel = mode === 'scoresheet' ? resolveInlineResponseLabel(item) : null;
     if (mode === 'scoresheet') {
       if (inlineLabel) {
         numberedRow += 1;
