@@ -115,6 +115,68 @@ export type GameExampleItem = {
   audio_answer_key: string | null;
 };
 
+export type ItemSearchResult = {
+  item_id: Id;
+  edition_id: Id;
+  game_id: Id;
+  game_name: string;
+  game_code: string | null;
+  game_type_code: string | null;
+  edition_title: string;
+  edition_number: number | null;
+  edition_theme: string | null;
+  edition_status: EditionStatus;
+  item_ordinal: number;
+  question_type: 'text' | 'multiple_choice';
+  prompt: string;
+  answer: string;
+  answer_a: string | null;
+  answer_b: string | null;
+  answer_a_label: string | null;
+  answer_b_label: string | null;
+  answer_parts_json: string | null;
+  fun_fact: string | null;
+  media_type: MediaType | null;
+  media_caption: string | null;
+  round_usage_count: number;
+  event_usage_count: number;
+  last_used_at: string | null;
+};
+
+export type MusicDashboardArtist = {
+  artist: string;
+  song_usage_count: number;
+  unique_song_count: number;
+  event_count: number;
+  round_count: number;
+  last_used_at: string | null;
+};
+
+export type MusicDashboardSong = {
+  song: string;
+  artist: string;
+  usage_count: number;
+  event_count: number;
+  round_count: number;
+  last_used_at: string | null;
+  last_event_title: string | null;
+  last_location_name: string | null;
+};
+
+export type MusicDashboardSummary = {
+  song_usage_count: number;
+  unique_song_count: number;
+  artist_count: number;
+  event_count: number;
+  round_count: number;
+};
+
+export type MusicDashboardData = {
+  summary: MusicDashboardSummary;
+  artists: MusicDashboardArtist[];
+  songs: MusicDashboardSong[];
+};
+
 export type ScoresheetSpecialCheckbox = {
   header: string;
   detail: string | null;

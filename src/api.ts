@@ -12,7 +12,9 @@ import type {
   Game,
   GameEdition,
   GameType,
+  ItemSearchResult,
   Location,
+  MusicDashboardData,
   ScoresheetSpecialCheckbox,
   Team,
   User
@@ -333,6 +335,30 @@ export const api = {
     }),
   deleteEditionItem: (itemId: string) =>
     apiFetch<{ ok: true }>(`/api/edition-items/${itemId}`, { method: 'DELETE' }),
+  searchItems: (query: string, options?: { limit?: number }) => {
+    const search = new URLSearchParams();
+    search.set('q', query);
+    if (options?.limit) search.set('limit', String(options.limit));
+    return apiFetch<{ query: string; results: ItemSearchResult[] }>(`/api/item-search?${search.toString()}`);
+  },
+  getMusicDashboard: (params?: {
+    location_id?: string;
+    from?: string;
+    to?: string;
+    artist?: string;
+    song?: string;
+    limit?: number;
+  }) => {
+    const search = new URLSearchParams();
+    if (params?.location_id) search.set('location_id', params.location_id);
+    if (params?.from) search.set('from', params.from);
+    if (params?.to) search.set('to', params.to);
+    if (params?.artist) search.set('artist', params.artist);
+    if (params?.song) search.set('song', params.song);
+    if (params?.limit) search.set('limit', String(params.limit));
+    const query = search.toString();
+    return apiFetch<MusicDashboardData>(`/api/music-dashboard${query ? `?${query}` : ''}`);
+  },
 
   listEvents: () => apiFetch<Event[]>('/api/events'),
   createEvent: (payload: EventMutationPayload) =>

@@ -6,8 +6,12 @@ const LoginPage = lazy(() => import('./pages/Login').then((mod) => ({ default: m
 const AboutPage = lazy(() => import('./pages/About').then((mod) => ({ default: mod.AboutPage })));
 const BillboardPage = lazy(() => import('./pages/Billboard').then((mod) => ({ default: mod.BillboardPage })));
 const DashboardPage = lazy(() => import('./pages/Dashboard').then((mod) => ({ default: mod.DashboardPage })));
+const MusicDashboardPage = lazy(() =>
+  import('./pages/MusicDashboard').then((mod) => ({ default: mod.MusicDashboardPage }))
+);
 const GamesPage = lazy(() => import('./pages/Games').then((mod) => ({ default: mod.GamesPage })));
 const GameDetailPage = lazy(() => import('./pages/GameDetail').then((mod) => ({ default: mod.GameDetailPage })));
+const RoundSearchPage = lazy(() => import('./pages/RoundSearch').then((mod) => ({ default: mod.RoundSearchPage })));
 const EditionNewPage = lazy(() => import('./pages/EditionNew').then((mod) => ({ default: mod.EditionNewPage })));
 const EditionDetailPage = lazy(() => import('./pages/EditionDetail').then((mod) => ({ default: mod.EditionDetailPage })));
 const EventsPage = lazy(() => import('./pages/Events').then((mod) => ({ default: mod.EventsPage })));
@@ -77,6 +81,14 @@ export function App() {
           }
         />
         <Route
+          path="/music-dashboard"
+          element={
+            <RequireAdmin>
+              <MusicDashboardPage />
+            </RequireAdmin>
+          }
+        />
+        <Route
           path="/games"
           element={
             <RequireAdmin>
@@ -89,6 +101,14 @@ export function App() {
           element={
             <RequireAdmin>
               <GameDetailPage />
+            </RequireAdmin>
+          }
+        />
+        <Route
+          path="/round-search"
+          element={
+            <RequireAdmin>
+              <RoundSearchPage />
             </RequireAdmin>
           }
         />

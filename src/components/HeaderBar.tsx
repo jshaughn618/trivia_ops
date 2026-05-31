@@ -59,6 +59,16 @@ export function HeaderBar() {
                 Games
               </NavLink>
             )}
+            {isAdmin && (
+              <NavLink to="/music-dashboard" className={topNavLinkClass}>
+                Music
+              </NavLink>
+            )}
+            {isAdmin && (
+              <NavLink to="/round-search" className={topNavLinkClass}>
+                Search
+              </NavLink>
+            )}
             <NavLink to="/events" className={topNavLinkClass}>
               Events
             </NavLink>
@@ -87,6 +97,16 @@ export function HeaderBar() {
                   {isAdmin && (
                     <NavLink to="/games" className={menuNavLinkClass} onClick={() => setOpen(false)}>
                       Games
+                    </NavLink>
+                  )}
+                  {isAdmin && (
+                    <NavLink to="/music-dashboard" className={menuNavLinkClass} onClick={() => setOpen(false)}>
+                      Music Dashboard
+                    </NavLink>
+                  )}
+                  {isAdmin && (
+                    <NavLink to="/round-search" className={menuNavLinkClass} onClick={() => setOpen(false)}>
+                      Round Search
                     </NavLink>
                   )}
                   <NavLink to="/events" className={menuNavLinkClass} onClick={() => setOpen(false)}>
