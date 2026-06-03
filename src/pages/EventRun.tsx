@@ -156,6 +156,7 @@ export function EventRunPage() {
   const [stopAnswerReceivedNotice, setStopAnswerReceivedNotice] = useState<string | null>(null);
   const remoteAudioPlayingSeenRef = useRef(false);
   const lastAudioKeyRef = useRef<string | null>(null);
+  const resumeStoppedAudioPositionRef = useRef(false);
   const stopAnswerNoticeTimerRef = useRef<number | null>(null);
   const stopAnswerSubmissionKeyRef = useRef('');
   const stopAudioLeadInTimerRef = useRef<number | null>(null);
@@ -614,6 +615,7 @@ export function EventRunPage() {
       edition_item_id: editionItemId
     });
     if (res.ok) {
+      resumeStoppedAudioPositionRef.current = false;
       setAudioStoppedByTeamNotice(null);
       setStopAnswerReceivedNotice(null);
       setShowAnswer(false);
@@ -680,6 +682,7 @@ export function EventRunPage() {
       setAudioRetryAttempt(0);
     }
     cancelStopAudioLeadIn();
+    resumeStoppedAudioPositionRef.current = false;
     setAudioError(null);
     setAudioRequestId(null);
     remoteAudioPlayingSeenRef.current = false;
@@ -718,8 +721,12 @@ export function EventRunPage() {
       }
       // Only treat a remote false as a stop request after we've observed true at least once.
       if (remoteAudioPlayingSeenRef.current && !res.data.audio_playing) {
+        const stoppedByTeam = Boolean(
+          res.data.participant_audio_stopped_by_team_name || res.data.participant_audio_stopped_by_team_id
+        );
         audioRef.current?.pause();
         setLocalAudioPlaying(false);
+        resumeStoppedAudioPositionRef.current = stoppedByTeam;
         if (res.data.participant_audio_stopped_by_team_name) {
           setAudioStoppedByTeamNotice(`Stopped by ${res.data.participant_audio_stopped_by_team_name}`);
         } else if (res.data.participant_audio_stopped_by_team_id) {
@@ -803,8 +810,14 @@ export function EventRunPage() {
   const startStopAudioLeadIn = () => {
     if (!audioRef.current || !isDedicatedAudioStopFlowItem || !effectiveAudioKey) return;
     cancelStopAudioLeadIn();
+    const shouldResumeStoppedAudio =
+      resumeStoppedAudioPositionRef.current &&
+      Number.isFinite(audioRef.current.currentTime) &&
+      audioRef.current.currentTime > 0;
     audioRef.current.pause();
-    audioRef.current.currentTime = 0;
+    if (!shouldResumeStoppedAudio) {
+      audioRef.current.currentTime = 0;
+    }
     setAudioStoppedByTeamNotice(null);
     setStopAnswerReceivedNotice(null);
     setAudioError(null);
@@ -822,6 +835,7 @@ export function EventRunPage() {
             setLocalAudioPlaying(false);
             syncAudioPlaying(false);
           });
+          resumeStoppedAudioPositionRef.current = false;
           return null;
         }
         return prev - 1;
@@ -895,6 +909,7 @@ export function EventRunPage() {
   const nextItem = () => {
     if (index < items.length - 1) {
       cancelStopAudioLeadIn();
+      resumeStoppedAudioPositionRef.current = false;
       audioRef.current?.pause();
       const nextIndex = index + 1;
       setIndex(nextIndex);
@@ -921,6 +936,7 @@ export function EventRunPage() {
   const prevItem = () => {
     if (index > 0) {
       cancelStopAudioLeadIn();
+      resumeStoppedAudioPositionRef.current = false;
       audioRef.current?.pause();
       const prevIndex = index - 1;
       setIndex(prevIndex);
@@ -947,6 +963,7 @@ export function EventRunPage() {
   const setLive = async () => {
     if (!activeRound) return;
     cancelStopAudioLeadIn();
+    resumeStoppedAudioPositionRef.current = false;
     audioRef.current?.pause();
     const keepRoundId = roundId || activeRound.id;
     const otherLive = rounds.filter((round) => round.id !== activeRound.id && round.status === 'live');
@@ -973,6 +990,7 @@ export function EventRunPage() {
   const setPlanned = async () => {
     if (!activeRound) return;
     cancelStopAudioLeadIn();
+    resumeStoppedAudioPositionRef.current = false;
     audioRef.current?.pause();
     const keepRoundId = roundId || activeRound.id;
     await api.updateEventRound(activeRound.id, { status: 'planned' });
@@ -1366,7 +1384,7 @@ export function EventRunPage() {
                             </SecondaryButton>
                           ) : (
                             <PrimaryButton className="h-11" onClick={startStopAudioLeadIn} disabled={audioLoading}>
-                              Start Stop! Audio
+                              {audioStoppedByTeamNotice ? 'Resume Stop! Audio' : 'Start Stop! Audio'}
                             </PrimaryButton>
                           )}
                         </div>
