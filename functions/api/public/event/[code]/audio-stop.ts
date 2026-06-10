@@ -98,6 +98,10 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request }
     await recordFailure();
     return jsonError({ code: 'forbidden', message: 'Participant audio stop is not enabled for this game.' }, 403);
   }
+  if (event.current_item_ordinal === null || event.current_item_ordinal === undefined) {
+    await recordFailure();
+    return jsonError({ code: 'not_live', message: 'No active item is live.' }, 400);
+  }
 
   const team = await queryFirst<{ id: string; name: string; team_session_token: string | null }>(
     env,
@@ -113,7 +117,7 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request }
     return jsonError({ code: 'team_session_invalid', message: 'Team session expired. Please rejoin with your team code.' }, 401);
   }
 
-  const itemOrdinal = event.current_item_ordinal ?? 0;
+  const itemOrdinal = event.current_item_ordinal;
   const recordAttempt = async (wonRace: boolean, attemptedAt: string) => {
     const attemptId = crypto.randomUUID();
     for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -141,6 +145,42 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request }
     }
   };
   const stopEnabledAtMs = event.stop_enabled_at ? new Date(event.stop_enabled_at).getTime() : null;
+
+  const currentItem = await queryFirst<{ edition_item_id: string }>(
+    env,
+    `SELECT edition_item_id
+     FROM event_round_items
+     WHERE event_round_id = ?
+       AND ordinal = ?
+       AND COALESCE(deleted, 0) = 0
+     LIMIT 1`,
+    [event.active_round_id, itemOrdinal]
+  );
+  if (!currentItem && itemOrdinal !== 0) {
+    await recordFailure();
+    return jsonError({ code: 'not_current', message: 'Item is not active.' }, 400);
+  }
+
+  if (currentItem) {
+    const existingAnswer = await queryFirst<{ id: string; team_id: string | null }>(
+      env,
+      `SELECT id, team_id
+       FROM event_item_responses
+       WHERE event_id = ?
+         AND event_round_id = ?
+         AND edition_item_id = ?
+         AND response_parts_json IS NOT NULL
+         AND COALESCE(deleted, 0) = 0
+       ORDER BY submitted_at DESC, updated_at DESC
+       LIMIT 1`,
+      [event.id, event.active_round_id, currentItem.edition_item_id]
+    );
+    if (existingAnswer) {
+      const attemptedAt = nowIso();
+      await recordAttempt(false, attemptedAt);
+      return jsonError({ code: 'already_submitted', message: 'This item already has a submitted answer.' }, 409);
+    }
+  }
 
   if (!Boolean(event.audio_playing)) {
     const attemptedAt = nowIso();

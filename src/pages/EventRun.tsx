@@ -205,14 +205,7 @@ export function EventRunPage() {
       audio_playing: playing,
       ...(playing
         ? { stop_enable_delay_ms: STOP_ENABLE_DELAY_MS }
-        : { stop_enabled_at: null }),
-      ...(playing
-        ? {
-            participant_audio_stopped_by_team_id: null,
-            participant_audio_stopped_by_team_name: null,
-            participant_audio_stopped_at: null
-          }
-        : {})
+        : { stop_enabled_at: null })
     });
   }, [eventId]);
 

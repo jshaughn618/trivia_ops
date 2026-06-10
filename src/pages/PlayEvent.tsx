@@ -461,6 +461,7 @@ export function PlayEventPage() {
     showAudioClue &&
     activeRound?.allow_participant_audio_stop &&
     data?.live?.audio_playing &&
+    !data?.live?.participant_audio_stopped_by_team_id &&
     teamId &&
     teamSession
   );
