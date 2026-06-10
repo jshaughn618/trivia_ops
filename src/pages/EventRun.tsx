@@ -8,7 +8,17 @@ import { AccordionSection } from '../components/AccordionSection';
 import { ButtonLink, PrimaryButton, SecondaryButton } from '../components/Buttons';
 import { StampBadge } from '../components/StampBadge';
 import { createRequestId, logError, logInfo } from '../lib/log';
-import type { EditionItem, Event, EventRound, Game, GameEdition, Team, EventRoundAudioSubmission, EventRoundScore } from '../types';
+import type {
+  EditionItem,
+  Event,
+  EventRound,
+  EventRoundAudioStopAttempt,
+  Game,
+  GameEdition,
+  Team,
+  EventRoundAudioSubmission,
+  EventRoundScore
+} from '../types';
 
 const STOP_ENABLE_DELAY_MS = 1000;
 const STOP_AUDIO_LEAD_IN_SECONDS = 3;
@@ -182,6 +192,8 @@ export function EventRunPage() {
   const [audioSubmissionsLoading, setAudioSubmissionsLoading] = useState(false);
   const [audioSubmissionsError, setAudioSubmissionsError] = useState<string | null>(null);
   const [audioMarkingItemId, setAudioMarkingItemId] = useState<string | null>(null);
+  const [audioStopAttempts, setAudioStopAttempts] = useState<EventRoundAudioStopAttempt[]>([]);
+  const [audioStopAttemptsError, setAudioStopAttemptsError] = useState<string | null>(null);
   const [roundResponseLabels, setRoundResponseLabels] = useState<string[]>([]);
   const [roundResponseRows, setRoundResponseRows] = useState<EventRoundResponseRow[]>([]);
   const [roundResponsesLoading, setRoundResponsesLoading] = useState(false);
@@ -485,11 +497,60 @@ export function EventRunPage() {
     };
   }, [activeRound?.id, activeRound?.status, hasParticipantAnswerWorkflow, loadAudioSubmissions]);
 
+  const loadAudioStopAttempts = useCallback(
+    async (selectedRoundId: string, silent = false) => {
+      if (!selectedRoundId) {
+        setAudioStopAttempts([]);
+        return;
+      }
+      const res = await api.listRoundAudioStopAttempts(selectedRoundId);
+      if (res.ok) {
+        setAudioStopAttempts(res.data);
+        if (!silent) setAudioStopAttemptsError(null);
+      } else if (!silent) {
+        setAudioStopAttemptsError(formatApiError(res, 'Failed to load stop order.'));
+      }
+    },
+    []
+  );
+
+  useEffect(() => {
+    if (!activeRound?.id || !isStopMode) {
+      setAudioStopAttempts([]);
+      setAudioStopAttemptsError(null);
+      return;
+    }
+    void loadAudioStopAttempts(activeRound.id);
+  }, [activeRound?.id, activeRound?.status, isStopMode, loadAudioStopAttempts]);
+
+  useEffect(() => {
+    if (!activeRound?.id || activeRound.status !== 'live' || !isStopMode) return;
+    let closed = false;
+    const tick = async () => {
+      if (closed) return;
+      await loadAudioStopAttempts(activeRound.id, true);
+    };
+    const timer = window.setInterval(() => {
+      void tick();
+    }, 1000);
+    return () => {
+      closed = true;
+      window.clearInterval(timer);
+    };
+  }, [activeRound?.id, activeRound?.status, isStopMode, loadAudioStopAttempts]);
+
   const audioSubmissionByItemId = useMemo(
     () => new Map(audioSubmissions.map((submission) => [submission.edition_item_id, submission])),
     [audioSubmissions]
   );
   const currentAudioSubmission = item ? audioSubmissionByItemId.get(item.id) ?? null : null;
+  const currentItemStopAttempts = useMemo(
+    () =>
+      item
+        ? audioStopAttempts.filter((attempt) => attempt.item_ordinal === item.ordinal)
+        : [],
+    [audioStopAttempts, item]
+  );
   const currentExpectedAudioParts = useMemo(() => parseExpectedAnswerParts(item), [item]);
   const currentSubmittedParts = useMemo(
     () => parseAnswerParts(currentAudioSubmission?.response_parts_json),
@@ -609,6 +670,9 @@ export function EventRunPage() {
     });
     if (res.ok) {
       resumeStoppedAudioPositionRef.current = false;
+      setAudioStopAttempts((prev) =>
+        prev.filter((attempt) => attempt.item_ordinal !== res.data.ordinal)
+      );
       setAudioStoppedByTeamNotice(null);
       setStopAnswerReceivedNotice(null);
       setShowAnswer(false);
@@ -1717,6 +1781,50 @@ export function EventRunPage() {
                   </SecondaryButton>
                 )}
               </div>
+              {item && isDedicatedAudioStopFlowItem && (
+                <div className="surface-inset p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="ui-label">Stop Order</div>
+                    <div className="text-xs text-muted">
+                      {currentItemStopAttempts.length === 0
+                        ? 'No stop attempts yet'
+                        : `${currentItemStopAttempts.length} attempt${currentItemStopAttempts.length === 1 ? '' : 's'}`}
+                    </div>
+                  </div>
+                  {currentItemStopAttempts.length > 0 ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {currentItemStopAttempts.map((attempt, attemptIndex) => (
+                        <div
+                          key={attempt.id}
+                          className={`inline-flex min-h-10 items-center gap-2 rounded-md border px-3 py-2 text-sm ${
+                            attempt.won_race
+                              ? 'border-accent-ink bg-accent-ink/10 text-text'
+                              : 'border-border bg-panel text-text-soft'
+                          }`}
+                        >
+                          <span className="text-xs font-semibold tabular-nums text-muted">#{attemptIndex + 1}</span>
+                          <span className="font-medium text-text">{attempt.team_name}</span>
+                          {attempt.won_race && <span className="text-xs font-semibold text-accent-ink">Stopped</span>}
+                          <span className="text-xs tabular-nums text-muted">
+                            {new Date(attempt.attempted_at).toLocaleTimeString([], {
+                              hour: 'numeric',
+                              minute: '2-digit',
+                              second: '2-digit'
+                            })}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="mt-2 text-sm text-muted">Teams will appear here in the order their stop requests arrive.</div>
+                  )}
+                  {audioStopAttemptsError && (
+                    <div className="mt-3 rounded-lg border border-danger bg-panel px-3 py-2 text-sm text-danger-ink">
+                      {audioStopAttemptsError}
+                    </div>
+                  )}
+                </div>
+              )}
               {clearResponsesMessage && (
                 <div
                   className={`text-sm ${clearResponsesStatus === 'error' ? 'text-danger-ink' : 'text-muted'}`}
