@@ -134,6 +134,16 @@ const parseChoices = (choicesJson?: string | null) => {
   return [];
 };
 
+const formatStopAttemptTime = (value: string) => {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return '—';
+  const hours = parsed.getHours() % 12 || 12;
+  const minutes = String(parsed.getMinutes()).padStart(2, '0');
+  const seconds = String(parsed.getSeconds()).padStart(2, '0');
+  const milliseconds = String(parsed.getMilliseconds()).padStart(3, '0');
+  return `${hours}:${minutes}:${seconds}.${milliseconds}`;
+};
+
 export function EventRunPage() {
   const { eventId } = useParams();
   const query = useQuery();
@@ -1806,11 +1816,7 @@ export function EventRunPage() {
                           <span className="font-medium text-text">{attempt.team_name}</span>
                           {attempt.won_race && <span className="text-xs font-semibold text-accent-ink">Stopped</span>}
                           <span className="text-xs tabular-nums text-muted">
-                            {new Date(attempt.attempted_at).toLocaleTimeString([], {
-                              hour: 'numeric',
-                              minute: '2-digit',
-                              second: '2-digit'
-                            })}
+                            {formatStopAttemptTime(attempt.attempted_at)}
                           </span>
                         </div>
                       ))}
