@@ -687,6 +687,11 @@ const formatPointsLabel = (points: number) => {
   return `${value} ${value === '1' || value === '1/2' ? 'point' : 'points'}`;
 };
 
+const formatAnswerPartHeader = (label: string, points: number) => {
+  if (Math.max(0, Math.round(points * 100) / 100) === 0) return label;
+  return `${label} (${formatPointsLabel(points)})`;
+};
+
 const deriveAnswerTypeLabels = (item: EditionItem): Array<{ label: string; points: number }> => {
   const parts = parseAnswerPartsJson(item.answer_parts_json);
   if (parts.length > 0) {
@@ -707,7 +712,7 @@ const resolveScoresheetAnswerColumns = (items: EditionItem[]) => {
     .map((item) => deriveAnswerTypeLabels(item))
     .reduce<Array<{ label: string; points: number }>>((best, current) => (current.length > best.length ? current : best), []);
   if (labels.length < 2) return [] as string[];
-  return labels.map((label) => `${label.label} (${formatPointsLabel(label.points)})`);
+  return labels.map((label) => formatAnswerPartHeader(label.label, label.points));
 };
 
 const isPlainPromptResponseItem = (item: EditionItem) =>
@@ -731,7 +736,7 @@ const resolveInlineResponseLabel = (item: EditionItem) => {
   const label = labels[0].label.trim();
   if (!label) return null;
   if (/^answer(?:\s+[ab])?$/i.test(label)) return null;
-  return `${label} (${formatPointsLabel(labels[0].points)})`;
+  return formatAnswerPartHeader(label, labels[0].points);
 };
 
 const formatAnswer = (item: EditionItem) => {
