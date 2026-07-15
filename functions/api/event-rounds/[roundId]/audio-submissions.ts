@@ -218,14 +218,16 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
   await execute(
     env,
     `INSERT INTO event_round_scores
-     (id, event_round_id, team_id, score, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?)
+     (id, event_round_id, team_id, score, score_source, created_at, updated_at)
+     VALUES (?, ?, ?, ?, 'automatic', ?, ?)
      ON CONFLICT(event_round_id, team_id)
      DO UPDATE SET score = excluded.score,
+                   score_source = 'automatic',
                    updated_at = excluded.updated_at,
                    deleted = 0,
                    deleted_at = NULL,
-                   deleted_by = NULL`,
+                   deleted_by = NULL
+     WHERE event_round_scores.score_source <> 'manual' OR COALESCE(event_round_scores.deleted, 0) = 1`,
     [crypto.randomUUID(), params.roundId as string, existing.team_id, total, now, now]
   );
 
@@ -294,13 +296,26 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request, 
      GROUP BY team_id`,
     [params.roundId]
   );
-  await execute(env, `DELETE FROM event_round_scores WHERE event_round_id = ?`, [params.roundId]);
+  await execute(
+    env,
+    `DELETE FROM event_round_scores
+     WHERE event_round_id = ? AND score_source <> 'manual'`,
+    [params.roundId]
+  );
   for (const scoreRow of scoreRows) {
     await execute(
       env,
       `INSERT INTO event_round_scores
-       (id, event_round_id, team_id, score, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+       (id, event_round_id, team_id, score, score_source, created_at, updated_at)
+       VALUES (?, ?, ?, ?, 'automatic', ?, ?)
+       ON CONFLICT(event_round_id, team_id)
+       DO UPDATE SET score = excluded.score,
+                     score_source = 'automatic',
+                     updated_at = excluded.updated_at,
+                     deleted = 0,
+                     deleted_at = NULL,
+                     deleted_by = NULL
+       WHERE event_round_scores.score_source <> 'manual' OR COALESCE(event_round_scores.deleted, 0) = 1`,
       [crypto.randomUUID(), params.roundId as string, scoreRow.team_id, scoreRow.total ?? 0, now, now]
     );
   }

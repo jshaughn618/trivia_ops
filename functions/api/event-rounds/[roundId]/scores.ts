@@ -35,10 +35,10 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
     await execute(
       env,
       `INSERT INTO event_round_scores
-       (id, event_round_id, team_id, score, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?)
+       (id, event_round_id, team_id, score, score_source, created_at, updated_at)
+       VALUES (?, ?, ?, ?, 'manual', ?, ?)
        ON CONFLICT(event_round_id, team_id)
-       DO UPDATE SET score = excluded.score, updated_at = excluded.updated_at,
+       DO UPDATE SET score = excluded.score, score_source = 'manual', updated_at = excluded.updated_at,
        deleted = 0, deleted_at = NULL, deleted_by = NULL`,
       [crypto.randomUUID(), params.roundId, entry.team_id, entry.score, now, now]
     );

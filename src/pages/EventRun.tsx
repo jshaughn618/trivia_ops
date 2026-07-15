@@ -198,6 +198,9 @@ export function EventRunPage() {
   const [scoreDrafts, setScoreDrafts] = useState<Record<string, string>>({});
   const [scoreDraftBaseline, setScoreDraftBaseline] = useState<Record<string, string>>({});
   const [scoreDraftRoundId, setScoreDraftRoundId] = useState<string | null>(null);
+  const scoreAutosaveTimeoutRef = useRef<number | null>(null);
+  const scoreSaveQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const scoreSaveVersionRef = useRef(0);
   const [audioSubmissions, setAudioSubmissions] = useState<EventRoundAudioSubmission[]>([]);
   const [audioSubmissionsLoading, setAudioSubmissionsLoading] = useState(false);
   const [audioSubmissionsError, setAudioSubmissionsError] = useState<string | null>(null);
@@ -1218,30 +1221,53 @@ export function EventRunPage() {
     }
   };
 
-  const saveScores = async () => {
-    if (!activeRound) return;
+  const saveScores = async (
+    roundId = activeRound?.id ?? '',
+    snapshot = scoreDrafts,
+    baseline = scoreDraftBaseline
+  ) => {
+    if (!roundId) return true;
+    const payload = teams
+      .filter((team) => (snapshot[team.id] ?? '') !== (baseline[team.id] ?? ''))
+      .map((team) => {
+        const raw = snapshot[team.id];
+        const parsed = raw === undefined || raw === '' ? 0 : Number.parseFloat(raw);
+        return { team_id: team.id, score: Number.isFinite(parsed) ? parsed : 0 };
+      });
+    if (payload.length === 0) return true;
+
+    const saveVersion = ++scoreSaveVersionRef.current;
     setScoresSaving(true);
     setScoresSaveState('saving');
     setScoresError(null);
-    const payload = teams.map((team) => {
-      const raw = scoreDrafts[team.id];
-      const parsed = raw === undefined || raw === '' ? 0 : Number.parseFloat(raw);
-      return { team_id: team.id, score: Number.isFinite(parsed) ? parsed : 0 };
+    let succeeded = false;
+    const operation = scoreSaveQueueRef.current.catch(() => undefined).then(async () => {
+      try {
+        const res = await api.updateRoundScores(roundId, payload);
+        if (res.ok) {
+          succeeded = true;
+          setScoreDraftBaseline({ ...snapshot });
+          if (scoreSaveVersionRef.current === saveVersion) {
+            setScoresSaveState('saved');
+          }
+        } else if (scoreSaveVersionRef.current === saveVersion) {
+          setScoresError(formatApiError(res, 'Failed to save scores.'));
+          setScoresSaveState('error');
+        }
+      } catch (error) {
+        if (scoreSaveVersionRef.current === saveVersion) {
+          setScoresError(error instanceof Error ? error.message : 'Failed to save scores.');
+          setScoresSaveState('error');
+        }
+      } finally {
+        if (scoreSaveVersionRef.current === saveVersion) {
+          setScoresSaving(false);
+        }
+      }
     });
-    const res = await api.updateRoundScores(activeRound.id, payload);
-    if (!res.ok) {
-      setScoresError(formatApiError(res, 'Failed to save scores.'));
-      setScoresSaveState('error');
-    } else {
-      const nextBaseline: Record<string, string> = {};
-      teams.forEach((team) => {
-        const raw = scoreDrafts[team.id];
-        nextBaseline[team.id] = raw ?? '';
-      });
-      setScoreDraftBaseline(nextBaseline);
-      setScoresSaveState('saved');
-    }
-    setScoresSaving(false);
+    scoreSaveQueueRef.current = operation;
+    await operation;
+    return succeeded;
   };
 
   const scoresDirty = useMemo(() => {
@@ -1253,11 +1279,48 @@ export function EventRunPage() {
   useEffect(() => {
     if (!scoresOpen || !activeRound) return;
     if (!scoresDirty) return;
+    const roundId = activeRound.id;
+    const snapshot = { ...scoreDrafts };
+    const baseline = { ...scoreDraftBaseline };
     const timeout = window.setTimeout(() => {
-      saveScores();
+      scoreAutosaveTimeoutRef.current = null;
+      void saveScores(roundId, snapshot, baseline);
     }, 700);
-    return () => window.clearTimeout(timeout);
-  }, [scoresOpen, activeRound, scoresDirty, scoreDrafts, teams]);
+    scoreAutosaveTimeoutRef.current = timeout;
+    return () => {
+      window.clearTimeout(timeout);
+      if (scoreAutosaveTimeoutRef.current === timeout) {
+        scoreAutosaveTimeoutRef.current = null;
+      }
+    };
+  }, [scoresOpen, activeRound, scoresDirty, scoreDrafts, scoreDraftBaseline, teams]);
+
+  const closeScores = async () => {
+    if (scoreAutosaveTimeoutRef.current !== null) {
+      window.clearTimeout(scoreAutosaveTimeoutRef.current);
+      scoreAutosaveTimeoutRef.current = null;
+    }
+    if (scoresDirty && scoreDraftRoundId) {
+      const saved = await saveScores(scoreDraftRoundId, { ...scoreDrafts }, { ...scoreDraftBaseline });
+      if (!saved) return;
+    }
+    setScoresOpen(false);
+  };
+
+  const selectRound = async (nextRoundId: string) => {
+    if (nextRoundId === roundId) return;
+    if (scoreAutosaveTimeoutRef.current !== null) {
+      window.clearTimeout(scoreAutosaveTimeoutRef.current);
+      scoreAutosaveTimeoutRef.current = null;
+    }
+    if (scoresOpen && scoresDirty && scoreDraftRoundId) {
+      const saved = await saveScores(scoreDraftRoundId, { ...scoreDrafts }, { ...scoreDraftBaseline });
+      if (!saved) return;
+    }
+    setScoresOpen(false);
+    preselectRef.current = true;
+    setRoundId(nextRoundId);
+  };
 
   useEffect(() => {
     if (scoresSaveState !== 'saved') return;
@@ -1912,10 +1975,7 @@ export function EventRunPage() {
                   <button
                     key={round.id}
                     type="button"
-                    onClick={() => {
-                      preselectRef.current = true;
-                      setRoundId(round.id);
-                    }}
+                    onClick={() => void selectRound(round.id)}
                     className={`surface-inset w-full p-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-ink focus-visible:ring-offset-2 focus-visible:ring-offset-bg ${
                       selected ? 'bg-panel3 border-accent-ink shadow-float' : ''
                     } ${isCompleted ? 'opacity-80' : ''}`}
@@ -2007,7 +2067,7 @@ export function EventRunPage() {
               <div className="text-sm font-display uppercase tracking-[0.25em]">Enter Scores</div>
               <button
                 type="button"
-                onClick={() => setScoresOpen(false)}
+                onClick={() => void closeScores()}
                 className="text-xs uppercase tracking-[0.2em] text-muted"
               >
                 Close
@@ -2051,7 +2111,7 @@ export function EventRunPage() {
                 {scoresSaveState === 'saving' && <span className="text-muted">Saving changes…</span>}
                 {scoresSaveState === 'saved' && <span className="text-accent-ink">All changes saved.</span>}
               </div>
-              <SecondaryButton onClick={() => setScoresOpen(false)}>Close</SecondaryButton>
+              <SecondaryButton onClick={() => void closeScores()} disabled={scoresSaving}>Close</SecondaryButton>
             </div>
           </div>
         </div>

@@ -1857,6 +1857,7 @@ export function EventDetailPage() {
   const [scoreSaveState, setScoreSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [scoreSaveError, setScoreSaveError] = useState<string | null>(null);
   const [scoreLoading, setScoreLoading] = useState(false);
+  const [scoreRoundChanging, setScoreRoundChanging] = useState(false);
   const [scoreScanOpen, setScoreScanOpen] = useState(false);
   const [scoreEntryMode, setScoreEntryMode] = useState<'scan' | 'manual'>('scan');
   const [scoreScanStatus, setScoreScanStatus] = useState<'idle' | 'requesting' | 'scanning' | 'unsupported'>('idle');
@@ -1916,6 +1917,9 @@ export function EventDetailPage() {
   const scoreScanVideoRef = useRef<HTMLVideoElement | null>(null);
   const scoreScanStreamRef = useRef<MediaStream | null>(null);
   const scoreScanTimeoutRef = useRef<number | null>(null);
+  const scoreAutosaveTimeoutRef = useRef<number | null>(null);
+  const scoreSaveQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const scoreSaveVersionRef = useRef(0);
 
   const loadCore = async (isActive: () => boolean = () => true) => {
     if (!eventId) return;
@@ -2556,7 +2560,7 @@ export function EventDetailPage() {
   }, [teamEditState]);
 
   const loadScores = async (roundId: string) => {
-    if (!roundId) return;
+    if (!roundId) return false;
     setScoreSaveError(null);
     setScoreSaveState('idle');
     const res = await api.listRoundScores(roundId);
@@ -2568,27 +2572,59 @@ export function EventDetailPage() {
       setScoreMap(map);
       setScoreMapBaseline(map);
       setScoreBaselineRoundId(roundId);
+      return true;
     }
+    setScoreSaveState('error');
+    setScoreSaveError(formatApiError(res, 'Failed to load scores.'));
+    return false;
   };
 
-  const saveScores = async () => {
-    if (!scoreRoundId) return;
+  const saveScores = async (
+    roundId = scoreRoundId,
+    snapshot = scoreMap,
+    baseline = scoreMapBaseline
+  ) => {
+    if (!roundId) return true;
+    const scores = teams
+      .filter((team) => Number(snapshot[team.id] ?? 0) !== Number(baseline[team.id] ?? 0))
+      .map((team) => ({
+        team_id: team.id,
+        score: Number(snapshot[team.id] ?? 0)
+      }));
+    if (scores.length === 0) return true;
+
+    const saveVersion = ++scoreSaveVersionRef.current;
     setScoreLoading(true);
     setScoreSaveState('saving');
     setScoreSaveError(null);
-    const scores = teams.map((team) => ({
-      team_id: team.id,
-      score: Number(scoreMap[team.id] ?? 0)
-    }));
-    const res = await api.updateRoundScores(scoreRoundId, scores);
-    if (res.ok) {
-      setScoreMapBaseline({ ...scoreMap });
-      setScoreSaveState('saved');
-    } else {
-      setScoreSaveState('error');
-      setScoreSaveError(formatApiError(res, 'Failed to save scores.'));
-    }
-    setScoreLoading(false);
+    let succeeded = false;
+    const operation = scoreSaveQueueRef.current.catch(() => undefined).then(async () => {
+      try {
+        const res = await api.updateRoundScores(roundId, scores);
+        if (res.ok) {
+          succeeded = true;
+          setScoreMapBaseline({ ...snapshot });
+          if (scoreSaveVersionRef.current === saveVersion) {
+            setScoreSaveState('saved');
+          }
+        } else if (scoreSaveVersionRef.current === saveVersion) {
+          setScoreSaveState('error');
+          setScoreSaveError(formatApiError(res, 'Failed to save scores.'));
+        }
+      } catch (error) {
+        if (scoreSaveVersionRef.current === saveVersion) {
+          setScoreSaveState('error');
+          setScoreSaveError(error instanceof Error ? error.message : 'Failed to save scores.');
+        }
+      } finally {
+        if (scoreSaveVersionRef.current === saveVersion) {
+          setScoreLoading(false);
+        }
+      }
+    });
+    scoreSaveQueueRef.current = operation;
+    await operation;
+    return succeeded;
   };
 
   const scoreDirty = useMemo(
@@ -2600,11 +2636,42 @@ export function EventDetailPage() {
 
   useEffect(() => {
     if (!scoreRoundId || !scoreDirty) return;
+    const roundId = scoreRoundId;
+    const snapshot = { ...scoreMap };
+    const baseline = { ...scoreMapBaseline };
     const timeout = window.setTimeout(() => {
-      saveScores();
+      scoreAutosaveTimeoutRef.current = null;
+      void saveScores(roundId, snapshot, baseline);
     }, 700);
-    return () => window.clearTimeout(timeout);
-  }, [scoreRoundId, scoreDirty, scoreMap, teams]);
+    scoreAutosaveTimeoutRef.current = timeout;
+    return () => {
+      window.clearTimeout(timeout);
+      if (scoreAutosaveTimeoutRef.current === timeout) {
+        scoreAutosaveTimeoutRef.current = null;
+      }
+    };
+  }, [scoreRoundId, scoreDirty, scoreMap, scoreMapBaseline, teams]);
+
+  const changeScoreRound = async (nextRoundId: string) => {
+    if (!nextRoundId || nextRoundId === scoreRoundId) return true;
+    if (scoreAutosaveTimeoutRef.current !== null) {
+      window.clearTimeout(scoreAutosaveTimeoutRef.current);
+      scoreAutosaveTimeoutRef.current = null;
+    }
+    setScoreRoundChanging(true);
+    try {
+      if (scoreDirty) {
+        const saved = await saveScores(scoreRoundId, { ...scoreMap }, { ...scoreMapBaseline });
+        if (!saved) return false;
+      }
+      const loaded = await loadScores(nextRoundId);
+      if (!loaded) return false;
+      setScoreRoundId(nextRoundId);
+      return true;
+    } finally {
+      setScoreRoundChanging(false);
+    }
+  };
 
   useEffect(() => {
     if (scoreSaveState !== 'saved') return;
@@ -2640,13 +2707,13 @@ export function EventDetailPage() {
     setScoreScanSaving(false);
   };
 
-  const openScoreScanner = (mode: 'scan' | 'manual' = 'scan') => {
+  const openScoreScanner = async (mode: 'scan' | 'manual' = 'scan') => {
     const defaultRoundId = lastCompletedRoundId || scoreRoundId || rounds[0]?.id || '';
-    setScoreScanRoundId(defaultRoundId);
-    if (defaultRoundId) {
-      setScoreRoundId(defaultRoundId);
-      void loadScores(defaultRoundId);
+    if (defaultRoundId && defaultRoundId !== scoreRoundId) {
+      const changed = await changeScoreRound(defaultRoundId);
+      if (!changed) return;
     }
+    setScoreScanRoundId(defaultRoundId);
     setScoreEntryMode(mode);
     setScoreScanOpen(true);
     setScoreScanStatus('idle');
@@ -2660,7 +2727,7 @@ export function EventDetailPage() {
   };
 
   const openManualScoreEntry = () => {
-    openScoreScanner('manual');
+    void openScoreScanner('manual');
   };
 
   const assignScannedTeam = (teamCode: string, sourceText?: string) => {
@@ -3219,9 +3286,9 @@ export function EventDetailPage() {
                   value={scoreRoundId}
                   onChange={(event) => {
                     const value = event.target.value;
-                    setScoreRoundId(value);
-                    loadScores(value);
+                    void changeScoreRound(value);
                   }}
+                  disabled={scoreRoundChanging}
                 >
                   <option value="">Choose round</option>
                   {rounds.map((round) => (
@@ -3307,10 +3374,11 @@ export function EventDetailPage() {
                       value={scoreScanRoundId}
                       onChange={(event) => {
                         const value = event.target.value;
-                        setScoreScanRoundId(value);
-                        setScoreRoundId(value);
-                        void loadScores(value);
+                        void changeScoreRound(value).then((changed) => {
+                          if (changed) setScoreScanRoundId(value);
+                        });
                       }}
+                      disabled={scoreRoundChanging}
                     >
                       <option value="">Choose round</option>
                       {rounds.map((round) => (
@@ -3751,9 +3819,9 @@ export function EventDetailPage() {
           value={scoreRoundId}
           onChange={(event) => {
             const value = event.target.value;
-            setScoreRoundId(value);
-            loadScores(value);
+            void changeScoreRound(value);
           }}
+          disabled={scoreRoundChanging}
         >
           <option value="">Choose round</option>
           {rounds.map((round) => (
@@ -4538,10 +4606,11 @@ export function EventDetailPage() {
                     value={scoreScanRoundId}
                     onChange={(event) => {
                       const value = event.target.value;
-                      setScoreScanRoundId(value);
-                      setScoreRoundId(value);
-                      void loadScores(value);
+                      void changeScoreRound(value).then((changed) => {
+                        if (changed) setScoreScanRoundId(value);
+                      });
                     }}
+                    disabled={scoreRoundChanging}
                   >
                     <option value="">Choose round</option>
                     {rounds.map((round) => (

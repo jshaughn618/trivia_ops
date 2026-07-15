@@ -150,18 +150,22 @@ export const onRequestPut: AppHandler<'roundId'> = async ({ env, params, request
           }
         }
 
-        const existingScore = await queryFirst<{ id: string; deleted: number }>(
+        const existingScore = await queryFirst<{ id: string; deleted: number; score_source: string }>(
           env,
-          `SELECT id, deleted FROM event_round_scores
+          `SELECT id, deleted, score_source FROM event_round_scores
            WHERE event_round_id = ? AND team_id = ?`,
           [params.roundId, team.id]
         );
 
+        if (existingScore?.score_source === 'manual' && Number(existingScore.deleted ?? 0) === 0) {
+          continue;
+        }
         if (existingScore) {
           await execute(
             env,
             `UPDATE event_round_scores
-             SET score = ?, updated_at = ?, deleted = 0, deleted_at = NULL, deleted_by = NULL
+             SET score = ?, score_source = 'automatic', updated_at = ?,
+                 deleted = 0, deleted_at = NULL, deleted_by = NULL
              WHERE id = ?`,
             [score, now, existingScore.id]
           );
@@ -169,8 +173,8 @@ export const onRequestPut: AppHandler<'roundId'> = async ({ env, params, request
           await execute(
             env,
             `INSERT INTO event_round_scores
-             (id, event_round_id, team_id, score, created_at, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?)`,
+             (id, event_round_id, team_id, score, score_source, created_at, updated_at)
+             VALUES (?, ?, ?, ?, 'automatic', ?, ?)`,
             [crypto.randomUUID(), params.roundId, team.id, score, now, now]
           );
         }
