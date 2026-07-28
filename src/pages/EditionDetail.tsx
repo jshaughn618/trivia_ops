@@ -65,6 +65,11 @@ const MUSIC_AI_PARSE_LIMIT = 60;
 const MUSIC_AI_INSTRUCTION_LIMIT = 600;
 const SPEED_ROUND_MAX_ITEMS = 60;
 const VISUAL_BULK_MAX_ITEMS = 80;
+const MAX_UPLOAD_IMAGE_BYTES = 5 * 1024 * 1024;
+const IMAGE_UPLOAD_REENCODE_BYTES = Math.floor(MAX_UPLOAD_IMAGE_BYTES * 0.9);
+const IMAGE_UPLOAD_MAX_EDGE = 1600;
+const IMAGE_UPLOAD_JPEG_QUALITY_STEPS = [0.86, 0.78, 0.68, 0.58];
+const IMAGE_UPLOAD_EDGE_STEPS = [1, 0.82, 0.68];
 
 const parseChoices = (choicesJson: string | null) => {
   if (!choicesJson) return ['', '', '', ''];
@@ -157,7 +162,81 @@ const answerSummary = (item: EditionItem) => {
 };
 
 const isSvgFile = (file: File) => file.type === 'image/svg+xml' || /\.svg$/i.test(file.name);
+const isImageFileName = (name: string) => /\.(png|jpe?g|webp|gif|bmp|svg)$/i.test(name);
 const isMp3File = (file: File) => file.type === 'audio/mpeg' || file.name.toLowerCase().endsWith('.mp3');
+
+const canvasToBlob = (canvas: HTMLCanvasElement, type: string, quality?: number) =>
+  new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (value) => {
+        if (!value) {
+          reject(new Error('Image conversion failed.'));
+          return;
+        }
+        resolve(value);
+      },
+      type,
+      quality
+    );
+  });
+
+const jpegUploadName = (name: string) => {
+  const withoutExtension = name.replace(/\.[^.]+$/, '').trim();
+  return `${withoutExtension || 'image'}.jpg`;
+};
+
+const prepareVisualUploadFile = async (file: File) => {
+  if ((!file.type.startsWith('image/') && !isImageFileName(file.name)) || isSvgFile(file)) return file;
+
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await createImageBitmap(file);
+  } catch {
+    return file;
+  }
+
+  try {
+    const shouldResize =
+      file.size > IMAGE_UPLOAD_REENCODE_BYTES ||
+      bitmap.width > IMAGE_UPLOAD_MAX_EDGE ||
+      bitmap.height > IMAGE_UPLOAD_MAX_EDGE;
+    if (!shouldResize) return file;
+
+    let bestBlob: Blob | null = null;
+    const baseScale = Math.min(1, IMAGE_UPLOAD_MAX_EDGE / bitmap.width, IMAGE_UPLOAD_MAX_EDGE / bitmap.height);
+
+    for (const edgeStep of IMAGE_UPLOAD_EDGE_STEPS) {
+      const scale = baseScale * edgeStep;
+      const width = Math.max(1, Math.round(bitmap.width * scale));
+      const height = Math.max(1, Math.round(bitmap.height * scale));
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const context = canvas.getContext('2d');
+      if (!context) throw new Error('Canvas is unavailable.');
+      context.fillStyle = '#ffffff';
+      context.fillRect(0, 0, width, height);
+      context.imageSmoothingEnabled = true;
+      context.imageSmoothingQuality = 'high';
+      context.drawImage(bitmap, 0, 0, width, height);
+
+      for (const quality of IMAGE_UPLOAD_JPEG_QUALITY_STEPS) {
+        const candidate = await canvasToBlob(canvas, 'image/jpeg', quality);
+        if (!bestBlob || candidate.size < bestBlob.size) {
+          bestBlob = candidate;
+        }
+        if (candidate.size <= MAX_UPLOAD_IMAGE_BYTES) {
+          return new File([candidate], jpegUploadName(file.name), { type: 'image/jpeg', lastModified: file.lastModified });
+        }
+      }
+    }
+
+    if (!bestBlob || (file.size <= MAX_UPLOAD_IMAGE_BYTES && bestBlob.size >= file.size)) return file;
+    return new File([bestBlob], jpegUploadName(file.name), { type: 'image/jpeg', lastModified: file.lastModified });
+  } finally {
+    bitmap.close();
+  }
+};
 
 const toBase64 = (value: string) => {
   const bytes = new TextEncoder().encode(value);
@@ -1113,11 +1192,14 @@ export function EditionDetailPage() {
       return;
     }
     let uploadFile = file;
-    if (!isAudioGame && isSvgFile(file)) {
+    if (!isAudioGame) {
       try {
-        uploadFile = await rasterizeSvgFile(file);
+        if (isSvgFile(file)) {
+          uploadFile = await rasterizeSvgFile(file);
+        }
+        uploadFile = await prepareVisualUploadFile(uploadFile);
       } catch (error) {
-        setMediaError(error instanceof Error ? error.message : 'SVG conversion failed.');
+        setMediaError(error instanceof Error ? error.message : 'Image conversion failed.');
         return;
       }
     }
@@ -1183,11 +1265,14 @@ export function EditionDetailPage() {
       return;
     }
     let uploadFile = file;
-    if (!isAudioGame && isSvgFile(file)) {
+    if (!isAudioGame) {
       try {
-        uploadFile = await rasterizeSvgFile(file);
+        if (isSvgFile(file)) {
+          uploadFile = await rasterizeSvgFile(file);
+        }
+        uploadFile = await prepareVisualUploadFile(uploadFile);
       } catch (error) {
-        setMediaError(error instanceof Error ? error.message : 'SVG conversion failed.');
+        setMediaError(error instanceof Error ? error.message : 'Image conversion failed.');
         return;
       }
     }
@@ -2066,7 +2151,7 @@ export function EditionDetailPage() {
 
   const isLikelyImageFile = (file: File) => {
     if (file.type.startsWith('image/')) return true;
-    return /\.(png|jpe?g|webp|gif|bmp|svg)$/i.test(file.name);
+    return isImageFileName(file.name);
   };
 
   const buildVisualAnswerPrompt = (prompt: string) =>
@@ -2826,15 +2911,16 @@ export function EditionDetailPage() {
     for (const [ordinal, entry] of sorted) {
       try {
         let uploadFile = entry.file;
-        if (isSvgFile(entry.file)) {
-          try {
+        try {
+          if (isSvgFile(entry.file)) {
             uploadFile = await rasterizeSvgFile(entry.file);
-          } catch (error) {
-            errors.push(
-              `SVG conversion failed for ${entry.file.name}: ${error instanceof Error ? error.message : 'Unknown error'}`
-            );
-            continue;
           }
+          uploadFile = await prepareVisualUploadFile(uploadFile);
+        } catch (error) {
+          errors.push(
+            `Image conversion failed for ${entry.file.name}: ${error instanceof Error ? error.message : 'Unknown error'}`
+          );
+          continue;
         }
 
         const uploadRes = await api.uploadMedia(uploadFile, 'image');

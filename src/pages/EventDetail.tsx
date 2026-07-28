@@ -41,6 +41,8 @@ const IMAGE_SHEET_SECTION_HEIGHT = PAGE_HEIGHT / IMAGE_SHEET_SECTION_COUNT;
 const IMAGE_SHEET_COLUMNS = 5;
 const IMAGE_SHEET_ROW_COUNT = 2;
 const IMAGE_SHEET_ITEMS_PER_SET = IMAGE_SHEET_COLUMNS * IMAGE_SHEET_ROW_COUNT;
+const IMAGE_SHEET_EMBED_MAX_EDGE = 520;
+const IMAGE_SHEET_EMBED_JPEG_QUALITY = 0.82;
 
 type RoundBundle = {
   round: EventRound;
@@ -156,33 +158,59 @@ const chunkArray = <T,>(items: T[], size: number) => {
   return chunks;
 };
 
-const blobToPngArrayBuffer = async (blob: Blob) => {
+const canvasToBlob = (canvas: HTMLCanvasElement, type: string, quality?: number) =>
+  new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (result) => {
+        if (!result) {
+          reject(new Error('Image conversion failed.'));
+          return;
+        }
+        resolve(result);
+      },
+      type,
+      quality
+    );
+  });
+
+const rasterizeImageBlob = async (
+  blob: Blob,
+  options: { type: 'image/png' | 'image/jpeg'; maxEdge?: number; quality?: number }
+) => {
   const bitmap = await createImageBitmap(blob);
   const canvas = document.createElement('canvas');
-  canvas.width = bitmap.width;
-  canvas.height = bitmap.height;
+  const scale = options.maxEdge ? Math.min(1, options.maxEdge / bitmap.width, options.maxEdge / bitmap.height) : 1;
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
   const context = canvas.getContext('2d');
   if (!context) {
     bitmap.close();
     throw new Error('Canvas unavailable for image conversion.');
   }
-  context.drawImage(bitmap, 0, 0);
+  if (options.type === 'image/jpeg') {
+    context.fillStyle = '#ffffff';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+  }
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = 'high';
+  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
   bitmap.close();
 
-  const pngBlob = await new Promise<Blob>((resolve, reject) => {
-    canvas.toBlob(
-      (result) => {
-        if (!result) {
-          reject(new Error('Failed to convert image to PNG.'));
-          return;
-        }
-        resolve(result);
-      },
-      'image/png',
-      1
-    );
-  });
+  return canvasToBlob(canvas, options.type, options.quality);
+};
+
+const blobToPngArrayBuffer = async (blob: Blob) => {
+  const pngBlob = await rasterizeImageBlob(blob, { type: 'image/png' });
   return pngBlob.arrayBuffer();
+};
+
+const blobToImageSheetJpeg = async (blob: Blob) => {
+  const jpegBlob = await rasterizeImageBlob(blob, {
+    type: 'image/jpeg',
+    maxEdge: IMAGE_SHEET_EMBED_MAX_EDGE,
+    quality: IMAGE_SHEET_EMBED_JPEG_QUALITY
+  });
+  return jpegBlob.arrayBuffer();
 };
 
 const drawImageSheetSection = (
@@ -3160,10 +3188,10 @@ export function EventDetailPage() {
         if (!response.ok) return null;
         const blob = await response.blob();
         if (!blob || blob.size === 0) return null;
-        const pngBytes = await blobToPngArrayBuffer(blob);
+        const jpegBytes = await blobToImageSheetJpeg(blob);
         return {
-          bytes: pngBytes,
-          contentType: 'image/png'
+          bytes: jpegBytes,
+          contentType: 'image/jpeg'
         };
       });
 
