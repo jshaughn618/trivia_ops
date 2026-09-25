@@ -425,6 +425,13 @@ export function EditionDetailPage() {
   const [infoSaveState, setInfoSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [infoSaveError, setInfoSaveError] = useState<string | null>(null);
   const [activeItemId, setActiveItemId] = useState<string | null>(null);
+  const [savedItemDraft, setSavedItemDraft] = useState<ItemDraft | null>(null);
+  const [itemSavePending, setItemSavePending] = useState(false);
+  const itemSavePendingRef = useRef(false);
+  const failedItemDraftRef = useRef<ItemDraft | null>(null);
+  const editSessionRef = useRef(0);
+  const currentEditorRef = useRef({ activeItemId, itemDraft });
+  currentEditorRef.current = { activeItemId, itemDraft };
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [itemMenuId, setItemMenuId] = useState<string | null>(null);
   const itemMenuRef = useRef<HTMLDivElement | null>(null);
@@ -609,15 +616,10 @@ export function EditionDetailPage() {
     return { ...draft, answer: nextAnswer };
   };
 
-  const activeItemDraft = useMemo(() => {
-    if (!activeItem || activeItemId === 'new') return null;
-    return buildItemDraftFromItem(activeItem);
-  }, [activeItem, activeItemId, gameTypeId, defaultMusicAnswerParts]);
-
   const itemEditDirty = useMemo(() => {
-    if (!activeItem || activeItemId === 'new' || !activeItemDraft) return false;
-    return JSON.stringify(normalizeItemDraft(itemDraft)) !== JSON.stringify(normalizeItemDraft(activeItemDraft));
-  }, [activeItem, activeItemId, activeItemDraft, itemDraft]);
+    if (!activeItem || activeItemId === 'new' || !savedItemDraft) return false;
+    return JSON.stringify(normalizeItemDraft(itemDraft)) !== JSON.stringify(normalizeItemDraft(savedItemDraft));
+  }, [activeItem, activeItemId, savedItemDraft, itemDraft]);
 
   const filteredGames = useMemo(() => {
     if (!gameTypeId) return games;
@@ -741,13 +743,13 @@ export function EditionDetailPage() {
 
   useEffect(() => {
     if (!activeItem || activeItemId === 'new') return;
-    if (!itemEditDirty) return;
+    if (!itemEditDirty || itemSavePending || failedItemDraftRef.current === itemDraft) return;
     if (hasIncompleteAnswerParts(itemDraft.answer_parts)) return;
     const timeout = window.setTimeout(() => {
       void saveEdit(activeItem, { source: 'auto' });
     }, 700);
     return () => window.clearTimeout(timeout);
-  }, [activeItem, activeItemId, itemEditDirty, itemDraft]);
+  }, [activeItem, activeItemId, itemEditDirty, itemDraft, itemSavePending]);
 
   useEffect(() => {
     if (itemSaveState !== 'saved') return;
@@ -923,6 +925,7 @@ export function EditionDetailPage() {
   };
 
   const startEdit = (item: EditionItem) => {
+    editSessionRef.current += 1;
     setActiveItemId(item.id);
     setRefineOpen(false);
     setRefineOptions([]);
@@ -932,10 +935,13 @@ export function EditionDetailPage() {
     setItemSaveError(null);
     setImageAnswerError(null);
     setImageAnswerLoading(false);
-    setItemDraft(buildItemDraftFromItem(item));
+    const draft = buildItemDraftFromItem(item);
+    setItemDraft(draft);
+    setSavedItemDraft(draft);
   };
 
   const cancelEdit = () => {
+    editSessionRef.current += 1;
     setActiveItemId(null);
     setItemDraft({ ...emptyItem, item_mode: 'text', answer_parts: [] });
     setItemValidationError(null);
@@ -946,6 +952,11 @@ export function EditionDetailPage() {
   };
 
   const saveEdit = async (item: EditionItem, options?: { closeAfterSave?: boolean; source?: 'manual' | 'auto' }) => {
+    // Keep requests ordered, including manual saves during autosave.
+    if (itemSavePendingRef.current) return false;
+    const editSession = editSessionRef.current;
+    const isCurrentEditor = () =>
+      editSessionRef.current === editSession && currentEditorRef.current.activeItemId === item.id;
     const closeAfterSave = options?.closeAfterSave ?? false;
     const source = options?.source ?? 'manual';
     const isMusic = gameTypeId === 'music';
@@ -1112,62 +1123,82 @@ export function EditionDetailPage() {
     setItemValidationError(null);
     setItemSaveState('saving');
     setItemSaveError(null);
-    const res = await api.updateEditionItem(item.id, {
-      question_type: itemDraft.question_type === 'tiebreaker' ? 'tiebreaker' : isMultipleChoice ? 'multiple_choice' : 'text',
-      choices_json: isMultipleChoice ? choicesJson ?? [] : [],
-      prompt: itemDraft.prompt,
-      answer: answerValue,
-      answer_a:
-        gameTypeId === 'audio'
-          ? primaryAudioPart?.answer ?? null
-          : isMusicAudio
-            ? musicAnswerA
-            : isStandardPartBased
-              ? standardAnswerA
-            : itemDraft.answer_a || null,
-      answer_b:
-        gameTypeId === 'audio'
-          ? secondaryAudioPart?.answer ?? null
-          : isMusicAudio
-            ? musicAnswerB
-            : isStandardPartBased
-              ? standardAnswerB
-            : itemDraft.answer_b || null,
-      answer_a_label:
-        gameTypeId === 'audio'
-          ? primaryAudioPart?.label ?? null
-          : isMusicAudio
-            ? musicAnswerALabel
-            : isStandardPartBased
-              ? standardAnswerALabel
-            : itemDraft.answer_a_label || null,
-      answer_b_label:
-        gameTypeId === 'audio'
-          ? secondaryAudioPart?.label ?? null
-          : isMusicAudio
-            ? musicAnswerBLabel
-            : isStandardPartBased
-              ? standardAnswerBLabel
-            : itemDraft.answer_b_label || null,
-      answer_parts_json: allowBlankVisualAnswer && !answerValue ? null : answerPartsPayload,
-      fun_fact: itemDraft.fun_fact || null,
-      media_type: isMusicAudio ? 'audio' : isMusicLabeled ? null : toPayloadMediaType(itemDraft.media_type),
-      media_key: itemDraft.media_key || null,
-      audio_answer_key: itemDraft.audio_answer_key || null
-    });
-    if (res.ok) {
-      setItems((prev) => prev.map((entry) => (entry.id === res.data.id ? res.data : entry)));
-      if (activeItemId === res.data.id) {
-        setItemDraft(buildItemDraftFromItem(res.data));
+    itemSavePendingRef.current = true;
+    setItemSavePending(true);
+    try {
+      const res = await api.updateEditionItem(item.id, {
+        question_type: itemDraft.question_type === 'tiebreaker' ? 'tiebreaker' : isMultipleChoice ? 'multiple_choice' : 'text',
+        choices_json: isMultipleChoice ? choicesJson ?? [] : [],
+        prompt: itemDraft.prompt,
+        answer: answerValue,
+        answer_a:
+          gameTypeId === 'audio'
+            ? primaryAudioPart?.answer ?? null
+            : isMusicAudio
+              ? musicAnswerA
+              : isStandardPartBased
+                ? standardAnswerA
+              : itemDraft.answer_a || null,
+        answer_b:
+          gameTypeId === 'audio'
+            ? secondaryAudioPart?.answer ?? null
+            : isMusicAudio
+              ? musicAnswerB
+              : isStandardPartBased
+                ? standardAnswerB
+              : itemDraft.answer_b || null,
+        answer_a_label:
+          gameTypeId === 'audio'
+            ? primaryAudioPart?.label ?? null
+            : isMusicAudio
+              ? musicAnswerALabel
+              : isStandardPartBased
+                ? standardAnswerALabel
+              : itemDraft.answer_a_label || null,
+        answer_b_label:
+          gameTypeId === 'audio'
+            ? secondaryAudioPart?.label ?? null
+            : isMusicAudio
+              ? musicAnswerBLabel
+              : isStandardPartBased
+                ? standardAnswerBLabel
+              : itemDraft.answer_b_label || null,
+        answer_parts_json: allowBlankVisualAnswer && !answerValue ? null : answerPartsPayload,
+        fun_fact: itemDraft.fun_fact || null,
+        media_type: isMusicAudio ? 'audio' : isMusicLabeled ? null : toPayloadMediaType(itemDraft.media_type),
+        media_key: itemDraft.media_key || null,
+        audio_answer_key: itemDraft.audio_answer_key || null
+      });
+      if (res.ok) {
+        setItems((prev) => prev.map((entry) => (entry.id === res.data.id ? res.data : entry)));
+        if (isCurrentEditor()) {
+          // Acknowledge the submitted snapshot without replacing the live inputs.
+          // The response may be normalized or older than what the user is typing.
+          setSavedItemDraft(itemDraft);
+          const hasNewEdits = currentEditorRef.current.itemDraft !== itemDraft;
+          setItemSaveState(hasNewEdits ? 'idle' : 'saved');
+          setItemSaveError(null);
+          if (closeAfterSave && !hasNewEdits) cancelEdit();
+        }
+        return true;
       }
-      setItemSaveState('saved');
-      setItemSaveError(null);
-      if (closeAfterSave) cancelEdit();
-      return true;
+      if (isCurrentEditor()) {
+        failedItemDraftRef.current = itemDraft;
+        setItemSaveState('error');
+        setItemSaveError(formatApiError(res, source === 'auto' ? 'Auto-save failed.' : 'Save failed.'));
+      }
+      return false;
+    } catch {
+      if (isCurrentEditor()) {
+        failedItemDraftRef.current = itemDraft;
+        setItemSaveState('error');
+        setItemSaveError(source === 'auto' ? 'Auto-save failed.' : 'Save failed.');
+      }
+      return false;
+    } finally {
+      itemSavePendingRef.current = false;
+      setItemSavePending(false);
     }
-    setItemSaveState('error');
-    setItemSaveError(formatApiError(res, source === 'auto' ? 'Auto-save failed.' : 'Save failed.'));
-    return false;
   };
 
   const reorderItems = async (sourceId: string, targetId: string) => {
@@ -3720,7 +3751,7 @@ export function EditionDetailPage() {
           </div>
         )}
         <div className="flex flex-wrap items-center gap-2">
-          <PrimaryButton onClick={() => saveEdit(item, { source: 'manual' })}>Save Now</PrimaryButton>
+          <PrimaryButton disabled={itemSavePending} onClick={() => saveEdit(item, { source: 'manual' })}>Save Now</PrimaryButton>
           <SecondaryButton onClick={cancelEdit}>Cancel</SecondaryButton>
           <div aria-live="polite" className="text-xs">
             {itemSaveState === 'saving' && <span className="text-muted">Saving changes…</span>}
