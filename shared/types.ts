@@ -79,7 +79,7 @@ export type GameEdition = {
 export type EditionItem = {
   id: Id;
   edition_id: Id;
-  question_type: 'text' | 'multiple_choice';
+  question_type: 'text' | 'multiple_choice' | 'tiebreaker';
   choices_json: string | null;
   prompt: string;
   answer: string;
@@ -127,7 +127,7 @@ export type ItemSearchResult = {
   edition_theme: string | null;
   edition_status: EditionStatus;
   item_ordinal: number;
-  question_type: 'text' | 'multiple_choice';
+  question_type: 'text' | 'multiple_choice' | 'tiebreaker';
   prompt: string;
   answer: string;
   answer_a: string | null;

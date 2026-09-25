@@ -83,7 +83,7 @@ export const editionUpdateSchema = z.object({
 
 const editionItemBaseSchema = z.object({
   prompt: z.string(),
-  question_type: z.enum(['text', 'multiple_choice']).optional(),
+  question_type: z.enum(['text', 'multiple_choice', 'tiebreaker']).optional(),
   choices_json: z.array(z.string().min(1)).optional(),
   answer: z.string().optional(),
   answer_a: z.string().min(1).nullable().optional(),
@@ -155,6 +155,7 @@ export const gameExampleItemSchema = gameExampleItemBaseSchema
   });
 
 export const editionItemCreateSchema = editionItemBaseSchema
+  .refine((data) => data.question_type !== 'tiebreaker' || Boolean(data.prompt.trim() && data.answer?.trim()), { message: 'Tiebreakers require a question and answer.', path: ['answer'] })
   .refine((data) => {
     if (!data.answer_parts_json) return true;
     return data.answer_parts_json.length > 0;

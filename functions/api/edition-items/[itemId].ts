@@ -20,10 +20,18 @@ export const onRequestPut: PagesFunction<Env> = async ({ env, params, request, d
   }
 
   const merged = { ...existing, ...parsed.data };
+  if (merged.question_type === 'tiebreaker') {
+    if (!String(merged.prompt ?? '').trim() || !String(merged.answer ?? '').trim()) {
+      return jsonError({ code: 'validation_error', message: 'Tiebreakers require a question and answer.' }, 400);
+    }
+    Object.assign(merged, { choices_json: [], answer_parts_json: null, answer_a: null, answer_b: null,
+      answer_a_label: null, answer_b_label: null, fun_fact: null, media_type: null,
+      media_key: null, audio_answer_key: null, media_caption: null });
+  }
   const questionType = merged.question_type ?? 'text';
-  const choicesJson =
+  const choicesJson = questionType === 'tiebreaker' ? null :
     parsed.data.choices_json !== undefined ? JSON.stringify(parsed.data.choices_json) : merged.choices_json ?? null;
-  const answerPartsJson =
+  const answerPartsJson = questionType === 'tiebreaker' ? null :
     parsed.data.answer_parts_json !== undefined
       ? parsed.data.answer_parts_json === null
         ? null

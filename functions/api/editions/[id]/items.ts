@@ -29,6 +29,14 @@ export const onRequestPost: PagesFunction<Env> = async ({ env, params, request, 
   const createdAt = nowIso();
   const payloadData = parsed.data;
 
+  if (payloadData.question_type === 'tiebreaker') {
+    if (!String(payloadData.prompt ?? '').trim() || !String(payloadData.answer ?? '').trim()) {
+      return jsonError({ code: 'validation_error', message: 'Tiebreakers require a question and answer.' }, 400);
+    }
+    Object.assign(payloadData, { choices_json: [], answer_parts_json: null, answer_a: null, answer_b: null,
+      answer_a_label: null, answer_b_label: null, fun_fact: null, media_type: null,
+      media_key: null, audio_answer_key: null, media_caption: null });
+  }
   const questionType = payloadData.question_type ?? 'text';
   const choicesJson = payloadData.choices_json ? JSON.stringify(payloadData.choices_json) : null;
   const answerPartsJson = payloadData.answer_parts_json ? JSON.stringify(payloadData.answer_parts_json) : null;

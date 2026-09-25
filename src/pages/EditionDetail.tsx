@@ -13,7 +13,7 @@ type EditionItemWritePayload = Parameters<typeof api.updateEditionItem>[1];
 type EditionAnswerPartPayload = NonNullable<EditionItemWritePayload['answer_parts_json']>;
 
 const emptyItem = {
-  question_type: 'text' as 'text' | 'multiple_choice',
+  question_type: 'text' as 'text' | 'multiple_choice' | 'tiebreaker',
   choices: ['', '', '', ''] as string[],
   correct_choice_index: 0,
   prompt: '',
@@ -773,7 +773,7 @@ export function EditionDetailPage() {
       itemDraft.question_type === 'multiple_choice' &&
       gameTypeId !== 'audio' &&
       !(isMusic && itemDraft.item_mode !== 'text');
-    const isStandardPartBased = !isMusic && gameTypeId !== 'audio' && !isMultipleChoice;
+    const isStandardPartBased = itemDraft.question_type !== 'tiebreaker' && !isMusic && gameTypeId !== 'audio' && !isMultipleChoice;
     let answerValue = gameTypeId === 'audio' ? '' : itemDraft.answer.trim();
     let answerPartsPayload: AnswerPart[] | undefined;
     let musicAnswerA: string | null = null;
@@ -869,7 +869,7 @@ export function EditionDetailPage() {
     const secondaryAudioPart = answerPartsPayload?.[1];
     setItemValidationError(null);
     const res = await api.createEditionItem(editionId, {
-      question_type: isMultipleChoice ? 'multiple_choice' : 'text',
+      question_type: itemDraft.question_type === 'tiebreaker' ? 'tiebreaker' : isMultipleChoice ? 'multiple_choice' : 'text',
       choices_json: choicesJson ?? undefined,
       prompt: itemDraft.prompt,
       answer: answerValue,
@@ -958,7 +958,7 @@ export function EditionDetailPage() {
       itemDraft.question_type === 'multiple_choice' &&
       gameTypeId !== 'audio' &&
       !(isMusic && itemDraft.item_mode !== 'text');
-    const isStandardPartBased = !isMusic && gameTypeId !== 'audio' && !isMultipleChoice;
+    const isStandardPartBased = itemDraft.question_type !== 'tiebreaker' && !isMusic && gameTypeId !== 'audio' && !isMultipleChoice;
     let answerValue = gameTypeId === 'audio' ? '' : itemDraft.answer.trim();
     let answerPartsPayload: AnswerPart[] | undefined;
     let musicAnswerA: string | null = null;
@@ -1113,7 +1113,7 @@ export function EditionDetailPage() {
     setItemSaveState('saving');
     setItemSaveError(null);
     const res = await api.updateEditionItem(item.id, {
-      question_type: isMultipleChoice ? 'multiple_choice' : 'text',
+      question_type: itemDraft.question_type === 'tiebreaker' ? 'tiebreaker' : isMultipleChoice ? 'multiple_choice' : 'text',
       choices_json: isMultipleChoice ? choicesJson ?? [] : [],
       prompt: itemDraft.prompt,
       answer: answerValue,
@@ -3044,12 +3044,13 @@ export function EditionDetailPage() {
               onChange={(event) =>
                 setItemDraft((draft) => ({
                   ...draft,
-                  question_type: event.target.value as 'text' | 'multiple_choice'
+                  question_type: event.target.value as 'text' | 'multiple_choice' | 'tiebreaker'
                 }))
               }
             >
               <option value="text">Text</option>
               <option value="multiple_choice">Multiple Choice</option>
+              {gameTypeId !== 'music' && gameTypeId !== 'visual' && <option value="tiebreaker">Tiebreaker</option>}
             </select>
           </label>
         )}
@@ -3075,8 +3076,15 @@ export function EditionDetailPage() {
             onChange={(event) => setItemDraft((draft) => ({ ...draft, prompt: event.target.value }))}
           />
         </label>
+        {itemDraft.question_type === 'tiebreaker' && (
+          <label className="flex flex-col gap-2 text-sm text-muted">
+            Answer
+            <input className="h-10 px-3" value={itemDraft.answer}
+              onChange={(event) => setItemDraft((draft) => ({ ...draft, answer: event.target.value }))} />
+          </label>
+        )}
         {gameTypeId !== 'audio' &&
-          itemDraft.question_type !== 'multiple_choice' &&
+          itemDraft.question_type !== 'multiple_choice' && itemDraft.question_type !== 'tiebreaker' &&
           !(gameTypeId === 'music' && itemDraft.item_mode !== 'text') && (
           <>
             {gameTypeId !== 'music' && itemDraft.answer_parts.length > 0 ? (
@@ -3458,7 +3466,7 @@ export function EditionDetailPage() {
             </SecondaryButton>
           </div>
         )}
-        <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+        {itemDraft.question_type !== 'tiebreaker' && <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
           <span className="flex items-center justify-between">
             Factoid
             <button
@@ -3476,8 +3484,8 @@ export function EditionDetailPage() {
             onChange={(event) => setItemDraft((draft) => ({ ...draft, fun_fact: event.target.value }))}
           />
           {factError && <span className="text-[10px] tracking-[0.2em] text-danger">{factError}</span>}
-        </label>
-        {allowAudioClip && (
+        </label>}
+        {allowAudioClip && itemDraft.question_type !== 'tiebreaker' && (
           <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
             Audio Clip (Optional)
             <div className="flex flex-wrap items-center gap-2">
@@ -3818,12 +3826,13 @@ export function EditionDetailPage() {
               onChange={(event) =>
                 setItemDraft((draft) => ({
                   ...draft,
-                  question_type: event.target.value as 'text' | 'multiple_choice'
+                  question_type: event.target.value as 'text' | 'multiple_choice' | 'tiebreaker'
                 }))
               }
             >
               <option value="text">Text</option>
               <option value="multiple_choice">Multiple Choice</option>
+              {gameTypeId !== 'music' && gameTypeId !== 'visual' && <option value="tiebreaker">Tiebreaker</option>}
             </select>
           </label>
         )}
@@ -3849,8 +3858,15 @@ export function EditionDetailPage() {
             onChange={(event) => setItemDraft((draft) => ({ ...draft, prompt: event.target.value }))}
           />
         </label>
+        {itemDraft.question_type === 'tiebreaker' && (
+          <label className="flex flex-col gap-2 text-sm text-muted">
+            Answer
+            <input className="h-10 px-3" value={itemDraft.answer}
+              onChange={(event) => setItemDraft((draft) => ({ ...draft, answer: event.target.value }))} />
+          </label>
+        )}
         {gameTypeId !== 'audio' &&
-          itemDraft.question_type !== 'multiple_choice' &&
+          itemDraft.question_type !== 'multiple_choice' && itemDraft.question_type !== 'tiebreaker' &&
           !(gameTypeId === 'music' && itemDraft.item_mode !== 'text') && (
           <>
             {gameTypeId !== 'music' && itemDraft.answer_parts.length > 0 ? (
@@ -4232,7 +4248,7 @@ export function EditionDetailPage() {
             </SecondaryButton>
           </div>
         )}
-        <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
+        {itemDraft.question_type !== 'tiebreaker' && <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
           <span className="flex items-center justify-between">
             Factoid
             <button
@@ -4250,8 +4266,8 @@ export function EditionDetailPage() {
             onChange={(event) => setItemDraft((draft) => ({ ...draft, fun_fact: event.target.value }))}
           />
           {factError && <span className="text-[10px] tracking-[0.2em] text-danger">{factError}</span>}
-        </label>
-        {allowAudioClip && (
+        </label>}
+        {allowAudioClip && itemDraft.question_type !== 'tiebreaker' && (
           <label className="flex flex-col gap-2 text-xs font-display uppercase tracking-[0.25em] text-muted">
             Audio Clip (Optional)
             <div className="flex flex-wrap items-center gap-2">

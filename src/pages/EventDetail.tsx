@@ -531,7 +531,7 @@ const buildRunbookPdf = async (event: Event, locationName: string, roundBundles:
     }
 
     promptItems.forEach((item, itemIndex) => {
-      const promptLines = wrapPdfText(fonts.regular, `${itemIndex + 1}. ${buildRunbookPrompt(item)}`, contentWidth, questionSize);
+      const promptLines = wrapPdfText(fonts.regular, `${item.question_type === 'tiebreaker' ? 'Tiebreaker:' : `${promptItems.slice(0, itemIndex + 1).filter((entry) => entry.question_type !== 'tiebreaker').length}.`} ${buildRunbookPrompt(item)}`, contentWidth, questionSize);
       const choiceLines =
         item.question_type === 'multiple_choice'
           ? parseChoicesJson(item.choices_json).flatMap((choice, choiceIndex) =>
@@ -588,7 +588,7 @@ const buildRunbookPdf = async (event: Event, locationName: string, roundBundles:
     bundle.items.forEach((item, itemIndex) => {
       const answerLines = wrapPdfText(
         fonts.regular,
-        `${itemIndex + 1}. ${formatAnswer(item)}`,
+        `${item.question_type === 'tiebreaker' ? 'Tiebreaker:' : `${bundle.items.slice(0, itemIndex + 1).filter((entry) => entry.question_type !== 'tiebreaker').length}.`} ${formatAnswer(item)}`,
         contentWidth,
         answerSize
       );
@@ -1192,7 +1192,7 @@ const renderRoundBlock = (
   const numberSize = 9;
   const textSize = mode === 'scoresheet' ? 9 : 8.5;
   const showPointsColumn = options?.showPointsColumn ?? true;
-  const items = bundle.items;
+  const items = mode === 'scoresheet' ? bundle.items.filter((item) => item.question_type !== 'tiebreaker') : bundle.items;
   const answerColumns = resolveScoresheetAnswerColumns(items);
   const hasSplitAnswerColumns = answerColumns.length > 0;
   const titleY = cell.y + cell.height - CELL_PADDING - titleSize;
@@ -1266,6 +1266,14 @@ const renderRoundBlock = (
   for (let index = 0; index < itemCount; index += 1) {
     const item = items[index];
     const rowY = baseY - lineSpacing * index;
+    if (item.question_type === 'tiebreaker') {
+      const lines = wrapPdfText(fonts.regular, `Tiebreaker: ${item.prompt} Answer: ${item.answer}`, cell.width - CELL_PADDING * 2, textSize);
+      if (lines.length * (textSize + 2) > lineSpacing) throw new Error('Tiebreaker is too long to fit on the answer sheet.');
+      lines.forEach((line, lineIndex) => drawPdfText(page, line, {
+        x: contentX, y: rowY - lineIndex * (textSize + 2), size: textSize, font: fonts.regular
+      }));
+      continue;
+    }
     const inlineLabel = mode === 'scoresheet' ? resolveInlineResponseLabel(item) : null;
     if (mode === 'scoresheet') {
       if (inlineLabel) {
@@ -1355,7 +1363,7 @@ const renderRoundBlock = (
         }
       }
     } else {
-      drawPdfText(page, `${index + 1}.`, {
+      drawPdfText(page, `${++numberedRow}.`, {
         x: contentX,
         y: rowY,
         size: numberSize,

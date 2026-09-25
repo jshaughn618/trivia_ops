@@ -92,7 +92,7 @@ type PublicEventResponse = {
   visual_round?: boolean;
   visual_items?: {
     id: string;
-    question_type?: 'text' | 'multiple_choice';
+    question_type?: 'text' | 'multiple_choice' | 'tiebreaker';
     choices_json?: string | null;
     prompt: string;
     answer?: string;
@@ -110,7 +110,7 @@ type PublicEventResponse = {
   speed_round_answers?: { ordinal: number; answer: string; song: string | null; artist: string | null }[] | null;
   current_item: {
     id?: string;
-    question_type?: 'text' | 'multiple_choice';
+    question_type?: 'text' | 'multiple_choice' | 'tiebreaker';
     choices_json?: string | null;
     prompt: string;
     answer?: string;
@@ -448,7 +448,9 @@ export function PlayDisplayPage() {
   const waitingMessage = data.live?.waiting_message?.trim() ?? '';
   const waitingShowLeaderboard = data.live?.waiting_show_leaderboard ?? false;
   const waitingShowNextRound = data.live?.waiting_show_next_round ?? true;
-  const questionLabel = visualMode
+  const questionLabel = displayItem?.question_type === 'tiebreaker'
+    ? `Round ${activeRound?.round_number ?? ''} • Tiebreaker`
+    : visualMode
     ? `Round ${activeRound?.round_number ?? ''} • Image ${visualIndex + 1} of ${visualItems.length}`.trim()
     : speedRoundMode
       ? `Round ${activeRound?.round_number ?? ''} • Speed round`.trim()

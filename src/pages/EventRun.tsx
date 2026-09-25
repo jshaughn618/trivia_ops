@@ -1374,7 +1374,7 @@ export function EventRunPage() {
                     variant={activeRound.status === 'live' ? 'approved' : 'inspected'}
                   />
                   <div className="text-xs tabular-nums text-muted">
-                    {isSpeedRoundMode ? `Songs ${items.length}` : `Item ${items.length === 0 ? 0 : index + 1} / ${items.length}`}
+                    {item?.question_type === 'tiebreaker' ? 'Tiebreaker' : isSpeedRoundMode ? `Songs ${items.length}` : `Item ${items.length === 0 ? 0 : index + 1} / ${items.length}`}
                   </div>
                 </div>
               </div>
@@ -1382,7 +1382,7 @@ export function EventRunPage() {
                 <div className="surface-inset p-5">
                   <div className="flex items-center justify-between gap-3">
                     <div className="ui-label">
-                      {isExampleItem
+                      {item.question_type === 'tiebreaker' ? 'Tiebreaker' : isExampleItem
                         ? 'Example item'
                         : isSpeedRoundMode
                         ? 'Speed round clip'
