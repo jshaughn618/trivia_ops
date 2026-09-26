@@ -7,7 +7,7 @@ export type GenericRoundSheet = {
 };
 
 export const ROUND_SHEET_PRESETS: Record<string, GenericRoundSheet> = {
-  general: { title: 'General Trivia', answerCount: 10, columns: ['Answer'] },
+  general: { title: 'General Trivia', answerCount: 10, columns: [''] },
   audio: { title: 'Audio', answerCount: 5, columns: ['Song', 'Artist'] },
   visual: { title: 'Visual', answerCount: 10, columns: ['Answer'] },
   music: { title: 'Music', answerCount: 10, columns: ['Song', 'Artist'] },
@@ -29,8 +29,8 @@ export const validateRoundSheet = (sheet: GenericRoundSheet) => {
   if (!Number.isInteger(sheet.answerCount) || sheet.answerCount < 1 || sheet.answerCount > 15) {
     throw new Error('Choose between 1 and 15 answers per round.');
   }
-  if (sheet.columns.length < 1 || sheet.columns.length > 2 || sheet.columns.some(label => !printable(label) || label.length > 24)) {
-    throw new Error('Use one or two answer columns with labels of 1–24 characters.');
+  if (sheet.columns.length < 1 || sheet.columns.length > 2 || sheet.columns.some(label => label.length > 24)) {
+    throw new Error('Use one or two answer columns with optional labels of up to 24 characters.');
   }
 };
 
@@ -74,6 +74,7 @@ export const buildGenericRoundSheetsPdf = async (sheets: GenericRoundSheet[]) =>
       const columnGap = 14;
       const columnWidth = (width - 23 - columnGap * (sheet.columns.length - 1)) / sheet.columns.length;
       sheet.columns.forEach((label, columnIndex) => {
+        if (!printable(label)) return;
         fittedText(page, label, regular, 10, answerX + columnIndex * (columnWidth + columnGap), top - 103, columnWidth);
       });
       const firstRowY = top - 127;

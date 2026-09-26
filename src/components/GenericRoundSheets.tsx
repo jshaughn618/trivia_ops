@@ -33,8 +33,8 @@ function RoundFields({ id, label, sheet, onChange }: {
       <div className="grid grid-cols-2 gap-3">
         {sheet.columns.map((column, index) => (
           <label key={index} className="flex flex-col gap-1 text-sm" htmlFor={`${id}-column-${index}`}>
-            {sheet.columns.length === 1 ? 'Column label' : `Column ${index + 1} label`}
-            <input id={`${id}-column-${index}`} value={column} maxLength={24} required onChange={event => onChange({ ...sheet, columns: sheet.columns.map((value, i) => i === index ? event.target.value : value) })} />
+            {sheet.columns.length === 1 ? 'Column label (optional)' : `Column ${index + 1} label (optional)`}
+            <input id={`${id}-column-${index}`} value={column} maxLength={24} onChange={event => onChange({ ...sheet, columns: sheet.columns.map((value, i) => i === index ? event.target.value : value) })} />
           </label>
         ))}
       </div>
