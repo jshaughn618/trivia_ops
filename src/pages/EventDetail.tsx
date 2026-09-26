@@ -16,6 +16,7 @@ import { IconButton } from '../components/IconButton';
 import { logError } from '../lib/log';
 import { useAuth } from '../auth';
 import { toOwnedArrayBuffer } from '../../shared/binary';
+import { buildTeamWelcomeSheetsPdf } from '../lib/welcomeSheets';
 import type {
   EditionItem,
   Event,
@@ -1940,6 +1941,8 @@ export function EventDetailPage() {
   const [imagesheetError, setImagesheetError] = useState<string | null>(null);
   const [scoresheetGenerating, setScoresheetGenerating] = useState(false);
   const [scoresheetGenerateError, setScoresheetGenerateError] = useState<string | null>(null);
+  const [welcomeGenerating, setWelcomeGenerating] = useState(false);
+  const [welcomeGenerateError, setWelcomeGenerateError] = useState<string | null>(null);
   const [runbookGenerating, setRunbookGenerating] = useState(false);
   const [runbookError, setRunbookError] = useState<string | null>(null);
   const [imagesheetGenerating, setImagesheetGenerating] = useState(false);
@@ -3032,6 +3035,23 @@ export function EventDetailPage() {
     setUploading(false);
   };
 
+  const generateTeamWelcomeSheets = async () => {
+    if (!eventId || !event) return;
+    setWelcomeGenerating(true);
+    setWelcomeGenerateError(null);
+    try {
+      const response = await api.listTeams(eventId);
+      if (!response.ok) throw new Error(formatApiError(response, 'Failed to load teams.'));
+      const locationName = locations.find(location => location.id === event.location_id)?.name ?? '';
+      const bytes = await buildTeamWelcomeSheetsPdf(event, locationName, response.data);
+      downloadPdfBytes(bytes, `${buildEventDocumentBaseName(event, locationName)}-team-welcome-sheets.pdf`);
+    } catch (error) {
+      setWelcomeGenerateError(error instanceof Error ? error.message : 'Failed to generate team welcome sheets.');
+    } finally {
+      setWelcomeGenerating(false);
+    }
+  };
+
   const generateScoresheets = async () => {
     if (!eventId || !event) return;
     if (rounds.length === 0) {
@@ -4086,6 +4106,9 @@ export function EventDetailPage() {
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-2">
+        <SecondaryButton onClick={generateTeamWelcomeSheets} disabled={welcomeGenerating}>
+          {welcomeGenerating ? 'Generating welcome sheets…' : 'Download team welcome sheets'}
+        </SecondaryButton>
         <SecondaryButton onClick={generateScoresheets} disabled={scoresheetGenerating}>
           {scoresheetGenerating ? 'Generating…' : 'Generate scoresheets'}
         </SecondaryButton>
@@ -4094,7 +4117,9 @@ export function EventDetailPage() {
         </SecondaryButton>
         {scoresheetGenerateError && <div className="text-xs text-danger-ink">{scoresheetGenerateError}</div>}
         {imagesheetGenerateError && <div className="text-xs text-danger-ink">{imagesheetGenerateError}</div>}
+        {welcomeGenerateError && <div role="alert" className="text-xs text-danger-ink">{welcomeGenerateError}</div>}
       </div>
+      <p className="text-xs text-muted">Team welcome sheets print four per page, with a unique sign-in QR code for each team and instructions for generic scoresheets. Add or pre-populate teams first.</p>
       <List>
         <ListRow className="flex-col items-start gap-3 sm:flex-row sm:items-center">
           <div className="flex-1">

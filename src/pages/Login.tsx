@@ -29,6 +29,7 @@ export function LoginPage() {
   const [hostOpen, setHostOpen] = useState(false);
   const eventRefs = useRef<Array<HTMLInputElement | null>>([]);
   const teamRefs = useRef<Array<HTMLInputElement | null>>([]);
+  const teamNameRef = useRef<HTMLInputElement | null>(null);
   const autoJoinRef = useRef(false);
   const navigate = useNavigate();
   const location = useLocation();
@@ -71,6 +72,8 @@ export function LoginPage() {
         if (autoTeamCode && autoTeamCode.length === 4) {
           const digits = autoTeamCode.split('');
           setTeamCode(digits);
+          setRequireTeamName(true);
+          setRequireTeamNameCode(autoTeamCode);
         }
         return;
       }
@@ -88,6 +91,10 @@ export function LoginPage() {
     const normalized = sanitized(value);
     const eventData = eventOverride ?? eventInfo;
     if (normalized.length !== 4 || teamLoading || !eventData) return;
+    if (requireTeamName && normalized === requireTeamNameCode && !teamNameInput.trim()) {
+      teamNameRef.current?.focus();
+      return;
+    }
     setTeamError(null);
     setTeamLoading(true);
     try {
@@ -112,6 +119,10 @@ export function LoginPage() {
         return;
       }
       setTeamError(formatApiError(res, 'Team code not recognized. Check the code and try again.'));
+      if (requireTeamName && (res.error?.code === 'conflict' || res.error?.code === 'team_name_mismatch')) {
+        teamNameRef.current?.focus();
+        return;
+      }
       setTeamCode(['', '', '', '']);
       teamRefs.current[0]?.focus();
     } catch {
@@ -124,10 +135,12 @@ export function LoginPage() {
   useEffect(() => {
     if (step === 'event') {
       eventRefs.current[0]?.focus();
+    } else if (requireTeamName) {
+      teamNameRef.current?.focus();
     } else {
       teamRefs.current[0]?.focus();
     }
-  }, [step]);
+  }, [step, requireTeamName]);
 
   useEffect(() => {
     if (autoJoinRef.current) return;
@@ -233,7 +246,7 @@ export function LoginPage() {
           ) : (
             <>
               <div className="mt-4 flex w-full flex-col items-center gap-6 text-center">
-                <PromptHero>Enter the team code from your scoresheet.</PromptHero>
+                <PromptHero>{requireTeamName ? 'Enter your team name to join the game.' : 'Enter the team code from your handout or scoresheet.'}</PromptHero>
                 <div className="w-full rounded-2xl bg-panel/40 p-4 text-left">
                   <div className="flex flex-col gap-3">
                     <div className="flex flex-col gap-2">
@@ -305,16 +318,29 @@ export function LoginPage() {
                       </div>
                     </div>
                     {requireTeamName && (
-                      <label className="flex flex-col gap-2">
-                        <span className="text-xs uppercase tracking-[0.25em] text-muted">Team name required</span>
+                      <div className="rounded-lg border-2 border-accent-ink bg-accent-soft p-4">
+                        <label htmlFor="player-team-name" className="block text-lg font-semibold text-text">Your team name</label>
+                        <p id="team-name-help" className="mt-1 text-sm text-text">Type your team name below, then select Join game. Use this same name on every scoresheet.</p>
                         <input
-                          className="h-10 px-3"
+                          id="player-team-name"
+                          ref={teamNameRef}
+                          className="mt-3 h-14 w-full border-2 border-accent-ink bg-panel px-3 text-lg text-text"
+                          required
+                          autoComplete="off"
+                          enterKeyHint="go"
+                          aria-describedby="team-name-help team-name-returning"
                           value={teamNameInput}
                           onChange={(event) => setTeamNameInput(event.target.value)}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter' && !event.nativeEvent.isComposing) {
+                              event.preventDefault();
+                              if (teamReady) attemptTeamJoin(teamValue);
+                            }
+                          }}
                           placeholder="Enter your team name"
                         />
-                        <span className="text-xs text-muted">Enter a team name to claim this code.</span>
-                      </label>
+                        <p id="team-name-returning" className="mt-2 text-xs text-muted">Already joined? Enter your existing team name.</p>
+                      </div>
                     )}
                     {teamError && (
                       <div className="border border-danger bg-panel2 px-3 py-2 text-xs text-danger-ink" aria-live="polite">
@@ -328,7 +354,7 @@ export function LoginPage() {
                       }}
                       disabled={!teamReady || teamLoading || (requireTeamName && !teamNameInput.trim())}
                     >
-                      {teamLoading ? 'Joining…' : 'Join'}
+                      {teamLoading ? 'Joining…' : requireTeamName && !teamNameInput.trim() ? 'Enter a team name to join' : 'Join game'}
                     </PrimaryButton>
                     <SecondaryButton
                       type="button"
