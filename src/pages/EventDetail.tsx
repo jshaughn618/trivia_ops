@@ -1246,10 +1246,19 @@ const renderRoundBlock = (
   const itemCount = items.length;
   const minLineSpacing = mode === 'scoresheet' ? 14 : 12;
   const availableHeight = contentTop - (cell.y + CELL_PADDING);
-  if (itemCount > 0 && availableHeight / itemCount < minLineSpacing) {
-    throw new Error(`Round ${bundle.round.round_number} has too many items to fit on one page.`);
+  const tiebreakerLineHeight = textSize + 2;
+  const tiebreakerLines = items.map((item) => item.question_type === 'tiebreaker'
+    ? wrapPdfText(fonts.regular, `Tiebreaker: ${item.prompt} Answer: ${item.answer}`, cell.width - CELL_PADDING * 2, textSize)
+    : null);
+  // Reserve enough room for wrapped tiebreakers before distributing spare space.
+  const rowHeights = tiebreakerLines.map((lines) => lines
+    ? Math.max(minLineSpacing, numberSize + (lines.length - 1) * tiebreakerLineHeight + 4)
+    : minLineSpacing);
+  const requiredHeight = rowHeights.reduce((total, height) => total + height, 0);
+  if (requiredHeight > availableHeight) {
+    throw new Error(`Round ${bundle.round.round_number} has too much content to fit on one page.`);
   }
-  const lineSpacing = itemCount > 0 ? availableHeight / itemCount : availableHeight;
+  const extraRowSpace = itemCount > 0 ? (availableHeight - requiredHeight) / itemCount : 0;
   const baseY = contentTop - numberSize;
 
   if (itemCount === 0) {
@@ -1263,14 +1272,15 @@ const renderRoundBlock = (
   }
 
   let numberedRow = 0;
+  let rowOffset = 0;
   for (let index = 0; index < itemCount; index += 1) {
     const item = items[index];
-    const rowY = baseY - lineSpacing * index;
+    const rowY = baseY - rowOffset;
+    rowOffset += rowHeights[index] + extraRowSpace;
     if (item.question_type === 'tiebreaker') {
-      const lines = wrapPdfText(fonts.regular, `Tiebreaker: ${item.prompt} Answer: ${item.answer}`, cell.width - CELL_PADDING * 2, textSize);
-      if (lines.length * (textSize + 2) > lineSpacing) throw new Error('Tiebreaker is too long to fit on the answer sheet.');
+      const lines = tiebreakerLines[index]!;
       lines.forEach((line, lineIndex) => drawPdfText(page, line, {
-        x: contentX, y: rowY - lineIndex * (textSize + 2), size: textSize, font: fonts.regular
+        x: contentX, y: rowY - lineIndex * tiebreakerLineHeight, size: textSize, font: fonts.regular
       }));
       continue;
     }

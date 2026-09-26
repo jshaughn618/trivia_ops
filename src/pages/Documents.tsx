@@ -7,6 +7,7 @@ import logoLight from '../assets/trivia_ops_logo_light.png';
 import { AppShell } from '../components/AppShell';
 import { PrimaryButton } from '../components/Buttons';
 import { Panel } from '../components/Panel';
+import { GenericRoundSheets } from '../components/GenericRoundSheets';
 import type { Location } from '../types';
 
 type PdfFonts = { regular: any; bold: any };
@@ -328,6 +329,7 @@ export function DocumentsPage() {
       <div className="space-y-4">
         <Panel title="Documents Library">
           <div className="grid gap-3">
+            <GenericRoundSheets />
             <section className="glass-inset p-4 sm:p-5">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div className="space-y-2">
