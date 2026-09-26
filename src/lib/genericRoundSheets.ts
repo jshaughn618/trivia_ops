@@ -63,19 +63,20 @@ export const buildGenericRoundSheetsPdf = async (sheets: GenericRoundSheet[]) =>
   for (const bottom of [396, 0]) {
     const top = bottom + 396;
     page.drawText('Team name:', { x: margin, y: top - 39, font: regular, size: 11 });
-    line(page, margin + 67, top - 42, 612 - margin);
+    const roundX = 612 - margin - 110;
+    line(page, margin + 67, top - 42, roundX - 20);
+    page.drawText('Round:', { x: roundX, y: top - 39, font: regular, size: 11 });
+    line(page, roundX + 40, top - 42, 612 - margin);
     sheets.forEach((sheet, sheetIndex) => {
       const x = margin + sheetIndex * (width + gap);
       fittedText(page, sheet.title, bold, 17, x, top - 76, width);
-      page.drawText('Round:', { x, y: top - 99, font: regular, size: 10 });
-      line(page, x + 37, top - 102, x + Math.min(width, 126));
       const answerX = x + 23;
       const columnGap = 14;
       const columnWidth = (width - 23 - columnGap * (sheet.columns.length - 1)) / sheet.columns.length;
       sheet.columns.forEach((label, columnIndex) => {
-        fittedText(page, label, regular, 10, answerX + columnIndex * (columnWidth + columnGap), top - 126, columnWidth);
+        fittedText(page, label, regular, 10, answerX + columnIndex * (columnWidth + columnGap), top - 103, columnWidth);
       });
-      const firstRowY = top - 150;
+      const firstRowY = top - 127;
       const lastRowY = bottom + 29;
       const rowSpacing = sheet.answerCount === 1 ? 0 : Math.min(30, (firstRowY - lastRowY) / (sheet.answerCount - 1));
       for (let row = 0; row < sheet.answerCount; row += 1) {
