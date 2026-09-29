@@ -827,29 +827,35 @@ const resolveTotalPossiblePoints = (item: EditionItem, bundle?: RoundBundle) => 
   return 1;
 };
 
-const sanitizePdfText = (value: unknown) => {
+const sanitizePdfText = (value: unknown, font: any) => {
+  const supportedCharacters = new Set<number>(font.getCharacterSet());
   const text = String(value ?? '');
   return text
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
+    .normalize('NFC')
     .replace(/\u00a0/g, ' ')
     .replace(/[\u2010-\u2015\u2212]/g, '-')
     .replace(/[\u2018-\u201b]/g, "'")
     .replace(/[\u201c-\u201f]/g, '"')
     .replace(/\u2026/g, '...')
-    .replace(/[^\x09\x0a\x0d\x20-\x7e]/g, '');
+    // Preserve supported accents; transliterate only glyphs the font cannot encode.
+    .replace(/[^\x09\x0a\x0d]/gu, (character) => {
+      if (supportedCharacters.has(character.codePointAt(0)!)) return character;
+      return Array.from(character.normalize('NFKD'))
+        .filter((fallback) => supportedCharacters.has(fallback.codePointAt(0)!))
+        .join('');
+    });
 };
 
 const measurePdfText = (font: any, text: unknown, size: number) => {
-  return font.widthOfTextAtSize(sanitizePdfText(text), size);
+  return font.widthOfTextAtSize(sanitizePdfText(text, font), size);
 };
 
 const drawPdfText = (page: any, text: unknown, options: { x: number; y: number; size: number; font: any; color?: any }) => {
-  page.drawText(sanitizePdfText(text), options);
+  page.drawText(sanitizePdfText(text, options.font), options);
 };
 
 const truncateText = (font: any, text: string, maxWidth: number, size: number) => {
-  const normalized = sanitizePdfText(text);
+  const normalized = sanitizePdfText(text, font);
   if (measurePdfText(font, normalized, size) <= maxWidth) return normalized;
   let truncated = normalized;
   while (truncated.length > 0 && measurePdfText(font, `${truncated}...`, size) > maxWidth) {
@@ -859,7 +865,7 @@ const truncateText = (font: any, text: string, maxWidth: number, size: number) =
 };
 
 const wrapPdfText = (font: any, text: string, maxWidth: number, size: number) => {
-  const normalized = sanitizePdfText(text);
+  const normalized = sanitizePdfText(text, font);
   const paragraphs = normalized.split(/\r?\n/);
   const lines: string[] = [];
 
