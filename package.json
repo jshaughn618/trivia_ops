@@ -5,6 +5,7 @@
   "type": "module",
   "packageManager": "pnpm@10.28.2",
   "scripts": {
+    "test:music-catalog": "node scripts/test-music-catalog.mjs",
     "release:patch": "npm version patch && git push --follow-tags",
     "dev": "vite",
     "build": "vite build",

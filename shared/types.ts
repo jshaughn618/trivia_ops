@@ -60,6 +60,32 @@ export type GameType = {
   created_at: string;
 };
 
+export type MusicCatalog = {
+  schema_version: 1;
+  exported_at: string;
+  games: Array<{
+    id: string;
+    code: string | null;
+    name: string;
+    editions: Array<{
+      id: string;
+      code: string | null;
+      number: number | null;
+      title: string;
+      theme: string | null;
+      songs: Array<{
+        id: string;
+        track: number;
+        prompt: string;
+        answer: string;
+        fun_fact: string | null;
+        caption: string | null;
+        answer_parts: Array<{ label: string; answer: string; points: number | null }>;
+      }>;
+    }>;
+  }>;
+};
+
 export type GameEdition = {
   id: Id;
   game_id: Id;

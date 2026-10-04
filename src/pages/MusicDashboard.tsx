@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { Filter, Music2, Search } from 'lucide-react';
+import { Download, Filter, Music2, Search } from 'lucide-react';
 import { api, formatApiError } from '../api';
 import { AppShell } from '../components/AppShell';
 import { PrimaryButton, SecondaryButton } from '../components/Buttons';
@@ -66,6 +66,31 @@ export function MusicDashboardPage() {
   const [song, setSong] = useState(params.get('song') ?? '');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+
+  const downloadCatalog = async () => {
+    setDownloading(true);
+    setDownloadError(null);
+    try {
+      const response = await fetch('/api/music-catalog', { credentials: 'include' });
+      if (!response.ok) throw new Error('Download failed');
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = response.headers.get('content-disposition')?.match(/filename="([^"]+)"/)?.[1]
+        || 'triviaops-music-catalog.json';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch {
+      setDownloadError('Could not download the music catalog. Please try again.');
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   const effectiveDates = useMemo(() => {
     if (rangePreset === 'custom') return { from, to };
@@ -164,6 +189,14 @@ export function MusicDashboardPage() {
   return (
     <AppShell title="Music Dashboard">
       <div className="space-y-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-muted">Download all music games, editions, songs, and answer parts, including unused rounds.</p>
+          <SecondaryButton onClick={downloadCatalog} disabled={downloading}>
+            <Download className="h-4 w-4" aria-hidden="true" />
+            {downloading ? 'Downloading…' : 'Download catalog JSON'}
+          </SecondaryButton>
+        </div>
+        {downloadError && <p role="alert" className="text-sm text-danger-ink">{downloadError}</p>}
         {error && <div className="rounded-lg border border-danger bg-panel px-4 py-3 text-sm text-danger-ink">{error}</div>}
 
         <form onSubmit={applyFilters} className="surface-card p-4 sm:p-5">

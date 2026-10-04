@@ -64,3 +64,21 @@ Covers:
 Titles look like "Ordinal - Song - Cover Artist - Original Artist". Use Ordinal as question number, Song as answer 1, Cover Artist as answer 2,
 Original Artist as answer 3
 ```
+
+### Music catalog JSON download
+
+On the Music Dashboard, **Download catalog JSON** exports the complete non-deleted
+music catalog, independent of dashboard filters or event usage. Draft, published,
+and archived editions are included. The authenticated admin endpoint is
+`GET /api/music-catalog`.
+
+The pretty-printed JSON has `schema_version`, `exported_at`, and nested
+`games → editions → songs → answer_parts`. Edition codes use the game code and
+zero-padded edition number (for example `ATM005`). Each answer part contains its
+label, answer, and points; unknown legacy points are `null`. Original prompts,
+answers, factoids, and captions are retained because older song titles can live
+in those fields. Empty games and editions remain visible. Audio, completion
+status, and event history are not included. Records never added to the database
+cannot appear in this export.
+
+Run catalog tests with `npm run test:music-catalog`.
