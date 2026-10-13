@@ -1347,16 +1347,17 @@ const renderRoundBlock = (
         const totalGap = gap * Math.max(0, colCount - 1);
         const colWidth = (responseWidth - totalGap) / colCount;
         const lineY = rowY - 2;
+        const responseLabelSize = 7;
         const itemParts = deriveAnswerTypeLabels(item);
         answerColumns.forEach((columnHeader, columnIndex) => {
           const part = itemParts[columnIndex];
           if (!part) return;
           const columnStart = textStartX + columnIndex * (colWidth + gap);
           if (!columnHeader) {
-            drawPdfText(page, truncateText(fonts.regular, formatAnswerPartHeader(part.label, part.points), colWidth, labelSize), {
+            drawPdfText(page, truncateText(fonts.regular, formatAnswerPartHeader(part.label, part.points), colWidth, responseLabelSize), {
               x: columnStart,
-              y: rowY + 5,
-              size: labelSize,
+              y: lineY - responseLabelSize - 3,
+              size: responseLabelSize,
               font: fonts.regular
             });
           }
