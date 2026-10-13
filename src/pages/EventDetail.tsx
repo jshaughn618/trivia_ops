@@ -737,13 +737,14 @@ const deriveAnswerTypeLabels = (item: EditionItem): Array<{ label: string; point
 };
 
 const resolveScoresheetAnswerColumns = (items: EditionItem[]) => {
-  const labels = items
-    .map((item) => deriveAnswerTypeLabels(item))
+  // Standalone responses (such as Connection) do not share the split columns.
+  const splitParts = items.map((item) => deriveAnswerTypeLabels(item)).filter((parts) => parts.length >= 2);
+  const labels = splitParts
     .reduce<Array<{ label: string; points: number }>>((best, current) => (current.length > best.length ? current : best), []);
   if (labels.length < 2) return [] as string[];
   return labels.map((label, index) => {
-    const headers = items
-      .map((item) => deriveAnswerTypeLabels(item)[index])
+    const headers = splitParts
+      .map((parts) => parts[index])
       .filter((part) => Boolean(part))
       .map((part) => formatAnswerPartHeader(part.label, part.points));
     // Different labels at the same position belong beside each item's response.
