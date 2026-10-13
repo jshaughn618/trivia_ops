@@ -741,7 +741,14 @@ const resolveScoresheetAnswerColumns = (items: EditionItem[]) => {
     .map((item) => deriveAnswerTypeLabels(item))
     .reduce<Array<{ label: string; points: number }>>((best, current) => (current.length > best.length ? current : best), []);
   if (labels.length < 2) return [] as string[];
-  return labels.map((label) => formatAnswerPartHeader(label.label, label.points));
+  return labels.map((label, index) => {
+    const headers = items
+      .map((item) => deriveAnswerTypeLabels(item)[index])
+      .filter((part) => Boolean(part))
+      .map((part) => formatAnswerPartHeader(part.label, part.points));
+    // Different labels at the same position belong beside each item's response.
+    return new Set(headers).size > 1 ? '' : formatAnswerPartHeader(label.label, label.points);
+  });
 };
 
 const isPlainPromptResponseItem = (item: EditionItem) =>
@@ -1258,9 +1265,11 @@ const renderRoundBlock = (
     ? wrapPdfText(fonts.regular, `Tiebreaker: ${item.prompt} Answer: ${item.answer}`, cell.width - CELL_PADDING * 2, textSize)
     : null);
   // Reserve enough room for wrapped tiebreakers before distributing spare space.
-  const rowHeights = tiebreakerLines.map((lines) => lines
+  const rowHeights = tiebreakerLines.map((lines, index) => lines
     ? Math.max(minLineSpacing, numberSize + (lines.length - 1) * tiebreakerLineHeight + 4)
-    : minLineSpacing);
+    : hasSplitAnswerColumns && deriveAnswerTypeLabels(items[index]).some((_, columnIndex) => answerColumns[columnIndex] === '')
+      ? Math.max(minLineSpacing, labelSize + numberSize + 6)
+      : minLineSpacing);
   const requiredHeight = rowHeights.reduce((total, height) => total + height, 0);
   if (requiredHeight > availableHeight) {
     throw new Error(`Round ${bundle.round.round_number} has too much content to fit on one page.`);
@@ -1338,8 +1347,19 @@ const renderRoundBlock = (
         const totalGap = gap * Math.max(0, colCount - 1);
         const colWidth = (responseWidth - totalGap) / colCount;
         const lineY = rowY - 2;
-        answerColumns.forEach((_, columnIndex) => {
+        const itemParts = deriveAnswerTypeLabels(item);
+        answerColumns.forEach((columnHeader, columnIndex) => {
+          const part = itemParts[columnIndex];
+          if (!part) return;
           const columnStart = textStartX + columnIndex * (colWidth + gap);
+          if (!columnHeader) {
+            drawPdfText(page, truncateText(fonts.regular, formatAnswerPartHeader(part.label, part.points), colWidth, labelSize), {
+              x: columnStart,
+              y: rowY + 5,
+              size: labelSize,
+              font: fonts.regular
+            });
+          }
           page.drawLine({
             start: { x: columnStart, y: lineY },
             end: { x: columnStart + colWidth, y: lineY },
@@ -1413,6 +1433,16 @@ const renderRoundBlock = (
           const colWidth = (responseWidth - totalGap) / colCount;
           const columnAnswers = resolveAnswerColumnValues(item, colCount);
           columnAnswers.forEach((columnAnswer, columnIndex) => {
+            const part = answerTypeLabels[columnIndex];
+            if (!part) return;
+            if (!answerColumns[columnIndex]) {
+              drawPdfText(page, truncateText(fonts.regular, formatAnswerPartHeader(part.label, part.points), colWidth, labelSize), {
+                x: textStartX + columnIndex * (colWidth + gap),
+                y: rowY + textSize + 3,
+                size: labelSize,
+                font: fonts.regular
+              });
+            }
             const answer = truncateText(fonts.regular, columnAnswer, colWidth, textSize);
             drawPdfText(page, answer, {
               x: textStartX + columnIndex * (colWidth + gap),
