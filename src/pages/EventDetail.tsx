@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, useId, useRef } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import QRCode from 'qrcode';
 import jsQR from 'jsqr';
-import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+import { PDFDocument, StandardFonts, rgb, type PDFImage } from 'pdf-lib';
 import { api, formatApiError } from '../api';
 import logoLight from '../assets/trivia_ops_logo_light.png';
 import calIcon from '../assets/cal_icon.png';
@@ -17,6 +17,7 @@ import { logError } from '../lib/log';
 import { useAuth } from '../auth';
 import { toOwnedArrayBuffer } from '../../shared/binary';
 import { buildTeamWelcomeSheetsPdf } from '../lib/welcomeSheets';
+import { embedImageSheetItems } from '../lib/imageSheetImages';
 import type {
   EditionItem,
   Event,
@@ -61,7 +62,7 @@ type ImageRoundBundle = {
 };
 type EmbeddedImageItem = {
   ordinal: number;
-  image: any;
+  image: PDFImage;
 };
 type ScoresheetIncludeOptions = {
   eventName: boolean;
@@ -279,62 +280,25 @@ const drawImageSheetSection = (
 };
 
 const buildImageSheetsPdf = async (
-  event: Event,
   roundBundles: ImageRoundBundle[],
-  fetchImageBytes: (key: string) => Promise<{ bytes: ArrayBuffer; contentType: string } | null>
+  fetchJpegBytes: (key: string) => Promise<ArrayBuffer | null>
 ) => {
   const pdfDoc = await PDFDocument.create();
   const fonts = {
     regular: await pdfDoc.embedFont(StandardFonts.Helvetica),
     bold: await pdfDoc.embedFont(StandardFonts.HelveticaBold)
   };
-  const embeddedImageCache = new Map<string, any>();
+  const embeddedImageCache = new Map<string, PDFImage>();
   let pageCount = 0;
 
   for (const bundle of roundBundles) {
-    const embeddedItems: EmbeddedImageItem[] = [];
-    for (const item of bundle.items) {
-      let embeddedImage = embeddedImageCache.get(item.media_key);
-      if (!embeddedImage) {
-        const imageFile = await fetchImageBytes(item.media_key);
-        if (!imageFile) continue;
-        const lowerContentType = imageFile.contentType.toLowerCase();
-        const lowerKey = item.media_key.toLowerCase();
-        if (lowerContentType.includes('png') || lowerKey.endsWith('.png')) {
-          try {
-            embeddedImage = await pdfDoc.embedPng(imageFile.bytes);
-          } catch {
-            embeddedImage = null;
-          }
-        } else if (
-          lowerContentType.includes('jpeg') ||
-          lowerContentType.includes('jpg') ||
-          lowerKey.endsWith('.jpg') ||
-          lowerKey.endsWith('.jpeg')
-        ) {
-          try {
-            embeddedImage = await pdfDoc.embedJpg(imageFile.bytes);
-          } catch {
-            embeddedImage = null;
-          }
-        } else {
-          try {
-            embeddedImage = await pdfDoc.embedPng(imageFile.bytes);
-          } catch {
-            try {
-              embeddedImage = await pdfDoc.embedJpg(imageFile.bytes);
-            } catch {
-              embeddedImage = null;
-            }
-          }
-        }
-        if (embeddedImage) {
-          embeddedImageCache.set(item.media_key, embeddedImage);
-        }
-      }
-      if (!embeddedImage) continue;
-      embeddedItems.push({ ordinal: item.ordinal, image: embeddedImage });
-    }
+    const embeddedItems = await embedImageSheetItems(
+      pdfDoc,
+      bundle.round.round_number,
+      bundle.items,
+      fetchJpegBytes,
+      embeddedImageCache
+    );
     if (embeddedItems.length === 0) continue;
 
     const chunks = chunkArray(embeddedItems, IMAGE_SHEET_ITEMS_PER_SET);
@@ -3246,9 +3210,14 @@ export function EventDetailPage() {
           throw new Error(response.error.message ?? `Failed to load items for round ${rounds[index].round_number}.`);
         }
         const imageItems = response.data
-          .filter((item) => item.media_type === 'image' && Boolean(item.media_key))
+          .filter((item) => item.media_type === 'image')
           .sort((a, b) => a.ordinal - b.ordinal)
-          .map((item) => ({ ordinal: item.ordinal, media_key: item.media_key as string }));
+          .map((item) => {
+            if (!item.media_key) {
+              throw new Error(`Round ${rounds[index].round_number}, image ${item.ordinal}: No image file attached. Image sheet was not saved.`);
+            }
+            return { ordinal: item.ordinal, media_key: item.media_key };
+          });
         if (imageItems.length > 0) {
           imageBundles.push({ round: rounds[index], items: imageItems });
         }
@@ -3259,16 +3228,12 @@ export function EventDetailPage() {
       }
       const locationName = locations.find((location) => location.id === event.location_id)?.name ?? '';
 
-      const imageSheetBytes = await buildImageSheetsPdf(event, imageBundles, async (mediaKey) => {
+      const imageSheetBytes = await buildImageSheetsPdf(imageBundles, async (mediaKey) => {
         const response = await fetch(api.mediaUrl(mediaKey), { credentials: 'include' });
-        if (!response.ok) return null;
+        if (!response.ok) throw new Error(`Image download failed (HTTP ${response.status}).`);
         const blob = await response.blob();
-        if (!blob || blob.size === 0) return null;
-        const jpegBytes = await blobToImageSheetJpeg(blob);
-        return {
-          bytes: jpegBytes,
-          contentType: 'image/jpeg'
-        };
+        if (blob.size === 0) return null;
+        return blobToImageSheetJpeg(blob);
       });
 
       const baseName = buildEventDocumentBaseName(event, locationName);
